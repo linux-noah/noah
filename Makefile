@@ -9,7 +9,7 @@ run: build/noah
 	./build/noah
 
 clean:
-	rm -rf src/*.o
-	rm -rf build/noah
+	$(RM) -r src/*.o
+	$(RM) -r build/noah
 
 .PHONY: all run clean
