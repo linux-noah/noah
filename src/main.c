@@ -6,17 +6,11 @@
 #include <Hypervisor/hv_vmx.h>
 
 /*
- mov rax, rbx
- vmcall
+  # intel sytnax
+  add ax, bx
+  vmcall
  */
-/* const unsigned char text[] = "\x48\x89\xd8\x0f\x01\xc1"; */
-/*
- mov ax, bx
- vmcall
- */
-/* const unsigned char text[] = "\x66\x89\xd8\x0f\x01\xc1"; */
-/* const unsigned char text[] = "\x0f\x01\xc1"; */
-const unsigned char text[] = "\x66\xb8\x00\x00\x0f\x01\xc1";
+const unsigned char text[] = "\x66\x01\xd8\x0f\x01\x01";
 
 void
 init_cpu(hv_vcpuid_t vcpuid)
@@ -34,7 +28,7 @@ init_cpu(hv_vcpuid_t vcpuid)
 #define VMCS_PRI_PROC_BASED_CTLS_CR8_LOAD      (1 << 19)
 #define VMCS_PRI_PROC_BASED_CTLS_CR8_STORE     (1 << 20)
 
-#define cap2ctrl(cap,ctrl) ((ctrl | (cap & 0xffffffff)) & (cap >> 32))
+#define cap2ctrl(cap,ctrl) (((ctrl) | ((cap) & 0xffffffff)) & ((cap) >> 32))
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_PIN_BASED, cap2ctrl(vmx_cap_pinbased, 0));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CPU_BASED, cap2ctrl(vmx_cap_procbased,
@@ -132,14 +126,6 @@ run(void)
 
   puts("successfully created the vm");
 
-  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
-  if (ret != HV_SUCCESS) {
-    printf("could not create a vcpu: error code %x", ret);
-    return;
-  }
-
-  puts("successfully created a vcpu");
-
   mem = valloc(1 * 1024 * 1024);
   assert(mem);
   memcpy((char *)mem + 0x100, text, sizeof text);
@@ -154,6 +140,14 @@ run(void)
 
   puts("successfully created a memory mapping");
 
+  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    printf("could not create a vcpu: error code %x", ret);
+    return;
+  }
+
+  puts("successfully created a vcpu");
+
   init_cpu(vcpuid);
 
   hv_vcpu_write_register(vcpuid, HV_X86_RIP, 0x100);
@@ -164,27 +158,29 @@ run(void)
 
   puts("now vm is ready");
 
-  hv_vcpu_write_register(vcpuid, HV_X86_RAX, 42);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBX, 0);
+  hv_vcpu_write_register(vcpuid, HV_X86_RAX, 1);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBX, 2);
 
   print_regs(vcpuid);
 
-  ret = hv_vcpu_run(vcpuid);
-  if (ret != HV_SUCCESS) {
-    puts("oops");
-    return;
+  for (int i = 0; i < 3; ++i) {
+    if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
+      puts("oops");
+      return;
+    }
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
+    printf("exit reason = 0x%llx\n", value);
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
+    printf("exit qualification = 0x%llx\n", value);
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
+    printf("guest-physical address = 0x%llx\n", value);
+
+    print_regs(vcpuid);
+    puts("");
   }
-
-  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
-  printf("exit reason = 0x%llx\n", value);
-
-  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
-  printf("exit qualification = 0x%llx\n", value);
-
-  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-  printf("guest-physical address = 0x%llx\n", value);
-
-  print_regs(vcpuid);
 
   puts("exit...");
 
