@@ -4,16 +4,14 @@
 #include <assert.h>
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
+#include "page.h"
+#include "segment.h"
 
-/*
-  # intel sytnax
-  add ax, bx
-  vmcall
- */
-const unsigned char text[] = "\x66\x01\xd8\x0f\x01\x01";
+extern char injected[];
+extern char injected_end[];
 
 void
-init_cpu(hv_vcpuid_t vcpuid)
+init_vmcs(hv_vcpuid_t vcpuid)
 {
   uint64_t vmx_cap_pinbased, vmx_cap_procbased, vmx_cap_procbased2, vmx_cap_entry;
 
@@ -38,63 +36,113 @@ init_cpu(hv_vcpuid_t vcpuid)
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CPU_BASED2, cap2ctrl(vmx_cap_procbased2, 0));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_VMENTRY_CONTROLS, cap2ctrl(vmx_cap_entry, 0));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_EXC_BITMAP, 0xffffffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR0_MASK, 0x60000000);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR0_SHADOW, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_MASK, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_SHADOW, 0);
 
-  /* set up cpu regs */
+}
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_AR, 0x9b);
+void
+init_page(hv_vcpuid_t vcpuid, void *mem)
+{
+  static const uint32_t entrypgdir[1024] = {
+    // Map VA's [0, 4MB) to PA's [0, 4MB)
+    // Map VA's [4MB, 8MB) to PA's [0, 4MB)
+    [1] = 0 | PTE_P | PTE_W | PTE_PS,
+  };
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_AR, 0x93);
+  memcpy((char *)mem + 0x3000, entrypgdir, sizeof entrypgdir);
+  uint64_t cr4;
+  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PSE | CR4_VMXE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_AR, 0x93);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, 0x3000);
+  
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+}
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_AR, 0x93);
+void
+init_segment(hv_vcpuid_t vcpuid, void *mem)
+{
+  // init segment
+  static struct segment_descriptor gdt[] = {
+    { .sd_lolimit = 0, .sd_type = 0, /* NULL */
+      .sd_p = 0, .sd_hilimit = 0, .sd_def32 = 0, .sd_gran = 0},
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_AR, 0x93);
+    { .sd_lolimit = 0xffff, .sd_type = SDT_MEMER, /* CODE */
+      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 }, 
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_LIMIT, 0xffff);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_AR, 0x93);
+    { .sd_lolimit = 0xffff, .sd_type = SDT_MEMRW, /* DATA */
+      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 },
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR, 0);
+    { .sd_lolimit = I386_TSS_SIZE - 1, /* TSS */
+      .sd_type = SDT_SYS386TSS, .sd_p = 1 }
+  };
+  uint64_t gdt_physaddr = 0x1000;
+  uint64_t tss_physaddr = gdt_physaddr + 1000; // 0x2000
+  gdt[3].sd_lobase = tss_physaddr;	
+  memcpy((char *)mem + 0x1000, &gdt, sizeof(gdt));
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, gdt_physaddr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, sizeof(gdt) - 1);
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, tss_physaddr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_LIMIT, I386_TSS_SIZE - 1);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_AR, DESC_PRESENT | SDT_SYS386BSY);
+
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_BASE, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_AR, 0x10000);
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_AR, 0x83);
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, 0);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, 0x20);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, 0x0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, 0x2000);
+  uint32_t codeseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMERA;
+  uint32_t dataseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMRWA;
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_AR, codeseg_ar);
 
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_AR, dataseg_ar);
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_AR, dataseg_ar);
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_AR, dataseg_ar);
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_AR, dataseg_ar);
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_AR, dataseg_ar);
+
+  hv_vcpu_write_register(vcpuid, HV_X86_CS, GSEL(SEG_CODE, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_DS, GSEL(SEG_DATA, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_ES, GSEL(SEG_DATA, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_FS, GSEL(SEG_DATA, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_GS, GSEL(SEG_DATA, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_SS, GSEL(SEG_DATA, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_TR, GSEL(SEG_TSS, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_LDTR, 0);
+}
+
+void
+init_regs(hv_vcpuid_t vcpuid)
+{
+  /* set up cpu regs */
   hv_vcpu_write_register(vcpuid, HV_X86_RFLAGS, 0x2);
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x0);
 }
@@ -126,13 +174,11 @@ run(void)
 
   puts("successfully created the vm");
 
-  mem = valloc(1 * 1024 * 1024);
+  mem = valloc(0x100000);
   assert(mem);
-  memcpy((char *)mem + 0x100, text, sizeof text);
+  memcpy((char *)mem + 0x100, injected, injected_end - injected);
 
-  assert(((char *)mem)[0x100] == text[0]);
-
-  ret = hv_vm_map(mem, 0, 1 * 1024 * 1024, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  ret = hv_vm_map(mem, 0, 0x100000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
     printf("could not map a memory region: error code %x", ret);
     return;
@@ -148,9 +194,12 @@ run(void)
 
   puts("successfully created a vcpu");
 
-  init_cpu(vcpuid);
+  init_vmcs(vcpuid);
+  init_segment(vcpuid, mem);
+  init_page(vcpuid, mem);
+  init_regs(vcpuid);
 
-  hv_vcpu_write_register(vcpuid, HV_X86_RIP, 0x100);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, 0x400100);
 
   puts("successfully set regs");
 
@@ -163,7 +212,7 @@ run(void)
 
   print_regs(vcpuid);
 
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < 5; ++i) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
       puts("oops");
       return;
@@ -177,6 +226,9 @@ run(void)
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
     printf("guest-physical address = 0x%llx\n", value);
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
+    printf("guest-rip = 0x%llx\n", value);
 
     print_regs(vcpuid);
     puts("");
