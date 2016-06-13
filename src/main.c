@@ -46,7 +46,6 @@ void
 init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr)
 {
   static const uint32_t entrypgdir[1024] = {
-    // Map VA's [0, 4MB) to PA's [0, 4MB)
     // Map VA's [4MB, 8MB) to PA's [0, 4MB)
     [1] = 0 | PTE_P | PTE_W | PTE_PS,
   };
