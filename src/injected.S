@@ -3,7 +3,7 @@
 .text
 .globl _injected
 _injected:
-  add %bx, %ax
+  add %ebx, %eax
   vmcall
 .globl _injected_end
 _injected_end:

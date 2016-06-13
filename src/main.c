@@ -43,26 +43,33 @@ init_vmcs(hv_vcpuid_t vcpuid)
 }
 
 void
-init_page(hv_vcpuid_t vcpuid, void *mem)
+init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr)
 {
   static const uint32_t entrypgdir[1024] = {
     // Map VA's [0, 4MB) to PA's [0, 4MB)
     // Map VA's [4MB, 8MB) to PA's [0, 4MB)
     [1] = 0 | PTE_P | PTE_W | PTE_PS,
   };
+  void *mem = valloc(sizeof entrypgdir);
+  memcpy(mem, entrypgdir, sizeof entrypgdir);
 
-  memcpy((char *)mem + 0x3000, entrypgdir, sizeof entrypgdir);
+  hv_return_t ret = hv_vm_map(mem, pgdir_addr, sizeof entrypgdir, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  if (ret != HV_SUCCESS) {
+    printf("could not map a page map region: error code %x", ret);
+    return;
+  }
+
   uint64_t cr4;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PSE | CR4_VMXE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, 0x3000);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, pgdir_addr);
   
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
 }
 
 void
-init_segment(hv_vcpuid_t vcpuid, void *mem)
+init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
 {
   // init segment
   static struct segment_descriptor gdt[] = {
@@ -78,15 +85,22 @@ init_segment(hv_vcpuid_t vcpuid, void *mem)
     { .sd_lolimit = I386_TSS_SIZE - 1, /* TSS */
       .sd_type = SDT_SYS386TSS, .sd_p = 1 }
   };
-  uint64_t gdt_physaddr = 0x1000;
-  uint64_t tss_physaddr = gdt_physaddr + 1000; // 0x2000
-  gdt[3].sd_lobase = tss_physaddr;	
-  memcpy((char *)mem + 0x1000, &gdt, sizeof(gdt));
+  uint64_t tss_addr = gdt_addr + 1000; // 0x2000
+  gdt[3].sd_lobase = tss_addr;	
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, gdt_physaddr);
+  void *mem = valloc(0x2000);
+  memcpy(mem, &gdt, sizeof(gdt));
+
+  hv_return_t ret = hv_vm_map(mem, gdt_addr, 0x2000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  if (ret != HV_SUCCESS) {
+    printf("could not map a gdt region: error code %x", ret);
+    return;
+  }
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, gdt_addr);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, sizeof(gdt) - 1);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, tss_physaddr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, tss_addr);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_LIMIT, I386_TSS_SIZE - 1);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_AR, DESC_PRESENT | SDT_SYS386BSY);
 
@@ -174,17 +188,17 @@ run(void)
 
   puts("successfully created the vm");
 
-  mem = valloc(0x100000);
+  mem = valloc(0x1000);
   assert(mem);
   memcpy((char *)mem + 0x100, injected, injected_end - injected);
 
-  ret = hv_vm_map(mem, 0, 0x100000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  ret = hv_vm_map(mem, 0, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    printf("could not map a memory region: error code %x", ret);
+    printf("could not map a text region: error code %x", ret);
     return;
   }
 
-  puts("successfully created a memory mapping");
+  puts("successfully created a text mapping");
 
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
@@ -195,8 +209,8 @@ run(void)
   puts("successfully created a vcpu");
 
   init_vmcs(vcpuid);
-  init_segment(vcpuid, mem);
-  init_page(vcpuid, mem);
+  init_segment(vcpuid, 0x1000);
+  init_page(vcpuid, 0x3000);
   init_regs(vcpuid);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, 0x400100);
