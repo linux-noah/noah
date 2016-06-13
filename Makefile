@@ -1,9 +1,10 @@
+ASFLAGS += -m32
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
-all: build/noah
+all: src/injected.o build/noah
 
-build/noah: src/main.o src/injected.o
+build/noah: src/main.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 run: build/noah

@@ -2,13 +2,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
+#include <Hypervisor/hv_arch_vmx.h>
 #include "page.h"
 #include "segment.h"
 
-extern char injected[];
-extern char injected_end[];
+const char text[] =
+  /* _injected: */
+  "\xb8\x04\x00\x00\x00"        /* mov $4, eax */
+  "\xbb\x01\x00\x00\x00"        /* mov $1, ebx */
+  "\xba\x0d\x00\x00\x00"        /* mov $13, edx */
+  "\x8d\x0d\x1a\x00\x00\x00"    /* lea _msg, ecx */
+  "\x0f\x01\xc1"                /* vmcall */
+  "\xeb\xe6"                    /* jmp _injected */
+  /* _msg: */
+  "\x68\x65\x6c\x6c\x6f\x2c\x20\x77\x6f\x72\x6c\x64\x21"
+  ;
 
 void
 init_vmcs(hv_vcpuid_t vcpuid)
@@ -166,9 +177,9 @@ print_regs(hv_vcpuid_t vcpuid)
   uint64_t value;
 
   hv_vcpu_read_register(vcpuid, HV_X86_RAX, &value);
-  printf("rax = %llx\n", value);
+  printf("rax = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBX, &value);
-  printf("rbx = %llx\n", value);
+  printf("rbx = 0x%llx\n", value);
 }
 
 void
@@ -189,7 +200,7 @@ run(void)
 
   mem = valloc(0x1000);
   assert(mem);
-  memcpy((char *)mem + 0x100, injected, injected_end - injected);
+  memcpy((char *)mem + 0x100, text, sizeof text);
 
   ret = hv_vm_map(mem, 0, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
@@ -234,6 +245,21 @@ run(void)
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
     printf("exit reason = 0x%llx\n", value);
 
+    print_regs(vcpuid);
+
+    switch (value) {
+      uint64_t rax, rbx, rcx, rdx;
+
+    case VMX_REASON_VMCALL:
+      hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
+      hv_vcpu_read_register(vcpuid, HV_X86_RBX, &rbx);
+      hv_vcpu_read_register(vcpuid, HV_X86_RCX, &rcx);
+      hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
+      assert(rax == 4);
+      write(rbx, (char *)text + rcx, rdx);
+      break;
+    }
+
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
     printf("exit qualification = 0x%llx\n", value);
 
@@ -243,7 +269,6 @@ run(void)
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
     printf("guest-rip = 0x%llx\n", value);
 
-    print_regs(vcpuid);
     puts("");
   }
 

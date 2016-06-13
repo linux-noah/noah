@@ -1,11 +1,16 @@
-
-.align 4
-.text
-.globl _injected
+        .align 4
+        .text
+        .globl _injected
 _injected:
-  add %ebx, %eax
-  vmcall
-.globl _injected_end
+        mov $4, %eax            # write
+        mov $1, %ebx
+        mov $13, %edx
+        lea _msg, %ecx
+        vmcall
+        jmp _injected
+_msg:
+        .ascii "hello, world!"
+        .globl _injected_end
 _injected_end:
 
 
