@@ -74,7 +74,7 @@ init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr)
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PSE | CR4_VMXE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, pgdir_addr);
-  
+
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
 }
 
@@ -87,7 +87,7 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
       .sd_p = 0, .sd_hilimit = 0, .sd_def32 = 0, .sd_gran = 0},
 
     { .sd_lolimit = 0xffff, .sd_type = SDT_MEMER, /* CODE */
-      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 }, 
+      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 },
 
     { .sd_lolimit = 0xffff, .sd_type = SDT_MEMRW, /* DATA */
       .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 },
@@ -96,7 +96,7 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
       .sd_type = SDT_SYS386TSS, .sd_p = 1 }
   };
   uint64_t tss_addr = gdt_addr + 1000; // 0x2000
-  gdt[3].sd_lobase = tss_addr;	
+  gdt[3].sd_lobase = tss_addr;
 
   void *mem = valloc(0x2000);
   memcpy(mem, &gdt, sizeof(gdt));
