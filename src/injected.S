@@ -6,7 +6,7 @@ _injected:
         mov $1, %ebx
         mov $13, %edx
         lea _msg, %ecx
-        vmcall
+        sysenter
         jmp _injected
 _msg:
         .ascii "hello, world!"

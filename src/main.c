@@ -14,9 +14,9 @@ const char text[] =
   "\xb8\x04\x00\x00\x00"        /* mov $4, eax */
   "\xbb\x01\x00\x00\x00"        /* mov $1, ebx */
   "\xba\x0d\x00\x00\x00"        /* mov $13, edx */
-  "\x8d\x0d\x1a\x00\x00\x00"    /* lea _msg, ecx */
-  "\x0f\x01\xc1"                /* vmcall */
-  "\xeb\xe6"                    /* jmp _injected */
+  "\x8d\x0d\x19\x00\x00\x00"    /* lea _msg, ecx */
+  "\x0f\x34"                    /* sysenter */
+  "\xeb\xe7"                    /* jmp _injected */
   /* _msg: */
   "\x68\x65\x6c\x6c\x6f\x2c\x20\x77\x6f\x72\x6c\x64\x21"
   ;
@@ -168,7 +168,8 @@ init_regs(hv_vcpuid_t vcpuid)
 {
   /* set up cpu regs */
   hv_vcpu_write_register(vcpuid, HV_X86_RFLAGS, 0x2);
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x0);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x400100);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBP, 0x400100);
 }
 
 void
@@ -180,6 +181,14 @@ print_regs(hv_vcpuid_t vcpuid)
   printf("rax = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBX, &value);
   printf("rbx = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RCX, &value);
+  printf("rcx = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RDX, &value);
+  printf("rdx = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RSP, &value);
+  printf("rsp = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
+  printf("rbp = 0x%llx\n", value);
 }
 
 void
@@ -251,13 +260,33 @@ run(void)
       uint64_t rax, rbx, rcx, rdx;
 
     case VMX_REASON_VMCALL:
+      puts("reason: vmcall");
+      assert(false);
+      break;
+
+    case VMX_REASON_EXC_NMI:
+      puts("reason: exc or nmi");
+      puts("");
+      hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
+      printf("idt info = %lld\n", value);
+      hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
+      printf("idt error = %lld\n", value);
+      hv_vcpu_read_register(vcpuid, VMCS_GUEST_INT_STATUS, &value);
+      printf("guest int status = %lld\n", value);
+      puts("!!DEFINITELY A SYSENTER!!");
+      puts(">>>start syscall handling...");
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
       hv_vcpu_read_register(vcpuid, HV_X86_RBX, &rbx);
       hv_vcpu_read_register(vcpuid, HV_X86_RCX, &rcx);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
       assert(rax == 4);
       write(rbx, (char *)text + rcx, rdx);
+      puts("<<<done");
+
       break;
+
+    default:
+      printf("reason: %lld\n", value);
     }
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
