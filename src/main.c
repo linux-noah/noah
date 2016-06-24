@@ -8,6 +8,7 @@
 #include <Hypervisor/hv_arch_vmx.h>
 #include "page.h"
 #include "segment.h"
+#include "idt.h"
 
 const char text[] =
   /* _injected: */
@@ -118,9 +119,6 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, 0);
-
   uint32_t codeseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMERA;
   uint32_t dataseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMRWA;
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS, 0);
@@ -161,6 +159,21 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
   hv_vcpu_write_register(vcpuid, HV_X86_SS, GSEL(SEG_DATA, 0));
   hv_vcpu_write_register(vcpuid, HV_X86_TR, GSEL(SEG_TSS, 0));
   hv_vcpu_write_register(vcpuid, HV_X86_LDTR, 0);
+}
+
+struct gate_desc idt[256];
+
+void
+init_idt(hv_vcpuid_t vcpuid, uint64_t idt_addr)
+{
+  hv_return_t ret = hv_vm_map(idt, idt_addr, sizeof idt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  if (ret != HV_SUCCESS) {
+    printf("could not map a idt region: error code %x", ret);
+    return;
+  }
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, idt_addr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
 }
 
 void
@@ -230,6 +243,7 @@ run(void)
   init_vmcs(vcpuid);
   init_segment(vcpuid, 0x1000);
   init_page(vcpuid, 0x3000);
+  init_idt(vcpuid, 0x4000);
   init_regs(vcpuid);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, 0x400100);
