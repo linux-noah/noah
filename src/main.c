@@ -6,21 +6,16 @@
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
+
+typedef unsigned char uchar;
+typedef unsigned short ushort;
+typedef unsigned int uint;
+typedef unsigned long ulong;
+
 #include "page.h"
 #include "segment.h"
 #include "idt.h"
-
-const char text[] =
-  /* _injected: */
-  "\xb8\x04\x00\x00\x00"        /* mov $4, eax */
-  "\xbb\x01\x00\x00\x00"        /* mov $1, ebx */
-  "\xba\x0d\x00\x00\x00"        /* mov $13, edx */
-  "\x8d\x0d\x19\x00\x00\x00"    /* lea _msg, ecx */
-  "\x0f\x34"                    /* sysenter */
-  "\xeb\xe7"                    /* jmp _injected */
-  /* _msg: */
-  "\x68\x65\x6c\x6c\x6f\x2c\x20\x77\x6f\x72\x6c\x64\x21"
-  ;
+#include "elf.h"
 
 void
 init_vmcs(hv_vcpuid_t vcpuid)
@@ -205,7 +200,7 @@ print_regs(hv_vcpuid_t vcpuid)
 }
 
 void
-run(void)
+run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 {
   hv_return_t ret;
   hv_vcpuid_t vcpuid;
@@ -222,7 +217,7 @@ run(void)
 
   mem = valloc(0x1000);
   assert(mem);
-  memcpy((char *)mem + 0x100, text, sizeof text);
+  memcpy((char *)mem + 0x100, text, tsize);
 
   ret = hv_vm_map(mem, 0, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
@@ -246,7 +241,7 @@ run(void)
   init_idt(vcpuid, 0x4000);
   init_regs(vcpuid);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, 0x400100);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry - vaddr + 0x400100);
 
   puts("successfully set regs");
 
@@ -287,14 +282,23 @@ run(void)
       printf("idt error = %lld\n", value);
       hv_vcpu_read_register(vcpuid, VMCS_GUEST_INT_STATUS, &value);
       printf("guest int status = %lld\n", value);
-      puts("!!DEFINITELY A SYSENTER!!");
+      puts("!!MAYBE A SYSENTER!!");
       puts(">>>start syscall handling...");
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
       hv_vcpu_read_register(vcpuid, HV_X86_RBX, &rbx);
       hv_vcpu_read_register(vcpuid, HV_X86_RCX, &rcx);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
-      assert(rax == 4);
-      write(rbx, (char *)text + rcx, rdx);
+      switch (rax) {
+      case 1:
+        exit(rbx);
+        break;
+      case 4:
+        write(rbx, rcx - vaddr + (char *)text, rdx);
+        break;
+      default:
+        printf("UNKNOWN SYSCALL!: %lld\n", rax);
+        abort();
+      }
       puts("<<<done");
 
       break;
@@ -339,7 +343,38 @@ run(void)
 int
 main(int argc, char *argv[])
 {
-  run();
+  assert(argc == 2);
+
+  FILE *file = fopen(argv[1], "r");
+  struct elf_header h;
+  struct program_header p;
+
+  fread(&h, sizeof h, 1, file);
+
+  printf("magic: 0x%08x\n", h.magic);
+  printf("size: %d\n", h.ehsize);
+  printf("entry: 0x%08x\n", h.entry);
+
+  assert(h.phoff != 0);
+  assert(h.phnum == 1);
+
+  fseek(file, h.phoff, SEEK_SET);
+  fread(&p, sizeof p, 1, file);
+
+  puts("# program header");
+
+  printf("vaddr = 0x%08x\n", p.vaddr);
+  printf("paddr = 0x%08x\n", p.paddr);
+  printf("type = %ul\n", p.type);
+  printf("filesz = 0x%x\n", p.filesz);
+  printf("offset = 0x%x\n", p.offset);
+
+  char *text = malloc(p.filesz);
+
+  fseek(file, p.offset, SEEK_SET);
+  fread(text, p.filesz, 1, file);
+
+  run(text, p.filesz, p.vaddr, h.entry);
 
   return 0;
 }
