@@ -301,6 +301,9 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
       }
       puts("<<<done");
 
+      hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
+      hv_vcpu_write_register(vcpuid, HV_X86_RIP, value + 2);
+
       break;
 
     default:
