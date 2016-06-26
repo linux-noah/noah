@@ -4,6 +4,9 @@ LDFLAGS += -framework Hypervisor
 
 all: build/noah
 
+dev: CFLAGS += -DDEBUG_MODE=1
+dev: build/noah
+
 build/noah: src/main.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 

@@ -17,6 +17,14 @@ typedef unsigned long ulong;
 #include "idt.h"
 #include "elf.h"
 
+#if DEBUG_MODE
+#define PUTS(...) puts(__VA_ARGS__)
+#define PRINTF(...) printf(__VA_ARGS__)
+#else
+#define PUTS(...) 0
+#define PRINTF(...) 0
+#endif
+
 void
 init_vmcs(hv_vcpuid_t vcpuid)
 {
@@ -61,7 +69,7 @@ init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr)
 
   hv_return_t ret = hv_vm_map(mem, pgdir_addr, sizeof entrypgdir, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    printf("could not map a page map region: error code %x", ret);
+    PRINTF("could not map a page map region: error code %x", ret);
     return;
   }
 
@@ -99,7 +107,7 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
 
   hv_return_t ret = hv_vm_map(mem, gdt_addr, 0x2000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    printf("could not map a gdt region: error code %x", ret);
+    PRINTF("could not map a gdt region: error code %x", ret);
     return;
   }
 
@@ -163,7 +171,7 @@ init_idt(hv_vcpuid_t vcpuid, uint64_t idt_addr)
 {
   hv_return_t ret = hv_vm_map(idt, idt_addr, sizeof idt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    printf("could not map a idt region: error code %x", ret);
+    PRINTF("could not map a idt region: error code %x", ret);
     return;
   }
 
@@ -186,17 +194,17 @@ print_regs(hv_vcpuid_t vcpuid)
   uint64_t value;
 
   hv_vcpu_read_register(vcpuid, HV_X86_RAX, &value);
-  printf("rax = 0x%llx\n", value);
+  PRINTF("rax = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBX, &value);
-  printf("rbx = 0x%llx\n", value);
+  PRINTF("rbx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RCX, &value);
-  printf("rcx = 0x%llx\n", value);
+  PRINTF("rcx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDX, &value);
-  printf("rdx = 0x%llx\n", value);
+  PRINTF("rdx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RSP, &value);
-  printf("rsp = 0x%llx\n", value);
+  PRINTF("rsp = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
-  printf("rbp = 0x%llx\n", value);
+  PRINTF("rbp = 0x%llx\n", value);
 }
 
 void
@@ -209,11 +217,11 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printf("could not create the vm: error code %x", ret);
+    PRINTF("could not create the vm: error code %x", ret);
     return;
   }
 
-  puts("successfully created the vm");
+  PUTS("successfully created the vm");
 
   mem = valloc(0x1000);
   assert(mem);
@@ -221,19 +229,19 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   ret = hv_vm_map(mem, 0, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    printf("could not map a text region: error code %x", ret);
+    PRINTF("could not map a text region: error code %x", ret);
     return;
   }
 
-  puts("successfully created a text mapping");
+  PUTS("successfully created a text mapping");
 
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printf("could not create a vcpu: error code %x", ret);
+    PRINTF("could not create a vcpu: error code %x", ret);
     return;
   }
 
-  puts("successfully created a vcpu");
+  PUTS("successfully created a vcpu");
 
   init_vmcs(vcpuid);
   init_segment(vcpuid, 0x1000);
@@ -243,11 +251,11 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry - vaddr + 0x400100);
 
-  puts("successfully set regs");
+  PUTS("successfully set regs");
 
   /* now vm is ready */
 
-  puts("now vm is ready");
+  PUTS("now vm is ready");
 
   hv_vcpu_write_register(vcpuid, HV_X86_RAX, 1);
   hv_vcpu_write_register(vcpuid, HV_X86_RBX, 2);
@@ -256,12 +264,12 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   for (int i = 0; i < 5; ++i) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
-      puts("oops");
+      PUTS("oops");
       return;
     }
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
-    printf("exit reason = 0x%llx\n", value);
+    PRINTF("exit reason = 0x%llx\n", value);
 
     print_regs(vcpuid);
 
@@ -269,37 +277,38 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
       uint64_t rax, rbx, rcx, rdx;
 
     case VMX_REASON_VMCALL:
-      puts("reason: vmcall");
+      PUTS("reason: vmcall");
       assert(false);
       break;
 
     case VMX_REASON_EXC_NMI:
-      puts("reason: exc or nmi");
-      puts("");
+      PUTS("reason: exc or nmi");
+      PUTS("");
       hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
-      printf("idt info = %lld\n", value);
+      PRINTF("idt info = %lld\n", value);
       hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
-      printf("idt error = %lld\n", value);
+      PRINTF("idt error = %lld\n", value);
       hv_vcpu_read_register(vcpuid, VMCS_GUEST_INT_STATUS, &value);
-      printf("guest int status = %lld\n", value);
-      puts("!!MAYBE A SYSENTER!!");
-      puts(">>>start syscall handling...");
+      PRINTF("guest int status = %lld\n", value);
+      PUTS("!!MAYBE A SYSENTER!!");
+      PUTS(">>>start syscall handling...");
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
       hv_vcpu_read_register(vcpuid, HV_X86_RBX, &rbx);
       hv_vcpu_read_register(vcpuid, HV_X86_RCX, &rcx);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
       switch (rax) {
       case 1:
+        PUTS("exit...");
         exit(rbx);
         break;
       case 4:
         write(rbx, rcx - vaddr + (char *)text, rdx);
         break;
       default:
-        printf("UNKNOWN SYSCALL!: %lld\n", rax);
+        PRINTF("UNKNOWN SYSCALL!: %lld\n", rax);
         abort();
       }
-      puts("<<<done");
+      PUTS("<<<done");
 
       hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
       hv_vcpu_write_register(vcpuid, HV_X86_RIP, value + 2);
@@ -307,40 +316,40 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
       break;
 
     default:
-      printf("reason: %lld\n", value);
+      PRINTF("reason: %lld\n", value);
     }
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
-    printf("exit qualification = 0x%llx\n", value);
+    PRINTF("exit qualification = 0x%llx\n", value);
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-    printf("guest-physical address = 0x%llx\n", value);
+    PRINTF("guest-physical address = 0x%llx\n", value);
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
-    printf("guest-rip = 0x%llx\n", value);
+    PRINTF("guest-rip = 0x%llx\n", value);
 
-    puts("");
+    PUTS("");
   }
 
-  puts("exit...");
+  PUTS("exit...");
 
   /* exit... */
 
   ret = hv_vcpu_destroy(vcpuid);
   if (ret != HV_SUCCESS) {
-    printf("could not destroy the vcpu: error code %x", ret);
+    PRINTF("could not destroy the vcpu: error code %x", ret);
     return;
   }
 
-  puts("successfully destroyed the vcpu");
+  PUTS("successfully destroyed the vcpu");
 
   ret = hv_vm_destroy();
   if (ret != HV_SUCCESS) {
-    printf("could not destroy the vm: error code %x", ret);
+    PRINTF("could not destroy the vm: error code %x", ret);
     return;
   }
 
-  puts("successfully destroyed the vm");
+  PUTS("successfully destroyed the vm");
 }
 
 int
@@ -354,9 +363,9 @@ main(int argc, char *argv[])
 
   fread(&h, sizeof h, 1, file);
 
-  printf("magic: 0x%08x\n", h.magic);
-  printf("size: %d\n", h.ehsize);
-  printf("entry: 0x%08x\n", h.entry);
+  PRINTF("magic: 0x%08x\n", h.magic);
+  PRINTF("size: %d\n", h.ehsize);
+  PRINTF("entry: 0x%08x\n", h.entry);
 
   assert(h.phoff != 0);
   assert(h.phnum == 1);
@@ -364,13 +373,13 @@ main(int argc, char *argv[])
   fseek(file, h.phoff, SEEK_SET);
   fread(&p, sizeof p, 1, file);
 
-  puts("# program header");
+  PUTS("# program header");
 
-  printf("vaddr = 0x%08x\n", p.vaddr);
-  printf("paddr = 0x%08x\n", p.paddr);
-  printf("type = %ul\n", p.type);
-  printf("filesz = 0x%x\n", p.filesz);
-  printf("offset = 0x%x\n", p.offset);
+  PRINTF("vaddr = 0x%08x\n", p.vaddr);
+  PRINTF("paddr = 0x%08x\n", p.paddr);
+  PRINTF("type = %ul\n", p.type);
+  PRINTF("filesz = 0x%x\n", p.filesz);
+  PRINTF("offset = 0x%x\n", p.offset);
 
   char *text = malloc(p.filesz);
 
