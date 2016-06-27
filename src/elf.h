@@ -8,9 +8,9 @@ struct elf_header {
   ushort type;
   ushort isa;
   uint version2;
-  uint entry;
-  uint phoff;
-  uint shoff;
+  ulong entry;
+  ulong phoff;
+  ulong shoff;
   uint flags;
   ushort ehsize;
   ushort phentsize;
@@ -24,24 +24,24 @@ struct elf_header {
 
 struct program_header {
   uint type;
-  uint offset;
-  uint vaddr;
-  uint paddr;
-  uint filesz;
-  uint memsz;
   uint flags;
-  uint align;
+  ulong offset;
+  ulong vaddr;
+  ulong paddr;
+  ulong filesz;
+  ulong memsz;
+  ulong align;
 };
 
 struct section_header {
   uint name;
   uint type;
-  uint flags;
-  uint addr;
-  uint offset;
-  uint size;
+  ulong flags;
+  ulong addr;
+  ulong offset;
+  ulong size;
   uint link;
   uint info;
-  uint align;
-  uint entsize;
+  ulong align;
+  ulong entsize;
 };

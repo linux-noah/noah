@@ -16,6 +16,7 @@ typedef unsigned long ulong;
 #include "segment.h"
 #include "idt.h"
 #include "elf.h"
+#include "msr.h"
 
 #if DEBUG_MODE
 #define PUTS(...) puts(__VA_ARGS__)
@@ -28,130 +29,143 @@ typedef unsigned long ulong;
 void
 init_vmcs(hv_vcpuid_t vcpuid)
 {
-  uint64_t vmx_cap_pinbased, vmx_cap_procbased, vmx_cap_procbased2, vmx_cap_entry;
+  uint64_t vmx_cap_pinbased, vmx_cap_procbased, vmx_cap_procbased2, vmx_cap_entry, vmx_cap_exit;
 
   hv_vmx_read_capability(HV_VMX_CAP_PINBASED, &vmx_cap_pinbased);
   hv_vmx_read_capability(HV_VMX_CAP_PROCBASED, &vmx_cap_procbased);
   hv_vmx_read_capability(HV_VMX_CAP_PROCBASED2, &vmx_cap_procbased2);
   hv_vmx_read_capability(HV_VMX_CAP_ENTRY, &vmx_cap_entry);
+  hv_vmx_read_capability(HV_VMX_CAP_EXIT, &vmx_cap_exit);
 
-  /* set up vmcs */
-
-#define VMCS_PRI_PROC_BASED_CTLS_HLT           (1 << 7)
-#define VMCS_PRI_PROC_BASED_CTLS_CR8_LOAD      (1 << 19)
-#define VMCS_PRI_PROC_BASED_CTLS_CR8_STORE     (1 << 20)
+  /* set up vmcs misc */
 
 #define cap2ctrl(cap,ctrl) (((ctrl) | ((cap) & 0xffffffff)) & ((cap) >> 32))
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_PIN_BASED, cap2ctrl(vmx_cap_pinbased, 0));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CPU_BASED, cap2ctrl(vmx_cap_procbased,
-                                                 VMCS_PRI_PROC_BASED_CTLS_HLT |
-                                                 VMCS_PRI_PROC_BASED_CTLS_CR8_LOAD |
-                                                 VMCS_PRI_PROC_BASED_CTLS_CR8_STORE));
+                                                 CPU_BASED_HLT |
+                                                 CPU_BASED_CR8_LOAD |
+                                                 CPU_BASED_CR8_STORE));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CPU_BASED2, cap2ctrl(vmx_cap_procbased2, 0));
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_VMENTRY_CONTROLS, cap2ctrl(vmx_cap_entry, 0));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_VMENTRY_CONTROLS,  cap2ctrl(vmx_cap_entry,
+                                                 VMENTRY_LOAD_EFER |
+                                                 VMENTRY_GUEST_IA32E));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_VMEXIT_CONTROLS, cap2ctrl(vmx_cap_exit, VMEXIT_LOAD_EFER));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_EXC_BITMAP, 0xffffffff);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR0_SHADOW, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_MASK, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_SHADOW, 0);
-
 }
 
 void
-init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr)
+init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr, uint64_t max_size)
 {
-  static const uint32_t entrypgdir[1024] = {
-    // Map VA's [4MB, 8MB) to PA's [0, 4MB)
-    [1] = 0 | PTE_P | PTE_W | PTE_PS,
-  };
-  void *mem = valloc(sizeof entrypgdir);
-  memcpy(mem, entrypgdir, sizeof entrypgdir);
+  if (max_size < 0x4000) {
+    PRINTF("memory region is too short for page initialization\n");
+    return;
+  }
 
-  hv_return_t ret = hv_vm_map(mem, pgdir_addr, sizeof entrypgdir, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  void *mem = valloc(0x4000);
+
+  // Map [0x0, 0x200000] to [0x0, 0x200000]
+  bzero(mem, 0x4000);
+  assert(sizeof (uint64_t[512]) == 0x1000);
+  uint64_t (*lv4_pg_map)[512] = mem;
+  uint64_t (*pdp)[512] = (void*)((char*)mem + 0x1000);
+  uint64_t (*pg)[512] = (void*)((char*)mem + 0x2000);
+  uint64_t (*pt)[512] = (void*)((char*)mem + 0x3000);
+
+  (*lv4_pg_map)[0] = (uint64_t) (pgdir_addr + 0x1000) | PTE_P | PTE_W | PTE_U;
+  (*pdp)[0] = (uint64_t) (pgdir_addr + 0x2000) | PTE_P | PTE_W | PTE_U;
+  (*pg)[0] = (uint64_t) (pgdir_addr + 0x3000) | PTE_P | PTE_W | PTE_U;
+  for (int i = 0; i < 512; i++) {
+      (*pt)[i] = (uint64_t) (0x1000 * i) | PTE_P | PTE_W | PTE_U;
+  }
+
+  hv_return_t ret = hv_vm_map(mem, pgdir_addr, 0x4000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
     PRINTF("could not map a page map region: error code %x", ret);
     return;
   }
 
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+
   uint64_t cr4;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PSE | CR4_VMXE);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_VMXE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, pgdir_addr);
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+  
+  uint64_t efer;
+  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, &efer);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
 }
 
 void
-init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
+init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr, uint64_t max_size)
 {
-  // init segment
-  static struct segment_descriptor gdt[] = {
-    { .sd_lolimit = 0, .sd_type = 0, /* NULL */
-      .sd_p = 0, .sd_hilimit = 0, .sd_def32 = 0, .sd_gran = 0},
+  uint64_t gdt[3];
+  gdt[SEG_NULL] = 0; // NULL SEL
+  gdt[SEG_CODE] = 0x0020980000000000; // CODE SEL
+  gdt[SEG_DATA] = 0x0000900000000000; // DATA SEL
 
-    { .sd_lolimit = 0xffff, .sd_type = SDT_MEMER, /* CODE */
-      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 },
+  if (max_size < sizeof gdt) {
+    PRINTF("memory region is too short for segment initialization\n");
+    return;
+  }
 
-    { .sd_lolimit = 0xffff, .sd_type = SDT_MEMRW, /* DATA */
-      .sd_p = 1, .sd_hilimit = 0xf, .sd_def32 = 1, .sd_gran = 1 },
+  void *mem = valloc(sizeof gdt);
 
-    { .sd_lolimit = I386_TSS_SIZE - 1, /* TSS */
-      .sd_type = SDT_SYS386TSS, .sd_p = 1 }
-  };
-  uint64_t tss_addr = gdt_addr + 1000; // 0x2000
-  gdt[3].sd_lobase = tss_addr;
+  memcpy(mem, &gdt, sizeof gdt);
 
-  void *mem = valloc(0x2000);
-  memcpy(mem, &gdt, sizeof(gdt));
-
-  hv_return_t ret = hv_vm_map(mem, gdt_addr, 0x2000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  hv_return_t ret = hv_vm_map(mem, gdt_addr, sizeof gdt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
     PRINTF("could not map a gdt region: error code %x", ret);
     return;
   }
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, gdt_addr);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, sizeof(gdt) - 1);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, tss_addr);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_LIMIT, I386_TSS_SIZE - 1);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_AR, DESC_PRESENT | SDT_SYS386BSY);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_LIMIT, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_AR, 0x0000008b);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_BASE, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
 
-  uint32_t codeseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMERA;
-  uint32_t dataseg_ar = DESC_GRAN | DESC_DEF32 | DESC_PRESENT | SDT_MEMRWA;
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, 0);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, 0xffff);
+
+  uint32_t codeseg_ar = 0x0000209B;
+  uint32_t dataseg_ar = 0x00000093;
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CS_AR, codeseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_DS_AR, dataseg_ar);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_ES_AR, dataseg_ar);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_AR, dataseg_ar);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_AR, dataseg_ar);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_LIMIT, 0xffffffff);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_LIMIT, 0);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_SS_AR, dataseg_ar);
 
   hv_vcpu_write_register(vcpuid, HV_X86_CS, GSEL(SEG_CODE, 0));
@@ -160,15 +174,20 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr)
   hv_vcpu_write_register(vcpuid, HV_X86_FS, GSEL(SEG_DATA, 0));
   hv_vcpu_write_register(vcpuid, HV_X86_GS, GSEL(SEG_DATA, 0));
   hv_vcpu_write_register(vcpuid, HV_X86_SS, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(vcpuid, HV_X86_TR, GSEL(SEG_TSS, 0));
+  hv_vcpu_write_register(vcpuid, HV_X86_TR, 0);
   hv_vcpu_write_register(vcpuid, HV_X86_LDTR, 0);
 }
 
 struct gate_desc idt[256];
 
 void
-init_idt(hv_vcpuid_t vcpuid, uint64_t idt_addr)
+init_idt(hv_vcpuid_t vcpuid, uint64_t idt_addr, uint64_t max_size)
 {
+  if (max_size < sizeof idt) {
+    PRINTF("memory region is too short for idt initialization\n");
+    return;
+  }
+
   hv_return_t ret = hv_vm_map(idt, idt_addr, sizeof idt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
     PRINTF("could not map a idt region: error code %x", ret);
@@ -184,8 +203,8 @@ init_regs(hv_vcpuid_t vcpuid)
 {
   /* set up cpu regs */
   hv_vcpu_write_register(vcpuid, HV_X86_RFLAGS, 0x2);
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x400100);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBP, 0x400100);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x10000);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBP, 0x10000);
 }
 
 void
@@ -205,6 +224,16 @@ print_regs(hv_vcpuid_t vcpuid)
   PRINTF("rsp = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
   PRINTF("rbp = 0x%llx\n", value);
+}
+    
+void
+init_msr(hv_vcpuid_t vcpuid)
+{
+  if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS && 
+      hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
+      hv_vcpu_enable_native_msr(vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
+    PRINTF("MSR initialization failed.\n");
+  }
 }
 
 void
@@ -244,12 +273,13 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
   PUTS("successfully created a vcpu");
 
   init_vmcs(vcpuid);
-  init_segment(vcpuid, 0x1000);
-  init_page(vcpuid, 0x3000);
-  init_idt(vcpuid, 0x4000);
+  init_msr(vcpuid);
+  init_page(vcpuid, 0x3000, 0x4000);
+  init_segment(vcpuid, 0x7000, 0x5000);
+  init_idt(vcpuid, 0x12000, 0x1000);
   init_regs(vcpuid);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry - vaddr + 0x400100);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry - vaddr + 0x100);
 
   PUTS("successfully set regs");
 
@@ -262,9 +292,9 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   print_regs(vcpuid);
 
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < 8; ++i) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
-      PUTS("oops");
+      PUTS("oops, hv_vcpu_run fails");
       return;
     }
 
@@ -364,22 +394,27 @@ main(int argc, char *argv[])
   fread(&h, sizeof h, 1, file);
 
   PRINTF("magic: 0x%08x\n", h.magic);
+  PRINTF("cpubit: 0x%08x\n", h.cpubit);
   PRINTF("size: %d\n", h.ehsize);
-  PRINTF("entry: 0x%08x\n", h.entry);
+  PRINTF("entry: 0x%016lx\n", h.entry);
+  PRINTF("phnum: %d\n", h.phnum);
 
   assert(h.phoff != 0);
-  assert(h.phnum == 1);
+  assert(h.phnum >= 1);
+  if (h.phnum != 1) {
+      PRINTF("WARNING: phnum != 1. Using only the first header...\n");
+  }
 
   fseek(file, h.phoff, SEEK_SET);
   fread(&p, sizeof p, 1, file);
 
   PUTS("# program header");
 
-  PRINTF("vaddr = 0x%08x\n", p.vaddr);
-  PRINTF("paddr = 0x%08x\n", p.paddr);
+  PRINTF("vaddr = 0x%016lx\n", p.vaddr);
+  PRINTF("paddr = 0x%016lx\n", p.paddr);
   PRINTF("type = %ul\n", p.type);
-  PRINTF("filesz = 0x%x\n", p.filesz);
-  PRINTF("offset = 0x%x\n", p.offset);
+  PRINTF("filesz = 0x%lx\n", p.filesz);
+  PRINTF("offset = 0x%lx\n", p.offset);
 
   char *text = malloc(p.filesz);
 
