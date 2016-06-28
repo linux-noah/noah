@@ -7,7 +7,7 @@ all: build/noah
 dev: CFLAGS += -DDEBUG_MODE=1
 dev: build/noah
 
-build/noah: src/main.o
+build/noah: src/main.o src/debug.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 hello: src/hello.S

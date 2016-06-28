@@ -17,14 +17,7 @@ typedef unsigned long ulong;
 #include "idt.h"
 #include "elf.h"
 #include "msr.h"
-
-#if DEBUG_MODE
-#define PUTS(...) puts(__VA_ARGS__)
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PUTS(...) 0
-#define PRINTF(...) 0
-#endif
+#include "debug.h"
 
 void
 init_vmcs(hv_vcpuid_t vcpuid)
