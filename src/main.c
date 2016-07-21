@@ -17,7 +17,90 @@ typedef unsigned long ulong;
 #include "idt.h"
 #include "elf.h"
 #include "msr.h"
+#include "vmem.h"
 #include "debug.h"
+
+uint64_t (*pml4)[512];
+static int phys_addr_bit_num = 39;
+
+uint64_t
+to_vmpa(void *haddr)
+{
+  uint64_t vmpaddr = ((1ULL << phys_addr_bit_num) - 1) & (uint64_t)haddr;
+  if ((1ULL << phys_addr_bit_num) & (uint64_t)haddr) {
+    // Assert truncated bits are all "1"
+    assert(((uint64_t)haddr >> phys_addr_bit_num) == ((1 << (47 - phys_addr_bit_num)) - 1));
+  }
+  return vmpaddr;
+}
+
+void*
+to_haddrp(uint64_t vmpaddr)
+{
+  // Assume the bits over max phys bits are all 1.
+  // Write serious "kalloc" after introducing multi-process model
+  return (void*)(vmpaddr | (CANONICAL_LOWER_END ^ ((1ULL << phys_addr_bit_num) - 1)));
+}
+
+void*
+kalloc(size_t size)
+{
+  void *mem = valloc(size);
+  uint64_t vmpaddr = to_vmpa(mem);
+  hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  if (ret != HV_SUCCESS) {
+    fprintf(stderr, "could not map a memory region: error code %x\n", ret);
+    exit(1);
+  }
+  return mem;
+}
+
+uint64_t
+rounddown(uint64_t x, uint64_t y)
+{
+  return x / y * y;
+}
+
+uint64_t
+roundup(uint64_t x, uint64_t y)
+{
+  return (x + y - 1) / y * y;
+}
+
+void
+vm_map_page(int depth, uint64_t (*table)[512], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
+{
+  page_type_t walking = PAGE_PML4E - depth;
+  int index = (vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff;
+
+  if (walking == page_type) {
+    perm |= (page_type == PAGE_4KB) ? 0 : PTE_PS;
+    (*table)[index] = rounddown(vmpaddr, PAGE_SIZE(page_type)) | perm;
+  } else {
+    uint64_t (*next)[512];
+    if (!(*table)[index]) {
+      next = kalloc(sizeof(uint64_t[512]));
+      bzero(next, sizeof(uint64_t[512]));
+      (*table)[index] = to_vmpa(next) | perm;
+    } else {
+      next = to_haddrp(rounddown((*table)[index], PAGE_SIZE(PAGE_4KB)));
+    }
+    vm_map_page(depth + 1, next, vmvaddr, vmpaddr, page_type, perm);
+  }
+}
+
+void
+vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm)
+{
+  assert(rounddown(vmvaddr, PAGE_SIZE(PAGE_4KB)) == vmvaddr);
+  
+  int page_num = roundup(size, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
+  for (int i = 0; i < page_num; i++) {
+    vm_map_page(0, pml4, vmvaddr, vmpaddr, page_type, perm);
+    vmvaddr += PAGE_SIZE(page_type);
+    vmpaddr += PAGE_SIZE(page_type);
+  }
+}
 
 void
 init_vmcs(hv_vcpuid_t vcpuid)
@@ -51,35 +134,11 @@ init_vmcs(hv_vcpuid_t vcpuid)
 }
 
 void
-init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr, uint64_t max_size)
+init_page(hv_vcpuid_t vcpuid)
 {
-  if (max_size < 0x4000) {
-    PRINTF("memory region is too short for page initialization\n");
-    return;
-  }
-
-  void *mem = valloc(0x4000);
-
-  // Map [0x0, 0x200000] to [0x0, 0x200000]
-  bzero(mem, 0x4000);
-  assert(sizeof (uint64_t[512]) == 0x1000);
-  uint64_t (*lv4_pg_map)[512] = mem;
-  uint64_t (*pdp)[512] = (void*)((char*)mem + 0x1000);
-  uint64_t (*pg)[512] = (void*)((char*)mem + 0x2000);
-  uint64_t (*pt)[512] = (void*)((char*)mem + 0x3000);
-
-  (*lv4_pg_map)[0] = (uint64_t) (pgdir_addr + 0x1000) | PTE_P | PTE_W | PTE_U;
-  (*pdp)[0] = (uint64_t) (pgdir_addr + 0x2000) | PTE_P | PTE_W | PTE_U;
-  (*pg)[0] = (uint64_t) (pgdir_addr + 0x3000) | PTE_P | PTE_W | PTE_U;
-  for (int i = 0; i < 512; i++) {
-      (*pt)[i] = (uint64_t) (0x1000 * i) | PTE_P | PTE_W | PTE_U;
-  }
-
-  hv_return_t ret = hv_vm_map(mem, pgdir_addr, 0x4000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not map a page map region: error code %x", ret);
-    return;
-  }
+  pml4 = kalloc(sizeof(uint64_t[512]));
+  bzero(pml4, sizeof(uint64_t[512]));
+  vm_map(KERN_BASE, 0, UINT64_MAX - KERN_BASE, PAGE_1GB, PTE_W | PTE_P);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
 
@@ -87,7 +146,7 @@ init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr, uint64_t max_size)
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_VMXE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, pgdir_addr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, to_vmpa(pml4));
   
   uint64_t efer;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, &efer);
@@ -95,29 +154,18 @@ init_page(hv_vcpuid_t vcpuid, uint64_t pgdir_addr, uint64_t max_size)
 }
 
 void
-init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr, uint64_t max_size)
+init_segment(hv_vcpuid_t vcpuid)
 {
   uint64_t gdt[3];
   gdt[SEG_NULL] = 0; // NULL SEL
   gdt[SEG_CODE] = 0x0020980000000000; // CODE SEL
   gdt[SEG_DATA] = 0x0000900000000000; // DATA SEL
 
-  if (max_size < sizeof gdt) {
-    PRINTF("memory region is too short for segment initialization\n");
-    return;
-  }
-
-  void *mem = valloc(sizeof gdt);
+  void *mem = kalloc(sizeof gdt);
 
   memcpy(mem, &gdt, sizeof gdt);
 
-  hv_return_t ret = hv_vm_map(mem, gdt_addr, sizeof gdt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not map a gdt region: error code %x", ret);
-    return;
-  }
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, gdt_addr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, to_vmpa(mem));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, 0);
@@ -171,23 +219,12 @@ init_segment(hv_vcpuid_t vcpuid, uint64_t gdt_addr, uint64_t max_size)
   hv_vcpu_write_register(vcpuid, HV_X86_LDTR, 0);
 }
 
-struct gate_desc idt[256];
-
 void
-init_idt(hv_vcpuid_t vcpuid, uint64_t idt_addr, uint64_t max_size)
+init_idt(hv_vcpuid_t vcpuid)
 {
-  if (max_size < sizeof idt) {
-    PRINTF("memory region is too short for idt initialization\n");
-    return;
-  }
+  struct gate_desc (*idt)[256] = kalloc(sizeof(struct gate_desc[256]));
 
-  hv_return_t ret = hv_vm_map(idt, idt_addr, sizeof idt, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not map a idt region: error code %x", ret);
-    return;
-  }
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, idt_addr);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, to_vmpa(idt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
 }
 
@@ -245,18 +282,6 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   PUTS("successfully created the vm");
 
-  mem = valloc(0x1000);
-  assert(mem);
-  memcpy((char *)mem + 0x100, text, tsize);
-
-  ret = hv_vm_map(mem, 0, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not map a text region: error code %x", ret);
-    return;
-  }
-
-  PUTS("successfully created a text mapping");
-
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
     PRINTF("could not create a vcpu: error code %x", ret);
@@ -267,12 +292,19 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   init_vmcs(vcpuid);
   init_msr(vcpuid);
-  init_page(vcpuid, 0x3000, 0x4000);
-  init_segment(vcpuid, 0x7000, 0x5000);
-  init_idt(vcpuid, 0x12000, 0x1000);
+  init_page(vcpuid);
+  init_segment(vcpuid);
+  init_idt(vcpuid);
   init_regs(vcpuid);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry - vaddr + 0x100);
+  mem = kalloc(tsize);
+  memcpy((char *)mem, text, tsize);
+  vm_map(vaddr, to_vmpa(mem), tsize, PAGE_4KB, PTE_P | PTE_W | PTE_U);
+
+  PUTS("successfully created a text mapping");
+
+
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 
   PUTS("successfully set regs");
 
@@ -285,11 +317,20 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
 
   print_regs(vcpuid);
 
-  for (int i = 0; i < 8; ++i) {
+  for (int i = 0; i < 16; ++i) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
       PUTS("oops, hv_vcpu_run fails");
       return;
     }
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
+    PRINTF("exit qualification = 0x%llx\n", value);
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
+    PRINTF("guest-physical address = 0x%llx\n", value);
+
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
+    PRINTF("guest-rip = 0x%llx\n", value);
 
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
     PRINTF("exit reason = 0x%llx\n", value);
@@ -342,14 +383,6 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
       PRINTF("reason: %lld\n", value);
     }
 
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
-    PRINTF("exit qualification = 0x%llx\n", value);
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-    PRINTF("guest-physical address = 0x%llx\n", value);
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
-    PRINTF("guest-rip = 0x%llx\n", value);
 
     PUTS("");
   }
