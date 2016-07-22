@@ -8,6 +8,7 @@ typedef enum {
 
 #define PAGE_SHIFT(page_type)            (12 + (page_type) * 9)
 #define PAGE_SIZE(page_type)             (1ULL << PAGE_SHIFT(page_type))
+#define NR_PAGE_ENTRY                    512
 
 #define KERN_BASE                        0xffff800000000000ULL
 

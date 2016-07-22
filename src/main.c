@@ -20,7 +20,7 @@ typedef unsigned long ulong;
 #include "vmem.h"
 #include "debug.h"
 
-uint64_t (*pml4)[512];
+uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;
 
 uint64_t
@@ -49,7 +49,8 @@ kalloc(size_t size)
   uint64_t vmpaddr = to_vmpa(mem);
   hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    fprintf(stderr, "could not map a memory region: error code %x\n", ret);
+    PRINTF("mapping %p to 0x%016llx, size:0x%llx\n", mem, vmpaddr, size);
+    PRINTF("could not map a memory region: error code %x\n", ret);
     exit(1);
   }
   return mem;
@@ -68,7 +69,7 @@ roundup(uint64_t x, uint64_t y)
 }
 
 void
-vm_map_page(int depth, uint64_t (*table)[512], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
+vm_map_page(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
 {
   page_type_t walking = PAGE_PML4E - depth;
   int index = (vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff;
@@ -77,10 +78,10 @@ vm_map_page(int depth, uint64_t (*table)[512], uint64_t vmvaddr, uint64_t vmpadd
     perm |= (page_type == PAGE_4KB) ? 0 : PTE_PS;
     (*table)[index] = rounddown(vmpaddr, PAGE_SIZE(page_type)) | perm;
   } else {
-    uint64_t (*next)[512];
+    uint64_t (*next)[NR_PAGE_ENTRY];
     if (!(*table)[index]) {
-      next = kalloc(sizeof(uint64_t[512]));
-      bzero(next, sizeof(uint64_t[512]));
+      next = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
+      bzero(next, sizeof(uint64_t[NR_PAGE_ENTRY]));
       (*table)[index] = to_vmpa(next) | perm;
     } else {
       next = to_haddrp(rounddown((*table)[index], PAGE_SIZE(PAGE_4KB)));
@@ -136,8 +137,8 @@ init_vmcs(hv_vcpuid_t vcpuid)
 void
 init_page(hv_vcpuid_t vcpuid)
 {
-  pml4 = kalloc(sizeof(uint64_t[512]));
-  bzero(pml4, sizeof(uint64_t[512]));
+  pml4 = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
+  bzero(pml4, sizeof(uint64_t[NR_PAGE_ENTRY]));
   vm_map(KERN_BASE, 0, UINT64_MAX - KERN_BASE, PAGE_1GB, PTE_W | PTE_P);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
@@ -266,8 +267,63 @@ init_msr(hv_vcpuid_t vcpuid)
   }
 }
 
+void *text;
+uint64_t vaddr;
+
+uint64_t
+load_elf(char *path)
+{
+  FILE *file = fopen(path, "r");
+  struct elf_header h;
+  struct program_header p;
+
+  fread(&h, sizeof h, 1, file);
+
+  PRINTF("magic: 0x%08x\n", h.magic);
+  PRINTF("cpubit: 0x%08x\n", h.cpubit);
+  PRINTF("size: %d\n", h.ehsize);
+  PRINTF("entry: 0x%016lx\n", h.entry);
+  PRINTF("phnum: %d\n", h.phnum);
+
+  assert(h.phoff != 0);
+  assert(h.phnum >= 1);
+
+  PUTS("# program header");
+  for (int i = 0; i < h.phnum; i++) {
+    fseek(file, h.phoff + h.phentsize * i, SEEK_SET);
+    fread(&p, sizeof p, 1, file);
+
+    PRINTF("program header #%d\n", i);
+    PRINTF("vaddr = 0x%016lx\n", p.vaddr);
+    PRINTF("paddr = 0x%016lx\n", p.paddr);
+    PRINTF("type = %ul\n", p.type);
+    PRINTF("filesz = 0x%lx\n", p.filesz);
+    PRINTF("offset = 0x%lx\n", p.offset);
+
+    if (p.type != PT_LOAD) {
+      continue;
+    }
+
+    void *segment = kalloc(p.memsz);
+    bzero(segment, p.memsz);
+    if (text == 0) {
+      text = segment;
+      vaddr = p.vaddr;
+    }
+
+    fseek(file, p.offset, SEEK_SET);
+    fread(segment, p.filesz, 1, file);
+
+    vm_map(p.vaddr, to_vmpa(segment), p.memsz, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+  }
+
+  fclose(file);
+
+  return h.entry;
+}
+
 void
-run(const char *text, size_t tsize, size_t vaddr, size_t entry)
+run(char *elf_path)
 {
   hv_return_t ret;
   hv_vcpuid_t vcpuid;
@@ -297,12 +353,7 @@ run(const char *text, size_t tsize, size_t vaddr, size_t entry)
   init_idt(vcpuid);
   init_regs(vcpuid);
 
-  mem = kalloc(tsize);
-  memcpy((char *)mem, text, tsize);
-  vm_map(vaddr, to_vmpa(mem), tsize, PAGE_4KB, PTE_P | PTE_W | PTE_U);
-
-  PUTS("successfully created a text mapping");
-
+  uint64_t entry = load_elf(elf_path);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 
@@ -412,42 +463,7 @@ int
 main(int argc, char *argv[])
 {
   assert(argc == 2);
-
-  FILE *file = fopen(argv[1], "r");
-  struct elf_header h;
-  struct program_header p;
-
-  fread(&h, sizeof h, 1, file);
-
-  PRINTF("magic: 0x%08x\n", h.magic);
-  PRINTF("cpubit: 0x%08x\n", h.cpubit);
-  PRINTF("size: %d\n", h.ehsize);
-  PRINTF("entry: 0x%016lx\n", h.entry);
-  PRINTF("phnum: %d\n", h.phnum);
-
-  assert(h.phoff != 0);
-  assert(h.phnum >= 1);
-  if (h.phnum != 1) {
-      PRINTF("WARNING: phnum != 1. Using only the first header...\n");
-  }
-
-  fseek(file, h.phoff, SEEK_SET);
-  fread(&p, sizeof p, 1, file);
-
-  PUTS("# program header");
-
-  PRINTF("vaddr = 0x%016lx\n", p.vaddr);
-  PRINTF("paddr = 0x%016lx\n", p.paddr);
-  PRINTF("type = %ul\n", p.type);
-  PRINTF("filesz = 0x%lx\n", p.filesz);
-  PRINTF("offset = 0x%lx\n", p.offset);
-
-  char *text = malloc(p.filesz);
-
-  fseek(file, p.offset, SEEK_SET);
-  fread(text, p.filesz, 1, file);
-
-  run(text, p.filesz, p.vaddr, h.entry);
+  run(argv[1]);
 
   return 0;
 }

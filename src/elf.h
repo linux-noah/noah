@@ -33,6 +33,9 @@ struct program_header {
   ulong align;
 };
 
+#define PT_NULL        0
+#define PT_LOAD        1
+
 struct section_header {
   uint name;
   uint type;
@@ -45,3 +48,4 @@ struct section_header {
   ulong align;
   ulong entsize;
 };
+
