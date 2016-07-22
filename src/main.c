@@ -439,11 +439,11 @@ run(char *elf_path)
     case VMX_REASON_EXC_NMI:
       PUTS("reason: exc or nmi");
       PUTS("");
-      hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
       PRINTF("idt info = %lld\n", value);
-      hv_vcpu_read_register(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
       PRINTF("idt error = %lld\n", value);
-      hv_vcpu_read_register(vcpuid, VMCS_GUEST_INT_STATUS, &value);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
       PRINTF("guest int status = %lld\n", value);
       PUTS("!!MAYBE A SYSENTER!!");
       PUTS(">>>start syscall handling...");
