@@ -69,7 +69,7 @@ roundup(uint64_t x, uint64_t y)
 }
 
 void
-vm_map_page(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
+vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
 {
   page_type_t walking = PAGE_PML4E - depth;
   int index = (vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff;
@@ -86,7 +86,7 @@ vm_map_page(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint6
     } else {
       next = to_haddrp(rounddown((*table)[index], PAGE_SIZE(PAGE_4KB)));
     }
-    vm_map_page(depth + 1, next, vmvaddr, vmpaddr, page_type, perm);
+    vm_map_rec(depth + 1, next, vmvaddr, vmpaddr, page_type, perm);
   }
 }
 
@@ -97,10 +97,39 @@ vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, i
   
   int page_num = roundup(size, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
   for (int i = 0; i < page_num; i++) {
-    vm_map_page(0, pml4, vmvaddr, vmpaddr, page_type, perm);
+    vm_map_rec(0, pml4, vmvaddr, vmpaddr, page_type, perm);
     vmvaddr += PAGE_SIZE(page_type);
     vmpaddr += PAGE_SIZE(page_type);
   }
+}
+
+bool
+vm_walk_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
+{
+  page_type_t walking = PAGE_PML4E - depth;
+  uint64_t pt_entry = (*table)[(vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff];
+
+  if (pt_entry & PTE_P) {
+    if (walking == PAGE_4KB || (pt_entry & PTE_PS)) {
+      uint64_t mask = (1 << PAGE_SHIFT(walking)) - 1;
+      if (vmpaddr != NULL) {
+        *vmpaddr = (pt_entry & ~mask) + (vmvaddr & mask);
+      }
+      if (perm != NULL) {
+        *perm = pt_entry & mask;
+      }
+      return true;
+    } else {
+      return vm_walk_rec(depth + 1, to_haddrp(rounddown(pt_entry, PAGE_SIZE(PAGE_4KB))), vmvaddr, vmpaddr, perm);
+    }
+  }
+  return false;
+}
+
+bool
+vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
+{
+  return vm_walk_rec(0, pml4, vmvaddr, vmpaddr, perm);
 }
 
 void
@@ -267,9 +296,6 @@ init_msr(hv_vcpuid_t vcpuid)
   }
 }
 
-void *text;
-uint64_t vaddr;
-
 uint64_t
 load_elf(char *path)
 {
@@ -306,10 +332,6 @@ load_elf(char *path)
 
     void *segment = kalloc(p.memsz);
     bzero(segment, p.memsz);
-    if (text == 0) {
-      text = segment;
-      vaddr = p.vaddr;
-    }
 
     fseek(file, p.offset, SEEK_SET);
     fread(segment, p.filesz, 1, file);
@@ -417,8 +439,15 @@ run(char *elf_path)
         exit(rbx);
         break;
       case 4:
-        write(rbx, rcx - vaddr + (char *)text, rdx);
-        break;
+        {
+          uint64_t str_paddr;
+          bool suc = vm_walk(rcx, &str_paddr, NULL);
+          if (!suc) {
+            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rcx);
+          }
+          write(rbx, to_haddrp(str_paddr), rdx);
+          break;
+        }
       default:
         PRINTF("UNKNOWN SYSCALL!: %lld\n", rax);
         abort();
