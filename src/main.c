@@ -45,11 +45,18 @@ to_haddrp(uint64_t vmpaddr)
 void*
 kalloc(size_t size)
 {
-  void *mem = valloc(size);
-  uint64_t vmpaddr = to_vmpa(mem);
+  void *mem;
+  uint64_t vmpaddr;
+
+  mem = valloc(size);
+  if (mem == NULL) {
+    PRINTF("could not valloc requested size: %ld\n", size);
+    exit(1);
+  }
+  vmpaddr = to_vmpa(mem);
   hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
-    PRINTF("mapping %p to 0x%016llx, size:0x%llx\n", mem, vmpaddr, size);
+    PRINTF("mapping %p to 0x%016llx, size:0x%lx\n", mem, vmpaddr, size);
     PRINTF("could not map a memory region: error code %x\n", ret);
     exit(1);
   }
@@ -93,8 +100,6 @@ vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64
 void
 vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm)
 {
-  assert(rounddown(vmvaddr, PAGE_SIZE(PAGE_4KB)) == vmvaddr);
-  
   int page_num = roundup(size, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
   for (int i = 0; i < page_num; i++) {
     vm_map_rec(0, pml4, vmvaddr, vmpaddr, page_type, perm);
@@ -263,8 +268,6 @@ init_regs(hv_vcpuid_t vcpuid)
 {
   /* set up cpu regs */
   hv_vcpu_write_register(vcpuid, HV_X86_RFLAGS, 0x2);
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, 0x10000);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBP, 0x10000);
 }
 
 void
@@ -296,12 +299,13 @@ init_msr(hv_vcpuid_t vcpuid)
   }
 }
 
-uint64_t
-load_elf(char *path)
+void
+load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
 {
   FILE *file = fopen(path, "r");
   struct elf_header h;
   struct program_header p;
+  uint64_t map_top = 0;
 
   fread(&h, sizeof h, 1, file);
 
@@ -319,16 +323,16 @@ load_elf(char *path)
     fseek(file, h.phoff + h.phentsize * i, SEEK_SET);
     fread(&p, sizeof p, 1, file);
 
+    if (p.type != PT_LOAD) {
+      continue;
+    }
+
     PRINTF("program header #%d\n", i);
     PRINTF("vaddr = 0x%016lx\n", p.vaddr);
     PRINTF("paddr = 0x%016lx\n", p.paddr);
     PRINTF("type = %ul\n", p.type);
     PRINTF("filesz = 0x%lx\n", p.filesz);
     PRINTF("offset = 0x%lx\n", p.offset);
-
-    if (p.type != PT_LOAD) {
-      continue;
-    }
 
     void *segment = kalloc(p.memsz);
     bzero(segment, p.memsz);
@@ -337,11 +341,23 @@ load_elf(char *path)
     fread(segment, p.filesz, 1, file);
 
     vm_map(p.vaddr, to_vmpa(segment), p.memsz, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+
+    if (p.vaddr + p.memsz > map_top) {
+      map_top = p.vaddr + p.memsz;
+    }
   }
+  void *heapmem = kalloc(PAGE_SIZE(PAGE_2MB));
+  *heap = roundup(map_top, PAGE_SIZE(PAGE_2MB));
+  vm_map(*heap, to_vmpa(heapmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
+
+  void *stackmem = kalloc(PAGE_SIZE(PAGE_2MB));
+  uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
+  vm_map(stack_top - PAGE_SIZE(PAGE_2MB), to_vmpa(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
+  *stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
+
+  *entry = h.entry;
 
   fclose(file);
-
-  return h.entry;
 }
 
 void
@@ -349,7 +365,6 @@ run(char *elf_path)
 {
   hv_return_t ret;
   hv_vcpuid_t vcpuid;
-  void *mem;
   uint64_t value;
 
   ret = hv_vm_create(HV_VM_DEFAULT);
@@ -375,7 +390,10 @@ run(char *elf_path)
   init_idt(vcpuid);
   init_regs(vcpuid);
 
-  uint64_t entry = load_elf(elf_path);
+  uint64_t entry, stack, heap;
+  load_elf(elf_path, &entry, &stack, &heap);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 
@@ -390,7 +408,7 @@ run(char *elf_path)
 
   print_regs(vcpuid);
 
-  for (int i = 0; i < 16; ++i) {
+  for (int i = 0; i < 16; i++) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
       PUTS("oops, hv_vcpu_run fails");
       return;
