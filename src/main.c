@@ -6,6 +6,7 @@
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
+#include <sys/mman.h>
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
@@ -18,6 +19,7 @@ typedef unsigned long ulong;
 #include "elf.h"
 #include "msr.h"
 #include "vmem.h"
+#include "syscall.h"
 #include "debug.h"
 
 uint64_t (*pml4)[NR_PAGE_ENTRY];
@@ -27,10 +29,9 @@ uint64_t
 to_vmpa(void *haddr)
 {
   uint64_t vmpaddr = ((1ULL << phys_addr_bit_num) - 1) & (uint64_t)haddr;
-  if ((1ULL << phys_addr_bit_num) & (uint64_t)haddr) {
-    // Assert truncated bits are all "1"
-    assert(((uint64_t)haddr >> phys_addr_bit_num) == ((1 << (47 - phys_addr_bit_num)) - 1));
-  }
+  // Assert truncated bits are all "1"
+  assert(((uint64_t)haddr >> phys_addr_bit_num) == ((1ULL << (47 - phys_addr_bit_num)) - 1));
+
   return vmpaddr;
 }
 
@@ -52,6 +53,14 @@ kalloc(size_t size)
   if (mem == NULL) {
     PRINTF("could not valloc requested size: %ld\n", size);
     exit(1);
+  }
+  if (!(((uint64_t)mem >> phys_addr_bit_num) == ((1ULL << (47 - phys_addr_bit_num)) - 1))) {
+    // If truncated bits are not all 1, fill them
+    mem = mmap((void*)(0x7f8000000000 | (uint64_t)mem), size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_FIXED | MAP_SHARED | MAP_ANON, -1, 0);
+    if (mem == NULL) {
+      PRINTF("could not mmap requested area\n");
+      exit(1);
+    }
   }
   vmpaddr = to_vmpa(mem);
   hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
@@ -283,8 +292,10 @@ print_regs(hv_vcpuid_t vcpuid)
   PRINTF("rcx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDX, &value);
   PRINTF("rdx = 0x%llx\n", value);
-  hv_vcpu_read_register(vcpuid, HV_X86_RSP, &value);
-  PRINTF("rsp = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RDI, &value);
+  PRINTF("rdi = 0x%llx\n", value);
+  hv_vcpu_read_register(vcpuid, HV_X86_RSI, &value);
+  PRINTF("rsi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
   PRINTF("rbp = 0x%llx\n", value);
 }
@@ -354,6 +365,7 @@ load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
   uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
   vm_map(stack_top - PAGE_SIZE(PAGE_2MB), to_vmpa(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
   *stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
+  PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
 
   *entry = h.entry;
 
@@ -408,7 +420,7 @@ run(char *elf_path)
 
   print_regs(vcpuid);
 
-  for (int i = 0; i < 16; i++) {
+  for (int i = 0; i < 256; i++) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
       PUTS("oops, hv_vcpu_run fails");
       return;
@@ -429,7 +441,7 @@ run(char *elf_path)
     print_regs(vcpuid);
 
     switch (value) {
-      uint64_t rax, rbx, rcx, rdx;
+      uint64_t rax, rdi, rsi, rdx;
 
     case VMX_REASON_VMCALL:
       PUTS("reason: vmcall");
@@ -448,22 +460,23 @@ run(char *elf_path)
       PUTS("!!MAYBE A SYSENTER!!");
       PUTS(">>>start syscall handling...");
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
-      hv_vcpu_read_register(vcpuid, HV_X86_RBX, &rbx);
-      hv_vcpu_read_register(vcpuid, HV_X86_RCX, &rcx);
+      hv_vcpu_read_register(vcpuid, HV_X86_RDI, &rdi);
+      hv_vcpu_read_register(vcpuid, HV_X86_RSI, &rsi);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
       switch (rax) {
-      case 1:
+      case SYS_exit:
+      case SYS_exit_group:
         PUTS("exit...");
-        exit(rbx);
+        exit(rdi);
         break;
-      case 4:
+      case SYS_write:
         {
           uint64_t str_paddr;
-          bool suc = vm_walk(rcx, &str_paddr, NULL);
+          bool suc = vm_walk(rsi, &str_paddr, NULL);
           if (!suc) {
-            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rcx);
+            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
-          write(rbx, to_haddrp(str_paddr), rdx);
+          write(rdi, to_haddrp(str_paddr), rdx);
           break;
         }
       default:
