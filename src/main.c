@@ -109,9 +109,10 @@ vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64
 void
 vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm)
 {
-  int page_num = roundup(size, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
+  uint64_t offset = vmvaddr - rounddown(vmvaddr, PAGE_SIZE(page_type));
+  int page_num = roundup(size + offset, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
   for (int i = 0; i < page_num; i++) {
-    vm_map_rec(0, pml4, vmvaddr, vmpaddr, page_type, perm);
+    vm_map_rec(0, pml4, vmvaddr - offset, vmpaddr - offset, page_type, perm);
     vmvaddr += PAGE_SIZE(page_type);
     vmpaddr += PAGE_SIZE(page_type);
   }
