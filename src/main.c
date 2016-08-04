@@ -477,7 +477,19 @@ run(char *elf_path)
           if (!suc) {
             PRINTF("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
-          write(rdi, to_haddrp(str_paddr), rdx);
+          value = write(rdi, to_haddrp(str_paddr), rdx);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_read:
+        {
+          uint64_t str_paddr;
+          bool suc = vm_walk(rsi, &str_paddr, NULL);
+          if (!suc) {
+            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rsi);
+          }
+          value = read(rdi, to_haddrp(str_paddr), rdx);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
           break;
         }
       default:

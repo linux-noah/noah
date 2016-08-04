@@ -1,3 +1,4 @@
+#define SYS_read             0
 #define SYS_write            1
 #define SYS_fstat            5
 #define SYS_brk              12
