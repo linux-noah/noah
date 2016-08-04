@@ -2,7 +2,9 @@ ASFLAGS += -m32
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
-all: build/noah
+USERS := _cat _fib _hello
+
+all: build/noah $(USERS)
 
 dev: CFLAGS += -DDEBUG_MODE=1
 dev: build/noah
