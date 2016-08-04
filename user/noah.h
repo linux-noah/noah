@@ -30,4 +30,5 @@ ssize_t write(int fd, const void *buf, size_t count)
 void _exit(int status)
 {
   syscall(SYS_exit, status, 0, 0);
+  __builtin_unreachable();
 }
