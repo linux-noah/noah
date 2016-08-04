@@ -10,18 +10,17 @@ dev: build/noah
 build/noah: src/main.o src/debug.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-hello: user/hello.c
-	echo RUN ME ON LINUX
-	gcc -nostdlib -static user/hello.c -o hello
-fib: user/fib.c
-	echo RUN ME ON LINUX
-	gcc -nostdlib -static user/fib.c -o fib
+_%: user/%.c user/noah.h
+	rsync $^ user/noah.h idylls.jp:/tmp/
+	ssh idylls.jp "gcc -nostdlib -static /tmp/$*.c -o /tmp/$@"
+	rsync idylls.jp:/tmp/$@ ./$@
 
-run: build/noah
-	./build/noah hello
+run: build/noah _hello
+	./build/noah _hello
 
 clean:
 	$(RM) -r src/*.o
 	$(RM) -r build/noah
+	$(RM) _*
 
 .PHONY: all run clean
