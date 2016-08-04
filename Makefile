@@ -1,4 +1,3 @@
-ASFLAGS += -m32
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
