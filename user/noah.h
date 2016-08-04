@@ -18,7 +18,7 @@ int syscall(uint64_t num, uint64_t rdi, uint64_t rsi, uint64_t rdx)
 
 void write(int fd, const void *buf, size_t count)
 {
-  syscall(SYS_write, (uint64_t)buf, count, 0);
+  syscall(SYS_write, fd, (uint64_t)buf, count);
 }
 
 void _exit(int status)
