@@ -1,6 +1,6 @@
 node {
     stage "Clone"
-    git url: "/Users/nullpo/noah/", branch: "feature/testing_framework"
+    checkout scm
     sh "git clean -fx"
 
     stage "Build Noah"
