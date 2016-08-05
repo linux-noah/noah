@@ -14,6 +14,7 @@ int fib(int n)
 int _start()
 {
   int fib10 = fib(10);
+  write(1, &fib10, 1);
   _exit(fib10);
 }
 
