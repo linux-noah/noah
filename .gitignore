@@ -1,5 +1,4 @@
 *.o
 *.dylib
 *.dSYM/
-_*
 build/noah
