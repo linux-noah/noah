@@ -1,4 +1,5 @@
 #include "noah.h"
+#include "test_assert.h"
 
 int fib(int n)
 {
@@ -14,7 +15,7 @@ int fib(int n)
 int _start()
 {
   int fib10 = fib(10);
-  write(1, &fib10, 1);
-  _exit(fib10);
+  assert_true(fib10 == 55);
+  _exit(0);
 }
 
