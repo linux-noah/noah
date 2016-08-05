@@ -12,9 +12,9 @@ build/noah: src/main.o src/debug.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 _%: user/%.c user/noah.h
-	rsync $^ user/noah.h idylls.jp:/tmp/
-	ssh idylls.jp "gcc -nostdlib -static /tmp/$*.c -o /tmp/$@"
-	rsync idylls.jp:/tmp/$@ ./$@
+	rsync $^ user/noah.h idylls.jp:/tmp/$(USER)
+	ssh idylls.jp "gcc -nostdlib -static /tmp/$(USER)/$*.c -o /tmp/$(USER)/$@"
+	rsync idylls.jp:/tmp/$(USER)/$@ ./$@
 
 run: build/noah _hello
 	./build/noah _hello
