@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require "open3"
+require "shellwords"
 
 @assertion = {pass: 0, fail: 0, crash: 0}
 @assertion_reports = []
@@ -24,7 +25,7 @@ end
 def test_assertion
   test_targets = Dir.glob(__dir__ + "/test_assertion/build/*")
   test_targets.each do |target|
-    out, err, status = Open3.capture3("#{__dir__}/../build/noah #{target}")
+    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape}")
     print(out)
     @assertion[:pass] += out.chars.count(".")
     @assertion[:fail] += out.chars.count("F")
@@ -44,7 +45,7 @@ def test_stdout
   test_targets.each do |target|
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = testdata_base + ".stdin"
-    out, err, status = Open3.capture3("#{__dir__}/../build/noah #{target} < #{File.exists?(target_stdin) ? target_stdin : '/dev/null'}")
+    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape} < #{File.exists?(target_stdin) ? target_stdin.shellescape : '/dev/null'}")
 
     if out == File.read(testdata_base + ".expected")
       @stdout[:pass] += 1
