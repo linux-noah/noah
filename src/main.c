@@ -373,6 +373,28 @@ load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
   fclose(file);
 }
 
+uint64_t
+push(hv_vcpuid_t vcpuid, const void *data, size_t n)
+{
+  uint64_t size = roundup(n, 8);
+  uint64_t rsp;
+
+  hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp - size);
+
+  uint64_t stack_vmpa;
+  if (! vm_walk(rsp, &stack_vmpa, NULL))
+    assert(false);
+  void *stackmem = to_haddrp(stack_vmpa);
+
+  memcpy(stackmem - size, data, n);
+
+  PRINTF("guest: 0x%llx\n", rsp - size);
+  PRINTF("host:  %p\n", stackmem - size);
+
+  return rsp - size;
+}
+
 void
 run(char *elf_path)
 {
