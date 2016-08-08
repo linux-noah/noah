@@ -1,5 +1,5 @@
 node {
-    stage "Clone"
+    stage "Clone Repository"
     checkout scm
     sh "git clean -fx"
 
