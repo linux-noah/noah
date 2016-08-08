@@ -514,6 +514,11 @@ run(char *elf_path)
           hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
           break;
         }
+      case SYS_printword:
+        {
+          printf("0x%llx (%llu)\n", rdi, rdi);
+          break;
+        }
       default:
         PRINTF("UNKNOWN SYSCALL!: %lld\n", rax);
         abort();
