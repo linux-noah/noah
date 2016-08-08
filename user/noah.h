@@ -42,3 +42,10 @@ int _start()
 
   _exit(main(argc, argv));
 }
+
+size_t strlen(const char *str)
+{
+  const char *s;
+  for (s = str; *s; s++);
+  return str - s;
+}
