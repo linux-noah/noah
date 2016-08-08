@@ -11,9 +11,8 @@ int fib(int n)
   }
 }
 
-int _start()
+int main()
 {
-  int fib10 = fib(10);
-  _exit(fib10);
+  return fib(10);
 }
 

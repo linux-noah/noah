@@ -1,6 +1,6 @@
 #include "noah.h"
 
-int _start()
+int main(int argc, char *argv[])
 {
   char buf[256];
   long n;

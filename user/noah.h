@@ -32,3 +32,13 @@ void _exit(int status)
   syscall(SYS_exit, status, 0, 0);
   __builtin_unreachable();
 }
+
+int _start()
+{
+  register int argc asm("rax");
+  register char **argv asm("rbx");
+
+  int main();
+
+  _exit(main(argc, argv));
+}
