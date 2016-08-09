@@ -1,6 +1,8 @@
 #define SYS_printword       (-1)
 #define SYS_read             0
 #define SYS_write            1
+#define SYS_open             2
+#define SYS_close            3
 #define SYS_fstat            5
 #define SYS_brk              12
 #define SYS_access           32

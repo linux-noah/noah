@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
@@ -145,6 +146,17 @@ bool
 vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
 {
   return vm_walk_rec(0, pml4, vmvaddr, vmpaddr, perm);
+}
+
+void *
+copy_from_user(uint64_t vmvaddr)
+{
+  uint64_t str_paddr;
+  bool suc = vm_walk(vmvaddr, &str_paddr, NULL);
+  if (!suc) {
+    return NULL;
+  }
+  return to_haddrp(str_paddr);
 }
 
 void
@@ -529,19 +541,11 @@ run(char *elf_path, int argc, char *argv[])
         break;
       case SYS_write:
         {
-          uint64_t rbp, rsp;
-          hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
-          hv_vcpu_read_register(vcpuid, HV_X86_RBP, &rbp);
-          PRINTF("rbp = %llx\n", rbp);
-          PRINTF("rsp = %llx\n", rsp);
-          PRINTF("write!\n");
-          PRINTF("count = %llu\n", rdx);
           uint64_t str_paddr;
           bool suc = vm_walk(rsi, &str_paddr, NULL);
           if (!suc) {
             printf("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
-          PRINTF("hmemaddr = %p\n", to_haddrp(str_paddr));
           value = write(rdi, to_haddrp(str_paddr), rdx);
           hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
           break;
@@ -554,6 +558,21 @@ run(char *elf_path, int argc, char *argv[])
             printf("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
           value = read(rdi, to_haddrp(str_paddr), rdx);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_open:
+        {
+          const char *path = copy_from_user(rdi);
+          int flags = rsi;
+          value = open(path, flags);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_close:
+        {
+          int fd = rdi;
+          value = close(fd);
           hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
           break;
         }
