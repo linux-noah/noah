@@ -34,8 +34,8 @@ def test_assertion
       print("X")
     end
 
-    unless err.empty? and status.success?
-      @assertion_reports << {name: File.basename(target), err: err, crash: !status.success?}
+    unless err.empty? && status.success?
+      @assertion_reports << {name: File.basename(target), diff: nil, err: err, crash: !status.success?} # C assertion cannot print "diff" currently, so let it nil
     end
   end
 end
@@ -45,9 +45,10 @@ def test_stdout
   test_targets.each do |target|
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = testdata_base + ".stdin"
+    expected = File.read(testdata_base + ".expected")
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape} < #{File.exists?(target_stdin) ? target_stdin.shellescape : '/dev/null'}")
 
-    if out == File.read(testdata_base + ".expected")
+    if out == expected
       @stdout[:pass] += 1
       print(".")
     elsif status.success?
@@ -58,8 +59,8 @@ def test_stdout
       print("X")
     end
 
-    unless err.empty? and status.success?
-      @stdout_reports << {name: File.basename(target), err: err, crash: !status.success?}
+    unless err.empty? && status.success? && out == expected
+      @stdout_reports << {name: File.basename(target), diff: [expected, out], err: err, crash: !status.success?}
     end
   end
 end
@@ -69,6 +70,13 @@ def report
   (@assertion_reports + @stdout_reports).each_with_index do |report, i|
     puts("#{i}) #{report[:name]}")
     puts(report[:err]) unless report[:err].empty?
+    if report[:diff] && report[:diff][0] != report[:diff][1]
+      puts "== Expected"
+      puts report[:diff][0]
+      puts "== Actual"
+      puts report[:diff][1]
+      puts "=="
+    end
     puts(report[:name] + " Crashed !!") if report[:crash]
   end
 
