@@ -40,13 +40,9 @@ void _exit(int status)
   __builtin_unreachable();
 }
 
-int _start()
+int _main(int argc, char **argv)
 {
-  register int argc asm("rax");
-  register char **argv asm("rbx");
-
   int main();
-
   _exit(main(argc, argv));
 }
 
