@@ -12,10 +12,9 @@ int fib(int n)
   }
 }
 
-int _start()
+int main()
 {
-  int fib10 = fib(10);
-  assert_true(fib10 == 55);
-  _exit(0);
+  assert_true(fib(10) == 55);
+  return 0;
 }
 

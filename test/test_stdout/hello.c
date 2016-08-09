@@ -1,8 +1,8 @@
 #include "noah.h"
 
-int _start()
+int main()
 {
   const char str[] = "hello, world!\n";
   write(1, str, sizeof str - 1);
-  _exit(0);
+  return 0;
 }

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
@@ -145,6 +146,17 @@ bool
 vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
 {
   return vm_walk_rec(0, pml4, vmvaddr, vmpaddr, perm);
+}
+
+void *
+copy_from_user(uint64_t vmvaddr)
+{
+  uint64_t str_paddr;
+  bool suc = vm_walk(vmvaddr, &str_paddr, NULL);
+  if (!suc) {
+    return NULL;
+  }
+  return to_haddrp(str_paddr);
 }
 
 void
@@ -373,8 +385,66 @@ load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
   fclose(file);
 }
 
+uint64_t
+push(hv_vcpuid_t vcpuid, const void *data, size_t n)
+{
+  uint64_t size = roundup(n, 8);
+  uint64_t rsp;
+
+  hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp - size);
+
+  uint64_t stack_vmpa;
+  if (! vm_walk(rsp, &stack_vmpa, NULL))
+    assert(false);
+  char *stackmem = to_haddrp(stack_vmpa);
+
+  if (data != 0) {
+    memcpy(stackmem - size, data, n);
+  } else {
+    memset(stackmem - size, 0, n);
+  }
+
+  PRINTF("guest: 0x%llx\n", rsp - size);
+  PRINTF("host:  %p\n", stackmem - size);
+
+  return rsp - size;
+}
+
 void
-run(char *elf_path)
+push_args(hv_vcpuid_t vcpuid, int argc, char *argv[])
+{
+  int total, i;
+  uint64_t offs[argc + 1];
+
+  total = 0;
+  for (i = 0; i < argc; ++i) {
+    offs[i] = total;
+    total += strlen(argv[i]) + 1;
+  }
+  offs[i] = total;
+
+  char buf[total];
+  for (int i = 0; i < argc; ++i) {
+    memcpy(buf + offs[i], argv[i], offs[i + 1] - offs[i]);
+  }
+
+  uint64_t args_start = push(vcpuid, buf, total);
+
+  /* set margin */
+  push(vcpuid, 0, 1024);
+
+  for (i = argc - 1; i >= 0; --i) {
+    uint64_t addr = args_start + offs[i];
+    push(vcpuid, &addr, sizeof addr);
+  }
+
+  uint64_t argc64 = argc;
+  push(vcpuid, &argc64, sizeof argc64);
+}
+
+void
+run(char *elf_path, int argc, char *argv[])
 {
   hv_return_t ret;
   hv_vcpuid_t vcpuid;
@@ -408,6 +478,8 @@ run(char *elf_path)
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack);
 
+  push_args(vcpuid, argc, argv);
+
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 
   PUTS("successfully set regs");
@@ -415,9 +487,6 @@ run(char *elf_path)
   /* now vm is ready */
 
   PUTS("now vm is ready");
-
-  hv_vcpu_write_register(vcpuid, HV_X86_RAX, 1);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBX, 2);
 
   print_regs(vcpuid);
 
@@ -475,7 +544,7 @@ run(char *elf_path)
           uint64_t str_paddr;
           bool suc = vm_walk(rsi, &str_paddr, NULL);
           if (!suc) {
-            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rsi);
+            printf("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
           value = write(rdi, to_haddrp(str_paddr), rdx);
           hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
@@ -486,10 +555,30 @@ run(char *elf_path)
           uint64_t str_paddr;
           bool suc = vm_walk(rsi, &str_paddr, NULL);
           if (!suc) {
-            PRINTF("vm_walk failed, rcx: 0x%016llx\n", rsi);
+            printf("vm_walk failed, rcx: 0x%016llx\n", rsi);
           }
           value = read(rdi, to_haddrp(str_paddr), rdx);
           hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_open:
+        {
+          const char *path = copy_from_user(rdi);
+          int flags = rsi;
+          value = open(path, flags);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_close:
+        {
+          int fd = rdi;
+          value = close(fd);
+          hv_vcpu_write_register(vcpuid, HV_X86_RAX, value);
+          break;
+        }
+      case SYS_printword:
+        {
+          printf("0x%llx (%llu)\n", rdi, rdi);
           break;
         }
       default:
@@ -535,8 +624,11 @@ run(char *elf_path)
 int
 main(int argc, char *argv[])
 {
-  assert(argc == 2);
-  run(argv[1]);
+  if (argc == 1) {
+    fprintf(stderr, "usage: noah elf_file ...\n");
+    exit(1);
+  }
+  run(argv[1], argc - 1, argv + 1);
 
   return 0;
 }
