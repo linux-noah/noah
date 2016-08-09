@@ -44,9 +44,10 @@ def test_stdout
   test_targets = Dir.glob(__dir__ + "/test_stdout/build/*")
   test_targets.each do |target|
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
-    target_stdin = testdata_base + ".stdin"
+    target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
+    target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
     expected = File.read(testdata_base + ".expected")
-    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape} < #{File.exists?(target_stdin) ? target_stdin.shellescape : '/dev/null'}")
+    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape} #{target_arg} < #{target_stdin}")
 
     if out == expected
       @stdout[:pass] += 1
