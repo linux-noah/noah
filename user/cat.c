@@ -11,5 +11,5 @@ int main(int argc, char *argv[])
       n -= w;
     }
   }
-  _exit(0);
+  return 0;
 }

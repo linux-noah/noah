@@ -1,7 +1,7 @@
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
-USERS := _cat _fib _hello
+USERS := _cat _fib _hello _echo
 
 all: build/noah $(USERS)
 
