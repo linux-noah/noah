@@ -3,7 +3,6 @@
 #include <string.h>
 #include <assert.h>
 #include <unistd.h>
-#include <fcntl.h>
 
 #include "sandbox.h"
 
@@ -14,8 +13,8 @@ typedef unsigned long ulong;
 
 #include "page.h"
 #include "elf.h"
-#include "syscall.h"
 #include "debug.h"
+#include "syscall/syscall.h"
 
 void
 load_elf(hv_vcpuid_t vcpuid, char *path)
@@ -137,78 +136,6 @@ init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
   uint64_t argc64 = argc;
   push(vcpuid, &argc64, sizeof argc64);
 }
-
-#define KV_SEL(K0,V0,K1,V1,K2,V2,K3,V3,K4,V4,K5,V5,X,...) X
-
-#define MAP_KV(f,...) MAP_KV_HELP(KV_SEL(__VA_ARGS__,MAP_KV6,ERROR,MAP_KV5,ERROR,MAP_KV4,ERROR,MAP_KV3,ERROR,MAP_KV2,ERROR,MAP_KV1,ERROR,MAP_KV0,ERROR),f,__VA_ARGS__)
-#define MAP_KV_HELP(MAP_KVN,f,...) MAP_KVN(f,__VA_ARGS__)
-#define MAP_KV0(f)
-#define MAP_KV1(f,k,v)     f(k,v)
-#define MAP_KV2(f,k,v,...) f(k,v), MAP_KV1(f,__VA_ARGS__)
-#define MAP_KV3(f,k,v,...) f(k,v), MAP_KV2(f,__VA_ARGS__)
-#define MAP_KV4(f,k,v,...) f(k,v), MAP_KV3(f,__VA_ARGS__)
-#define MAP_KV5(f,k,v,...) f(k,v), MAP_KV4(f,__VA_ARGS__)
-#define MAP_KV6(f,k,v,...) f(k,v), MAP_KV5(f,__VA_ARGS__)
-
-#define MK_DECL(t,v) t v
-#define MK_TEMP(t,v) uint64_t temp__##v
-#define MK_CAST(t,v) (t) temp__##v
-
-#define DECLARE_SCFUNCT(name, ...)                      \
-  uint64_t _sys_##name(MAP_KV(MK_DECL, __VA_ARGS__));
-
-#define DEFINE_SCWRAPPER(name, ...)                     \
-  uint64_t sys_##name(MAP_KV(MK_TEMP,__VA_ARGS__)) {    \
-    return _sys_##name(MAP_KV(MK_CAST,__VA_ARGS__));    \
-  }
-
-#define DEFINE_SCFUNCT(name, ...)                       \
-  uint64_t _sys_##name(MAP_KV(MK_DECL, __VA_ARGS__))
-
-#define DEFINE_SYSCALL(name, ...)               \
-  DECLARE_SCFUNCT(name, __VA_ARGS__)            \
-  DEFINE_SCWRAPPER(name, __VA_ARGS__)           \
-  DEFINE_SCFUNCT(name, __VA_ARGS__)
-
-
-DEFINE_SYSCALL(write, int, fd, const void *, buf, size_t, size)
-{
-  return write(fd, copy_from_user(buf), size);
-}
-
-DEFINE_SYSCALL(read, int, fd, void *, buf, size_t, size)
-{
-  return read(fd, copy_from_user(buf), size);
-}
-
-DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
-{
-  return open(path, flags, mode);
-}
-
-DEFINE_SYSCALL(close, int, fd)
-{
-  return close(fd);
-}
-
-DEFINE_SYSCALL(exit, int, reason)
-{
-  exit(reason);
-}
-
-typedef uint64_t (*sc_handler_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
-
-#define NR_SYSCALLS 256         /* FIXME */
-
-#define SYSCALL(name) [SYS_##name] = ((sc_handler_t) sys_##name),
-
-sc_handler_t sc_handler_table[NR_SYSCALLS] = {
-  SYSCALL(read)
-  SYSCALL(write)
-  SYSCALL(open)
-  SYSCALL(close)
-  SYSCALL(exit)
-};
 
 void
 run(char *elf_path, int argc, char *argv[])

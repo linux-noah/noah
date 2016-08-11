@@ -9,7 +9,7 @@ all: build/noah $(TEST_UPROGS)
 dev: CFLAGS += -DDEBUG_MODE=1
 dev: build/noah
 
-build/noah: src/main.o src/debug.o src/sandbox.c
+build/noah: src/main.o src/debug.o src/syscall/syscall.c src/syscall/fs.c src/sandbox.c
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h test/include/noah.S
