@@ -7,6 +7,8 @@ require "shellwords"
 @assertion_reports = []
 @stdout = {pass: 0, fail: 0, crash: 0}
 @stdout_reports = []
+@shell = {pass: 0, fail: 0, crash: 0}
+@shell_reports = []
 
 def main
   puts <<-"EOS"
@@ -72,22 +74,22 @@ def test_shell
     _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{target.shellescape} /bin/bash #{run.shellescape}")
 
     if status.success?
-      @stdout[:pass] += 1
+      @shell[:pass] += 1
       print(".")
     else
-      @stdout[:fail] += 1
+      @shell[:fail] += 1
       print("F")
     end
 
     unless err.empty? && status.success?
-      @stdout_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: false}
+      @shell_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: false}
     end
   end
 end
 
 def report
   puts("")
-  (@assertion_reports + @stdout_reports).each_with_index do |report, i|
+  (@assertion_reports + @stdout_reports + @shell_reports).each_with_index do |report, i|
     puts("#{i}) #{report[:name]}")
     puts(report[:err]) unless report[:err].empty?
     if report[:diff] && report[:diff][0] != report[:diff][1]
@@ -111,6 +113,9 @@ Output Test:
   Pass: #{@stdout[:pass]}, Fail: #{@stdout[:fail]}
   Crash Test Programs: #{@stdout[:crash]}
   Total Test Programs: #{@stdout.values.reduce(&:+)}
+Shell Test:
+  Pass: #{@shell[:pass]}, Fail: #{@shell[:fail]}
+  Total Test Programs: #{@shell.values.reduce(&:+)}
   EOS
 end
 
