@@ -1,8 +1,10 @@
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
-TEST_UPROGS := $(addprefix test/test_assertion/build/, fib)\
-               $(addprefix test/test_stdout/build/, hello cat echo)
+TEST_UPROGS := \
+	$(addprefix test/test_assertion/build/, fib)\
+	$(addprefix test/test_stdout/build/, hello cat echo)\
+	$(addprefix test/test_shell/build/, mv)
 
 all: build/noah $(TEST_UPROGS)
 
@@ -15,6 +17,8 @@ build/noah: src/main.o src/debug.o src/syscall/syscall.c src/syscall/fs.c src/sy
 test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h test/include/noah.S
 	$(MAKE_TEST_UPROGS)
 test/test_stdout/build/%: test/test_stdout/%.c test/include/*.h test/include/noah.S
+	$(MAKE_TEST_UPROGS)
+test/test_shell/build/%: test/test_shell/%.c test/include/*.h test/include/noah.S
 	$(MAKE_TEST_UPROGS)
 
 MAKE_TEST_UPROGS = rsync $^ idylls.jp:/tmp/$(USER)/;\

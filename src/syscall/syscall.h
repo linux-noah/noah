@@ -116,7 +116,7 @@ typedef uint64_t (*sc_handler_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_
   SYSCALL(79, unimplemented)                    \
   SYSCALL(80, unimplemented)                    \
   SYSCALL(81, unimplemented)                    \
-  SYSCALL(82, unimplemented)                    \
+  SYSCALL(82, rename)                           \
   SYSCALL(83, unimplemented)                    \
   SYSCALL(84, unimplemented)                    \
   SYSCALL(85, unimplemented)                    \

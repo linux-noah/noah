@@ -1,6 +1,9 @@
 #include "syscall.h"
 #include "../sandbox.h"
 
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -22,6 +25,11 @@ DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
 DEFINE_SYSCALL(close, int, fd)
 {
   return close(fd);
+}
+
+DEFINE_SYSCALL(rename, const char *, oldpath, const char *, newpath)
+{
+  return rename(copy_from_user(oldpath), copy_from_user(newpath));
 }
 
 DEFINE_SYSCALL(exit, int, reason)

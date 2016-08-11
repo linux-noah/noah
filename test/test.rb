@@ -18,19 +18,19 @@ Test Starts
   EOS
   test_assertion()
   test_stdout()
+  test_shell()
   puts("")
   report()
 end
 
 def test_assertion
-  test_targets = Dir.glob(__dir__ + "/test_assertion/build/*")
-  test_targets.each do |target|
+  Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape}")
     print(out)
     @assertion[:pass] += out.chars.count(".")
     @assertion[:fail] += out.chars.count("F")
     unless status.success?
-      @assertion[:crash] += 1 
+      @assertion[:crash] += 1
       print("X")
     end
 
@@ -41,8 +41,7 @@ def test_assertion
 end
 
 def test_stdout
-  test_targets = Dir.glob(__dir__ + "/test_stdout/build/*")
-  test_targets.each do |target|
+  Dir.glob(__dir__ + "/test_stdout/build/*").each do |target|
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
@@ -62,6 +61,26 @@ def test_stdout
 
     unless err.empty? && status.success? && out == expected
       @stdout_reports << {name: File.basename(target), diff: [expected, out], err: err, crash: !status.success?}
+    end
+  end
+end
+
+def test_shell
+  Dir.glob(__dir__ + "/test_shell/build/*").each do |target|
+    run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
+
+    _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{target.shellescape} /bin/bash #{run.shellescape}")
+
+    if status.success?
+      @stdout[:pass] += 1
+      print(".")
+    else
+      @stdout[:fail] += 1
+      print("F")
+    end
+
+    unless err.empty? && status.success?
+      @stdout_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: false}
     end
   end
 end

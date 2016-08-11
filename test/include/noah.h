@@ -19,6 +19,7 @@ uint64_t syscall(uint64_t num, uint64_t rdi, uint64_t rsi, uint64_t rdx)
 #define SYS_open 2
 #define SYS_close 3
 #define SYS_exit 60
+#define SYS_rename 82
 
 #define O_RDONLY 0
 
@@ -41,6 +42,11 @@ ssize_t write(int fd, const void *buf, size_t count)
 int open(const char *path, int flags)
 {
   return syscall(SYS_open, (uint64_t)path, flags, 0);
+}
+
+int rename(const char *oldpath, const char *newpath)
+{
+  return syscall(SYS_rename, (uint64_t)oldpath, (uint64_t)newpath, 0);
 }
 
 int close(unsigned int fd)
