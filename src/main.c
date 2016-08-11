@@ -312,7 +312,7 @@ print_regs(hv_vcpuid_t vcpuid)
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
   PRINTF("rbp = 0x%llx\n", value);
 }
-    
+
 void
 init_msr(hv_vcpuid_t vcpuid)
 {
@@ -324,7 +324,7 @@ init_msr(hv_vcpuid_t vcpuid)
 }
 
 void
-load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
+load_elf(hv_vcpuid_t vcpuid, char *path)
 {
   FILE *file = fopen(path, "r");
   struct elf_header h;
@@ -371,18 +371,22 @@ load_elf(char *path, uint64_t *entry, uint64_t *stack_base, uint64_t *heap)
     }
   }
   void *heapmem = kalloc(PAGE_SIZE(PAGE_2MB));
-  *heap = roundup(map_top, PAGE_SIZE(PAGE_2MB));
-  vm_map(*heap, to_vmpa(heapmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
+  uint64_t heap = roundup(map_top, PAGE_SIZE(PAGE_2MB));
+  vm_map(heap, to_vmpa(heapmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
 
   void *stackmem = kalloc(PAGE_SIZE(PAGE_2MB));
   uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
   vm_map(stack_top - PAGE_SIZE(PAGE_2MB), to_vmpa(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
-  *stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
+  uint64_t stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
   PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
 
-  *entry = h.entry;
+  uint64_t entry = h.entry;
 
   fclose(file);
+
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack_base);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack_base);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 }
 
 uint64_t
@@ -412,7 +416,7 @@ push(hv_vcpuid_t vcpuid, const void *data, size_t n)
 }
 
 void
-push_args(hv_vcpuid_t vcpuid, int argc, char *argv[])
+init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
 {
   int total, i;
   uint64_t offs[argc + 1];
@@ -444,11 +448,9 @@ push_args(hv_vcpuid_t vcpuid, int argc, char *argv[])
 }
 
 void
-run(char *elf_path, int argc, char *argv[])
+create_sandbox(hv_vcpuid_t *vcpuid)
 {
   hv_return_t ret;
-  hv_vcpuid_t vcpuid;
-  uint64_t value;
 
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
@@ -458,7 +460,7 @@ run(char *elf_path, int argc, char *argv[])
 
   PUTS("successfully created the vm");
 
-  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
+  ret = hv_vcpu_create(vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
     PRINTF("could not create a vcpu: error code %x", ret);
     return;
@@ -466,29 +468,48 @@ run(char *elf_path, int argc, char *argv[])
 
   PUTS("successfully created a vcpu");
 
-  init_vmcs(vcpuid);
-  init_msr(vcpuid);
-  init_page(vcpuid);
-  init_segment(vcpuid);
-  init_idt(vcpuid);
-  init_regs(vcpuid);
+  init_vmcs(*vcpuid);
+  init_msr(*vcpuid);
+  init_page(*vcpuid);
+  init_segment(*vcpuid);
+  init_idt(*vcpuid);
+  init_regs(*vcpuid);
+}
 
-  uint64_t entry, stack, heap;
-  load_elf(elf_path, &entry, &stack, &heap);
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack);
+void
+destroy_sandbox(hv_vcpuid_t vcpuid)
+{
+  hv_return_t ret;
 
-  push_args(vcpuid, argc, argv);
+  ret = hv_vcpu_destroy(vcpuid);
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not destroy the vcpu: error code %x", ret);
+    return;
+  }
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
+  PUTS("successfully destroyed the vcpu");
 
-  PUTS("successfully set regs");
+  ret = hv_vm_destroy();
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not destroy the vm: error code %x", ret);
+    return;
+  }
 
-  /* now vm is ready */
+  PUTS("successfully destroyed the vm");
+}
+
+void
+run(char *elf_path, int argc, char *argv[])
+{
+  hv_return_t ret;
+  hv_vcpuid_t vcpuid;
+  uint64_t value;
+
+  create_sandbox(&vcpuid);
+  load_elf(vcpuid, elf_path);
+  init_userstack(vcpuid, argc, argv);
 
   PUTS("now vm is ready");
-
-  print_regs(vcpuid);
 
   for (int i = 0; i < 256; i++) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
@@ -602,23 +623,7 @@ run(char *elf_path, int argc, char *argv[])
 
   PUTS("exit...");
 
-  /* exit... */
-
-  ret = hv_vcpu_destroy(vcpuid);
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not destroy the vcpu: error code %x", ret);
-    return;
-  }
-
-  PUTS("successfully destroyed the vcpu");
-
-  ret = hv_vm_destroy();
-  if (ret != HV_SUCCESS) {
-    PRINTF("could not destroy the vm: error code %x", ret);
-    return;
-  }
-
-  PUTS("successfully destroyed the vm");
+  destroy_sandbox(vcpuid);
 }
 
 int
