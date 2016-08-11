@@ -1,3 +1,5 @@
+#ifndef NOAH_VMEM_H
+#define NOAH_VMEM_H
 
 typedef enum {
   PAGE_4KB,
@@ -13,3 +15,5 @@ typedef enum {
 #define KERN_BASE                        0xffff800000000000ULL
 
 #define CANONICAL_LOWER_END              0x00007fffffffffffULL
+
+#endif
