@@ -233,7 +233,7 @@ int
 main(int argc, char *argv[])
 {
   if (argc == 1) {
-    fprintf(stderr, "usage: noah elf_file ...\n");
+    fprintf(stderr, "usage: %s elf_file ...\n", argv[0]);
     exit(1);
   }
   run(argv[1], argc - 1, argv + 1);
