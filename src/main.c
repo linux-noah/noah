@@ -92,7 +92,7 @@ push(hv_vcpuid_t vcpuid, const void *data, size_t n)
   hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp - size);
 
-  char *stackmem = copy_from_user(rsp);;
+  char *stackmem = copy_from_user((void *)rsp);
 
   if (data != 0) {
     memcpy(stackmem - size, data, n);
@@ -204,19 +204,19 @@ run(char *elf_path, int argc, char *argv[])
         break;
       case SYS_write:
         {
-          void *buf = copy_from_user(rsi);
+          void *buf = copy_from_user((void *)rsi);
           retval = write(rdi, buf, rdx);
           break;
         }
       case SYS_read:
         {
-          void *buf = copy_from_user(rsi);
+          void *buf = copy_from_user((void *)rsi);
           retval = read(rdi, buf, rdx);
           break;
         }
       case SYS_open:
         {
-          const char *path = copy_from_user(rdi);
+          const char *path = copy_from_user((void *)rdi);
           retval = open(path, rsi);
           break;
         }

@@ -145,10 +145,10 @@ vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
 }
 
 void *
-copy_from_user(uint64_t vmvaddr)
+copy_from_user(const void *vmvaddr)
 {
   uint64_t str_paddr;
-  bool suc = vm_walk(vmvaddr, &str_paddr, NULL);
+  bool suc = vm_walk((uint64_t) vmvaddr, &str_paddr, NULL);
   if (!suc) {
     return NULL;
   }
