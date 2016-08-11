@@ -138,46 +138,60 @@ init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
   push(vcpuid, &argc64, sizeof argc64);
 }
 
-#define DECLARE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)  \
-  uint64_t _sys_##name(t0 v0, t1 v1, t2 v2);
+#define KV_SEL(K0,V0,K1,V1,K2,V2,K3,V3,K4,V4,K5,V5,X,...) X
 
-#define DEFINE_SCWRAPPER3(name, t0, v0, t1, v1, t2, v2)         \
-  uint64_t sys_##name(uint64_t a0, uint64_t a1, uint64_t a2) {  \
-    return _sys_##name((t0)a0, (t1)a1, (t2)a2);                 \
+#define MAP_KV(f,...) MAP_KV_HELP(KV_SEL(__VA_ARGS__,MAP_KV6,ERROR,MAP_KV5,ERROR,MAP_KV4,ERROR,MAP_KV3,ERROR,MAP_KV2,ERROR,MAP_KV1,ERROR,MAP_KV0,ERROR),f,__VA_ARGS__)
+#define MAP_KV_HELP(MAP_KVN,f,...) MAP_KVN(f,__VA_ARGS__)
+#define MAP_KV0(f)
+#define MAP_KV1(f,k,v)     f(k,v)
+#define MAP_KV2(f,k,v,...) f(k,v), MAP_KV1(f,__VA_ARGS__)
+#define MAP_KV3(f,k,v,...) f(k,v), MAP_KV2(f,__VA_ARGS__)
+#define MAP_KV4(f,k,v,...) f(k,v), MAP_KV3(f,__VA_ARGS__)
+#define MAP_KV5(f,k,v,...) f(k,v), MAP_KV4(f,__VA_ARGS__)
+#define MAP_KV6(f,k,v,...) f(k,v), MAP_KV5(f,__VA_ARGS__)
+
+#define MK_DECL(t,v) t v
+#define MK_TEMP(t,v) uint64_t temp__##v
+#define MK_CAST(t,v) (t) temp__##v
+
+#define DECLARE_SCFUNCT(name, ...)                      \
+  uint64_t _sys_##name(MAP_KV(MK_DECL, __VA_ARGS__));
+
+#define DEFINE_SCWRAPPER(name, ...)                     \
+  uint64_t sys_##name(MAP_KV(MK_TEMP,__VA_ARGS__)) {    \
+    return _sys_##name(MAP_KV(MK_CAST,__VA_ARGS__));    \
   }
 
-#define DEFINE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)   \
-  uint64_t _sys_##name(t0 v0, t1 v1, t2 v2)
+#define DEFINE_SCFUNCT(name, ...)                       \
+  uint64_t _sys_##name(MAP_KV(MK_DECL, __VA_ARGS__))
 
-#define DEFINE_SYSCALL3(name, t0, v0, t1, v1, t2, v2)   \
-  DECLARE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)        \
-  DEFINE_SCWRAPPER3(name, t0, v0, t1, v1, t2, v2)       \
-  DEFINE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)
+#define DEFINE_SYSCALL(name, ...)               \
+  DECLARE_SCFUNCT(name, __VA_ARGS__)            \
+  DEFINE_SCWRAPPER(name, __VA_ARGS__)           \
+  DEFINE_SCFUNCT(name, __VA_ARGS__)
 
 
-DEFINE_SYSCALL3(write, int, fd, const void *, buf, size_t, size)
+DEFINE_SYSCALL(write, int, fd, const void *, buf, size_t, size)
 {
   return write(fd, copy_from_user(buf), size);
 }
 
-DEFINE_SYSCALL3(read, int, fd, void *, buf, size_t, size)
+DEFINE_SYSCALL(read, int, fd, void *, buf, size_t, size)
 {
   return read(fd, copy_from_user(buf), size);
 }
 
-/* TODO: generic DEFINE_SYSCALL */
-
-DEFINE_SYSCALL3(open, const char *, path, int, flags, int, mode)
+DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
 {
   return open(path, flags, mode);
 }
 
-DEFINE_SYSCALL3(close, int, fd, int, _1, int, _2)
+DEFINE_SYSCALL(close, int, fd)
 {
   return close(fd);
 }
 
-DEFINE_SYSCALL3(exit, int, reason, int, _1, int, _2)
+DEFINE_SYSCALL(exit, int, reason)
 {
   exit(reason);
 }
@@ -186,14 +200,14 @@ typedef uint64_t (*sc_handler_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_
 
 #define NR_SYSCALLS 256         /* FIXME */
 
-#define SYSCALL(name) ((sc_handler_t) sys_##name)
+#define SYSCALL(name) [SYS_##name] = ((sc_handler_t) sys_##name),
 
 sc_handler_t sc_handler_table[NR_SYSCALLS] = {
-  [0] = SYSCALL(read),
-  [1] = SYSCALL(write),
-  [2] = SYSCALL(open),
-  [3] = SYSCALL(close),
-  [60] = SYSCALL(exit),
+  SYSCALL(read)
+  SYSCALL(write)
+  SYSCALL(open)
+  SYSCALL(close)
+  SYSCALL(exit)
 };
 
 void
