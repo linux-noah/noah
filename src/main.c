@@ -138,6 +138,64 @@ init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
   push(vcpuid, &argc64, sizeof argc64);
 }
 
+#define DECLARE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)  \
+  uint64_t _sys_##name(t0 v0, t1 v1, t2 v2);
+
+#define DEFINE_SCWRAPPER3(name, t0, v0, t1, v1, t2, v2)         \
+  uint64_t sys_##name(uint64_t a0, uint64_t a1, uint64_t a2) {  \
+    return _sys_##name((t0)a0, (t1)a1, (t2)a2);                 \
+  }
+
+#define DEFINE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)   \
+  uint64_t _sys_##name(t0 v0, t1 v1, t2 v2)
+
+#define DEFINE_SYSCALL3(name, t0, v0, t1, v1, t2, v2)   \
+  DECLARE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)        \
+  DEFINE_SCWRAPPER3(name, t0, v0, t1, v1, t2, v2)       \
+  DEFINE_SCFUNCT3(name, t0, v0, t1, v1, t2, v2)
+
+
+DEFINE_SYSCALL3(write, int, fd, const void *, buf, size_t, size)
+{
+  return write(fd, copy_from_user(buf), size);
+}
+
+DEFINE_SYSCALL3(read, int, fd, void *, buf, size_t, size)
+{
+  return read(fd, copy_from_user(buf), size);
+}
+
+/* TODO: generic DEFINE_SYSCALL */
+
+DEFINE_SYSCALL3(open, const char *, path, int, flags, int, mode)
+{
+  return open(path, flags, mode);
+}
+
+DEFINE_SYSCALL3(close, int, fd, int, _1, int, _2)
+{
+  return close(fd);
+}
+
+DEFINE_SYSCALL3(exit, int, reason, int, _1, int, _2)
+{
+  exit(reason);
+}
+
+typedef uint64_t (*sc_handler_t)(uint64_t, uint64_t, uint64_t, uint64_t, uint64_t, uint64_t);
+
+#define NR_SYSCALLS 256         /* FIXME */
+
+#define SYSCALL(name) ((sc_handler_t) sys_##name)
+
+sc_handler_t sc_handler_table[NR_SYSCALLS] = {
+  [0] = SYSCALL(read),
+  [1] = SYSCALL(write),
+  [2] = SYSCALL(open),
+  [3] = SYSCALL(close),
+  [60] = SYSCALL(exit),
+};
+
 void
 run(char *elf_path, int argc, char *argv[])
 {
@@ -172,7 +230,7 @@ run(char *elf_path, int argc, char *argv[])
     print_regs(vcpuid);
 
     switch (value) {
-      uint64_t rax, rdi, rsi, rdx;
+      uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
 
     case VMX_REASON_VMCALL:
       PUTS("reason: vmcall");
@@ -196,44 +254,16 @@ run(char *elf_path, int argc, char *argv[])
       hv_vcpu_read_register(vcpuid, HV_X86_RDI, &rdi);
       hv_vcpu_read_register(vcpuid, HV_X86_RSI, &rsi);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
-      switch (rax) {
-      case SYS_exit:
-      case SYS_exit_group:
-        PUTS("exit...");
-        exit(rdi);
-        break;
-      case SYS_write:
-        {
-          void *buf = copy_from_user((void *)rsi);
-          retval = write(rdi, buf, rdx);
-          break;
-        }
-      case SYS_read:
-        {
-          void *buf = copy_from_user((void *)rsi);
-          retval = read(rdi, buf, rdx);
-          break;
-        }
-      case SYS_open:
-        {
-          const char *path = copy_from_user((void *)rdi);
-          retval = open(path, rsi);
-          break;
-        }
-      case SYS_close:
-        {
-          retval = close(rdi);
-          break;
-        }
-      case SYS_printword:
-        {
-          printf("0x%llx (%llu)\n", rdi, rdi);
-          retval = 0;
-          break;
-        }
-      default:
-        PRINTF("UNKNOWN SYSCALL!: %lld\n", rax);
-        abort();
+      hv_vcpu_read_register(vcpuid, HV_X86_R10, &r10);
+      hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
+      hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
+      if (rax < NR_SYSCALLS) {
+        retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
+      } else {
+        /* printint */
+        assert(rax == 0xffffffffffffffff);
+        printf("0x%llx (%llu)\n", rdi, rdi);
+        retval = 0;
       }
       PUTS("<<<done");
 
