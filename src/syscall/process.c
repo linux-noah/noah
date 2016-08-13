@@ -8,6 +8,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+DEFINE_SYSCALL(exit, int, reason)
+{
+  _exit(reason);
+}
+
 DEFINE_SYSCALL(arch_prctl, int, code, uint64_t, addr)
 {
   puts("FIXME: arch_prctl");

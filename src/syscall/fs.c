@@ -31,8 +31,3 @@ DEFINE_SYSCALL(rename, const char *, oldpath, const char *, newpath)
 {
   return rename(copy_from_user(oldpath), copy_from_user(newpath));
 }
-
-DEFINE_SYSCALL(exit, int, reason)
-{
-  _exit(reason);
-}
