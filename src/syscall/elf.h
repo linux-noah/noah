@@ -22,6 +22,10 @@ struct elf_header {
   ushort shstrndx;
 };
 
+#define ELF_TYPE_EXEC 2
+
+#define ELF_ISA_X64 62
+
 #define ELF_PROG_LOAD 1
 
 struct program_header {

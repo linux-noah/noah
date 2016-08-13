@@ -20,11 +20,16 @@ load_elf(hv_vcpuid_t vcpuid, char *path)
 
   fread(&h, sizeof h, 1, file);
 
-  PRINTF("magic: 0x%08x\n", h.magic);
-  PRINTF("cpubit: 0x%08x\n", h.cpubit);
-  PRINTF("size: %d\n", h.ehsize);
-  PRINTF("entry: 0x%016lx\n", h.entry);
-  PRINTF("phnum: %d\n", h.phnum);
+  assert(h.magic == 0x464c457f);
+
+  if (h.type != ELF_TYPE_EXEC) {
+    fprintf(stderr, "not an executable file");
+    return;
+  }
+  if (h.isa != ELF_ISA_X64) {
+    fprintf(stderr, "not an x64 executable");
+    return;
+  }
 
   assert(h.phoff != 0);
   assert(h.phnum >= 1);
