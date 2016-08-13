@@ -15,7 +15,7 @@
 #include "elf.h"
 
 void
-load_elf(hv_vcpuid_t vcpuid, char *path)
+load_elf(char *path)
 {
   char *data;
   struct elf_header *h;
@@ -105,7 +105,7 @@ push(hv_vcpuid_t vcpuid, const void *data, size_t n)
 }
 
 void
-init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[], char **envp)
+init_userstack(int argc, char *argv[], char **envp)
 {
   char **renvp;
   for (renvp = envp; *renvp; ++renvp)
@@ -168,12 +168,11 @@ void
 do_exec(char *elf_path, int argc, char *argv[], char **envp)
 {
   hv_return_t ret;
-  hv_vcpuid_t vcpuid;
   uint64_t value;
 
-  create_sandbox(&vcpuid);
-  load_elf(vcpuid, elf_path);
-  init_userstack(vcpuid, argc, argv, envp);
+  create_sandbox();
+  load_elf(elf_path);
+  init_userstack(argc, argv, envp);
 
   PUTS("now vm is ready");
 
@@ -195,7 +194,7 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
     PRINTF("exit reason = 0x%llx\n", value);
 
-    print_regs(vcpuid);
+    print_regs();
 
     switch (value) {
       uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
@@ -254,5 +253,5 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
 
   PUTS("exit...");
 
-  destroy_sandbox(vcpuid);
+  destroy_sandbox();
 }

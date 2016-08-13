@@ -19,6 +19,8 @@
 #include "x86/msr.h"
 #include "vmem.h"
 
+hv_vcpuid_t vcpuid;
+
 uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;
 
@@ -156,7 +158,7 @@ copy_from_user(const void *vmvaddr)
 }
 
 void
-init_vmcs(hv_vcpuid_t vcpuid)
+init_vmcs()
 {
   uint64_t vmx_cap_pinbased, vmx_cap_procbased, vmx_cap_procbased2, vmx_cap_entry, vmx_cap_exit;
 
@@ -187,7 +189,7 @@ init_vmcs(hv_vcpuid_t vcpuid)
 }
 
 void
-init_page(hv_vcpuid_t vcpuid)
+init_page()
 {
   pml4 = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
   bzero(pml4, sizeof(uint64_t[NR_PAGE_ENTRY]));
@@ -207,7 +209,7 @@ init_page(hv_vcpuid_t vcpuid)
 }
 
 void
-init_segment(hv_vcpuid_t vcpuid)
+init_segment()
 {
   uint64_t gdt[3];
   gdt[SEG_NULL] = 0; // NULL SEL
@@ -273,7 +275,7 @@ init_segment(hv_vcpuid_t vcpuid)
 }
 
 void
-init_idt(hv_vcpuid_t vcpuid)
+init_idt()
 {
   struct gate_desc (*idt)[256] = kalloc(sizeof(struct gate_desc[256]));
 
@@ -282,14 +284,14 @@ init_idt(hv_vcpuid_t vcpuid)
 }
 
 void
-init_regs(hv_vcpuid_t vcpuid)
+init_regs()
 {
   /* set up cpu regs */
   hv_vcpu_write_register(vcpuid, HV_X86_RFLAGS, 0x2);
 }
 
 void
-init_msr(hv_vcpuid_t vcpuid)
+init_msr()
 {
   if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS && 
       hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
@@ -299,7 +301,7 @@ init_msr(hv_vcpuid_t vcpuid)
 }
 
 void
-create_sandbox(hv_vcpuid_t *vcpuid)
+create_sandbox()
 {
   hv_return_t ret;
 
@@ -311,7 +313,7 @@ create_sandbox(hv_vcpuid_t *vcpuid)
 
   PUTS("successfully created the vm");
 
-  ret = hv_vcpu_create(vcpuid, HV_VCPU_DEFAULT);
+  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
     PRINTF("could not create a vcpu: error code %x", ret);
     return;
@@ -319,16 +321,16 @@ create_sandbox(hv_vcpuid_t *vcpuid)
 
   PUTS("successfully created a vcpu");
 
-  init_vmcs(*vcpuid);
-  init_msr(*vcpuid);
-  init_page(*vcpuid);
-  init_segment(*vcpuid);
-  init_idt(*vcpuid);
-  init_regs(*vcpuid);
+  init_vmcs();
+  init_msr();
+  init_page();
+  init_segment();
+  init_idt();
+  init_regs();
 }
 
 void
-destroy_sandbox(hv_vcpuid_t vcpuid)
+destroy_sandbox()
 {
   hv_return_t ret;
 
@@ -350,7 +352,7 @@ destroy_sandbox(hv_vcpuid_t vcpuid)
 }
 
 void
-print_regs(hv_vcpuid_t vcpuid)
+print_regs()
 {
   uint64_t value;
 
