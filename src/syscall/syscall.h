@@ -16,11 +16,11 @@
   SYSCALL(13, unimplemented)                    \
   SYSCALL(14, unimplemented)                    \
   SYSCALL(15, unimplemented)                    \
-  SYSCALL(16, unimplemented)                    \
+  SYSCALL(16, ioctl)                            \
   SYSCALL(17, unimplemented)                    \
   SYSCALL(18, unimplemented)                    \
   SYSCALL(19, unimplemented)                    \
-  SYSCALL(20, unimplemented)                    \
+  SYSCALL(20, writev)                           \
   SYSCALL(21, unimplemented)                    \
   SYSCALL(22, unimplemented)                    \
   SYSCALL(23, unimplemented)                    \
