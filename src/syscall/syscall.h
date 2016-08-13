@@ -231,7 +231,7 @@
   SYSCALL(228, unimplemented)                   \
   SYSCALL(229, unimplemented)                   \
   SYSCALL(230, unimplemented)                   \
-  SYSCALL(231, unimplemented)                   \
+  SYSCALL(231, exit_group)                      \
   SYSCALL(232, unimplemented)                   \
   SYSCALL(233, unimplemented)                   \
   SYSCALL(234, unimplemented)                   \
