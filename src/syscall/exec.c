@@ -45,9 +45,6 @@ load_elf(hv_vcpuid_t vcpuid, char *path)
     return;
   }
 
-  assert(h->phoff != 0);
-  assert(h->phnum >= 1);
-
   struct program_header *p = (struct program_header *)(data + h->phoff);
 
   for (int i = 0; i < h->phnum; i++) {
@@ -55,14 +52,16 @@ load_elf(hv_vcpuid_t vcpuid, char *path)
       continue;
     }
 
-    void *segment = kalloc(p[i].memsz);
-    bzero(segment, p[i].memsz);
+    ulong start = p[i].vaddr & ~(PAGE_SIZE(PAGE_4KB) - 1);
+    ulong offset = p[i].vaddr - start;
+    ulong size = p[i].memsz + offset;
 
-    memcpy(segment, data + p[i].offset, p[i].filesz);
+    char *segment = kalloc(size);
+    memcpy(segment + offset, data + p[i].offset, p[i].filesz);
 
-    vm_map(p[i].vaddr, to_vmpa(segment), p[i].memsz, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+    vm_map(start, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
-    map_top = MAX(map_top, p[i].vaddr + p[i].memsz);
+    map_top = MAX(map_top, start + size);
   }
 
   void *heapmem = kalloc(PAGE_SIZE(PAGE_2MB));
