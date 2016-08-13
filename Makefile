@@ -15,7 +15,7 @@ TEST_UPROGS := \
 	$(addprefix test/test_stdout/build/, hello cat echo)\
 	$(addprefix test/test_shell/build/, mv env)
 
-all: build/noah $(TEST_UPROGS)
+all: build/noah
 
 dev: CFLAGS += -DDEBUG_MODE=1
 dev: build/noah
@@ -38,6 +38,7 @@ run: build/noah test/test_stdout/build/hello
 	./build/noah test/test_stdout/build/hello
 clean:
 	$(RM) -r src/*.o
+	$(RM) -r src/syscall/*.o
 	$(RM) -r build/noah
 	$(RM) test/test_assertion/build/* test/test_stdout/build/* test/test_shell/build/*
 
