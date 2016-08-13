@@ -191,7 +191,7 @@ do_exec(char *elf_path, int argc, char *argv[])
       hv_vcpu_read_register(vcpuid, HV_X86_R10, &r10);
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
-      printf(">>>start syscall handling...: %llu\n", rax);
+      PRINTF(">>>start syscall handling...: %llu\n", rax);
       if (rax < NR_SYSCALLS) {
         retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
       } else {
