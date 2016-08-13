@@ -1,4 +1,4 @@
-#include "../sandbox.h"
+#include "common.h"
 
 #include <unistd.h>
 #include <stdio.h>
@@ -6,9 +6,9 @@
 #include <string.h>
 #include <assert.h>
 
+#include "../sandbox.h"
 #include "../page.h"
 #include "../elf.h"
-#include "syscall.h"
 
 void
 load_elf(hv_vcpuid_t vcpuid, char *path)
@@ -184,7 +184,6 @@ do_exec(char *elf_path, int argc, char *argv[])
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
       PRINTF("guest int status = %lld\n", value);
       PUTS("!!MAYBE A SYSENTER!!");
-      PUTS(">>>start syscall handling...");
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
       hv_vcpu_read_register(vcpuid, HV_X86_RDI, &rdi);
       hv_vcpu_read_register(vcpuid, HV_X86_RSI, &rsi);
@@ -192,6 +191,7 @@ do_exec(char *elf_path, int argc, char *argv[])
       hv_vcpu_read_register(vcpuid, HV_X86_R10, &r10);
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
+      printf(">>>start syscall handling...: %llu\n", rax);
       if (rax < NR_SYSCALLS) {
         retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
       } else {

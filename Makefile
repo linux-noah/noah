@@ -4,9 +4,8 @@ LDFLAGS += -framework Hypervisor
 SRCS := \
 	src/main.c\
 	src/debug.c\
-	src/syscall/syscall.c\
-	src/syscall/fs.c\
 	src/syscall/common.c\
+	src/syscall/fs.c\
 	src/syscall/exec.c\
 	src/sandbox.c
 

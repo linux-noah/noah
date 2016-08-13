@@ -1,4 +1,4 @@
-#include "syscall.h"
+#include "common.h"
 #include "../sandbox.h"
 
 #include <stdio.h>
