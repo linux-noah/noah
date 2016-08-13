@@ -100,31 +100,59 @@ push(hv_vcpuid_t vcpuid, const void *data, size_t n)
 }
 
 void
-init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
+init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[], char **envp)
 {
-  int total, i;
-  uint64_t offs[argc + 1];
+  char **renvp;
+  for (renvp = envp; *renvp; ++renvp)
+    ;
 
-  total = 0;
-  for (i = 0; i < argc; ++i) {
-    offs[i] = total;
+  uint64_t total = 0, args_total = 0;
+
+  for (int i = 0; i < argc; ++i) {
     total += strlen(argv[i]) + 1;
   }
-  offs[i] = total;
+  args_total = total;
+  for (char **e = envp; *e; ++e) {
+    total += strlen(*e) + 1;
+  }
 
   char buf[total];
+
+  uint64_t off = 0;
+
   for (int i = 0; i < argc; ++i) {
-    memcpy(buf + offs[i], argv[i], offs[i + 1] - offs[i]);
+    size_t len = strlen(argv[i]);
+    memcpy(buf + off, argv[i], len + 1);
+    off += len + 1;
+  }
+  for (char **e = envp; *e; ++e) {
+    size_t len = strlen(*e);
+    memcpy(buf + off, *e, len + 1);
+    off += len + 1;
   }
 
   uint64_t args_start = push(vcpuid, buf, total);
+  uint64_t args_end = args_start + args_total, env_end = args_start + total;
 
   /* set margin */
   push(vcpuid, 0, 1024);
 
-  for (i = argc - 1; i >= 0; --i) {
-    uint64_t addr = args_start + offs[i];
-    push(vcpuid, &addr, sizeof addr);
+  push(vcpuid, 0, sizeof(uint64_t));
+
+  uint64_t ptr = env_end;
+  for (char **e = renvp - 1; e >= envp; --e) {
+    ptr -= strlen(*e) + 1;
+    push(vcpuid, &ptr, sizeof ptr);
+    assert(strcmp(buf + (ptr - args_start), *e) == 0);
+  }
+
+  push(vcpuid, 0, sizeof(uint64_t));
+
+  ptr = args_end;
+  for (int i = argc - 1; i >= 0; --i) {
+    ptr -= strlen(argv[i]) + 1;
+    push(vcpuid, &ptr, sizeof ptr);
+    assert(strcmp(buf + (ptr - args_start), argv[i]) == 0);
   }
 
   uint64_t argc64 = argc;
@@ -132,7 +160,7 @@ init_userstack(hv_vcpuid_t vcpuid, int argc, char *argv[])
 }
 
 void
-do_exec(char *elf_path, int argc, char *argv[])
+do_exec(char *elf_path, int argc, char *argv[], char **envp)
 {
   hv_return_t ret;
   hv_vcpuid_t vcpuid;
@@ -140,7 +168,7 @@ do_exec(char *elf_path, int argc, char *argv[])
 
   create_sandbox(&vcpuid);
   load_elf(vcpuid, elf_path);
-  init_userstack(vcpuid, argc, argv);
+  init_userstack(vcpuid, argc, argv, envp);
 
   PUTS("now vm is ready");
 

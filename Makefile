@@ -13,7 +13,7 @@ SRCS := \
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
-	$(addprefix test/test_shell/build/, mv)
+	$(addprefix test/test_shell/build/, mv env)
 
 all: build/noah $(TEST_UPROGS)
 
@@ -39,7 +39,7 @@ run: build/noah test/test_stdout/build/hello
 clean:
 	$(RM) -r src/*.o
 	$(RM) -r build/noah
-	$(RM) test/test_assertion/build/* test/test_stdout/build/*
+	$(RM) test/test_assertion/build/* test/test_stdout/build/* test/test_shell/build/*
 
 test: build/noah $(TEST_UPROGS)
 	./test/test.rb

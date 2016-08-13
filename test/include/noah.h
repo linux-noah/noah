@@ -62,8 +62,9 @@ void _exit(int status)
 
 int _main(int argc, char **argv)
 {
+  typedef int (*main_t)(int, char **, char **);
   int main();
-  _exit(main(argc, argv));
+  _exit(((main_t)main)(argc, argv, argv + argc + 1));
 }
 
 size_t strlen(const char *str)
@@ -71,4 +72,9 @@ size_t strlen(const char *str)
   const char *s;
   for (s = str; *s; s++);
   return s - str;
+}
+
+int strcmp(const char *s, const char *t) {
+  while (*s && *s == *t) s++, t++;
+  return *s - *t;
 }
