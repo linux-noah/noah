@@ -6,18 +6,18 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
+#include "common.h"
 #include "sandbox.h"
 
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
-#include "page.h"
-#include "segment.h"
-#include "idt.h"
-#include "msr.h"
+#include "x86/page.h"
+#include "x86/segment.h"
+#include "x86/idt.h"
+#include "x86/msr.h"
 #include "vmem.h"
-#include "debug.h"
 
 uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;

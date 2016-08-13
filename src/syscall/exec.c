@@ -7,8 +7,8 @@
 #include <assert.h>
 
 #include "../sandbox.h"
-#include "../page.h"
-#include "../elf.h"
+#include "../x86/page.h"
+#include "elf.h"
 
 void
 load_elf(hv_vcpuid_t vcpuid, char *path)
