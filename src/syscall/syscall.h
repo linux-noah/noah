@@ -158,7 +158,7 @@
   SYSCALL(155, unimplemented)                   \
   SYSCALL(156, unimplemented)                   \
   SYSCALL(157, unimplemented)                   \
-  SYSCALL(158, unimplemented)                   \
+  SYSCALL(158, arch_prctl)                      \
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, unimplemented)                   \
   SYSCALL(161, unimplemented)                   \
@@ -218,7 +218,7 @@
   SYSCALL(215, unimplemented)                   \
   SYSCALL(216, unimplemented)                   \
   SYSCALL(217, unimplemented)                   \
-  SYSCALL(218, unimplemented)                   \
+  SYSCALL(218, set_tid_address)                 \
   SYSCALL(219, unimplemented)                   \
   SYSCALL(220, unimplemented)                   \
   SYSCALL(221, unimplemented)                   \
