@@ -1,6 +1,15 @@
 CFLAGS += -g
 LDFLAGS += -framework Hypervisor
 
+SRCS := \
+	src/main.c\
+	src/debug.c\
+	src/syscall/syscall.c\
+	src/syscall/fs.c\
+	src/syscall/common.c\
+	src/syscall/exec.c\
+	src/sandbox.c
+
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
@@ -11,7 +20,7 @@ all: build/noah $(TEST_UPROGS)
 dev: CFLAGS += -DDEBUG_MODE=1
 dev: build/noah
 
-build/noah: src/main.o src/debug.o src/syscall/syscall.c src/syscall/fs.c src/syscall/common.c src/sandbox.c
+build/noah: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h test/include/noah.S

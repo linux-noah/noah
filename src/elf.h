@@ -1,3 +1,5 @@
+#include "common.h"
+
 struct elf_header {
   uint magic;
   uchar cpubit;
