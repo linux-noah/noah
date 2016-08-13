@@ -26,8 +26,6 @@ struct elf_header {
 
 #define ELF_ISA_X64 62
 
-#define ELF_PROG_LOAD 1
-
 struct program_header {
   uint type;
   uint flags;
@@ -39,8 +37,7 @@ struct program_header {
   ulong align;
 };
 
-#define PT_NULL        0
-#define PT_LOAD        1
+#define ELF_PROG_LOAD 1
 
 struct section_header {
   uint name;

@@ -1,10 +1,14 @@
 #include "common.h"
 
-#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "../sandbox.h"
 #include "../x86/page.h"
@@ -13,55 +17,54 @@
 void
 load_elf(hv_vcpuid_t vcpuid, char *path)
 {
-  FILE *file = fopen(path, "r");
-  struct elf_header h;
-  struct program_header p;
+  char *data;
+  struct elf_header *h;
   uint64_t map_top = 0;
+  int fd;
+  struct stat st;
 
-  fread(&h, sizeof h, 1, file);
+  if ((fd = open(path, O_RDONLY)) < 0) {
+    fprintf(stderr, "could not open file: %s\n", path);
+    return;
+  }
 
-  assert(h.magic == 0x464c457f);
+  stat(path, &st);
 
-  if (h.type != ELF_TYPE_EXEC) {
+  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+
+  h = (struct elf_header *)data;
+
+  assert(h->magic == 0x464c457f);
+
+  if (h->type != ELF_TYPE_EXEC) {
     fprintf(stderr, "not an executable file");
     return;
   }
-  if (h.isa != ELF_ISA_X64) {
+  if (h->isa != ELF_ISA_X64) {
     fprintf(stderr, "not an x64 executable");
     return;
   }
 
-  assert(h.phoff != 0);
-  assert(h.phnum >= 1);
+  assert(h->phoff != 0);
+  assert(h->phnum >= 1);
 
-  PUTS("# program header");
-  for (int i = 0; i < h.phnum; i++) {
-    fseek(file, h.phoff + h.phentsize * i, SEEK_SET);
-    fread(&p, sizeof p, 1, file);
+  struct program_header *p = (struct program_header *)(data + h->phoff);
 
-    if (p.type != PT_LOAD) {
+  for (int i = 0; i < h->phnum; i++) {
+    if (p[i].type != ELF_PROG_LOAD) {
       continue;
     }
 
-    PRINTF("program header #%d\n", i);
-    PRINTF("vaddr = 0x%016lx\n", p.vaddr);
-    PRINTF("paddr = 0x%016lx\n", p.paddr);
-    PRINTF("type = %ul\n", p.type);
-    PRINTF("filesz = 0x%lx\n", p.filesz);
-    PRINTF("offset = 0x%lx\n", p.offset);
+    void *segment = kalloc(p[i].memsz);
+    bzero(segment, p[i].memsz);
 
-    void *segment = kalloc(p.memsz);
-    bzero(segment, p.memsz);
+    memcpy(segment, data + p[i].offset, p[i].filesz);
 
-    fseek(file, p.offset, SEEK_SET);
-    fread(segment, p.filesz, 1, file);
+    vm_map(p[i].vaddr, to_vmpa(segment), p[i].memsz, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
-    vm_map(p.vaddr, to_vmpa(segment), p.memsz, PAGE_4KB, PTE_W | PTE_P | PTE_U);
-
-    if (p.vaddr + p.memsz > map_top) {
-      map_top = p.vaddr + p.memsz;
-    }
+    map_top = MAX(map_top, p[i].vaddr + p[i].memsz);
   }
+
   void *heapmem = kalloc(PAGE_SIZE(PAGE_2MB));
   uint64_t heap = roundup(map_top, PAGE_SIZE(PAGE_2MB));
   vm_map(heap, to_vmpa(heapmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
@@ -72,9 +75,7 @@ load_elf(hv_vcpuid_t vcpuid, char *path)
   uint64_t stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
   PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
 
-  uint64_t entry = h.entry;
-
-  fclose(file);
+  uint64_t entry = h->entry;
 
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack_base);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack_base);
