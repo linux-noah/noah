@@ -217,22 +217,23 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
       PRINTF("guest int status = %lld\n", value);
       PUTS("!!MAYBE A SYSENTER!!");
+
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
+
+      if (rax >= NR_SYSCALLS) {
+        printf("unknown system call: %llu\n", rax);
+        exit(1);
+      }
+
       hv_vcpu_read_register(vcpuid, HV_X86_RDI, &rdi);
       hv_vcpu_read_register(vcpuid, HV_X86_RSI, &rsi);
       hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
       hv_vcpu_read_register(vcpuid, HV_X86_R10, &r10);
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
+
       PRINTF(">>>start syscall handling...: %llu\n", rax);
-      if (rax < NR_SYSCALLS) {
-        retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      } else {
-        /* printint */
-        assert(rax == 0xffffffffffffffff);
-        printf("0x%llx (%llu)\n", rdi, rdi);
-        retval = 0;
-      }
+      retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
       PUTS("<<<done");
 
       hv_vcpu_write_register(vcpuid, HV_X86_RAX, retval);
