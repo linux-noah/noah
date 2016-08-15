@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
+#include "../common.h"
 #include "../sandbox.h"
 #include "../x86/page.h"
 #include "elf.h"
@@ -18,7 +19,7 @@ void
 load_elf(char *path)
 {
   char *data;
-  struct elf_header *h;
+  Elf64_Ehdr *h;
   uint64_t map_top = 0;
   int fd;
   struct stat st;
@@ -32,32 +33,32 @@ load_elf(char *path)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
-  h = (struct elf_header *)data;
+  h = (Elf64_Ehdr *)data;
 
-  assert(h->magic == 0x464c457f);
+  assert(IS_ELF(*h));
 
-  if (h->type != ELF_TYPE_EXEC) {
+  if (h->e_type != ET_EXEC) {
     fprintf(stderr, "not an executable file");
     return;
   }
-  if (h->isa != ELF_ISA_X64) {
+  if (h->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
     return;
   }
 
-  struct program_header *p = (struct program_header *)(data + h->phoff);
+  Elf64_Phdr *p = (Elf64_Phdr *)(data + h->e_phoff);
 
-  for (int i = 0; i < h->phnum; i++) {
-    if (p[i].type != ELF_PROG_LOAD) {
+  for (int i = 0; i < h->e_phnum; i++) {
+    if (p[i].p_type != PT_LOAD) {
       continue;
     }
 
-    ulong start = p[i].vaddr & ~(PAGE_SIZE(PAGE_4KB) - 1);
-    ulong offset = p[i].vaddr - start;
-    ulong size = p[i].memsz + offset;
+    ulong offset = p[i].p_vaddr & (PAGE_SIZE(PAGE_4KB) - 1);
+    ulong start = p[i].p_vaddr - offset;
+    ulong size = p[i].p_memsz + offset;
 
     char *segment = kalloc(size);
-    memcpy(segment + offset, data + p[i].offset, p[i].filesz);
+    memcpy(segment + offset, data + p[i].p_offset, p[i].p_filesz);
 
     vm_map(start, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
@@ -74,7 +75,7 @@ load_elf(char *path)
   uint64_t stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
   PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
 
-  uint64_t entry = h->entry;
+  uint64_t entry = h->e_entry;
 
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack_base);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack_base);
