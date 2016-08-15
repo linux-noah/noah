@@ -16,7 +16,7 @@
 #include "elf.h"
 
 void
-load_elf(char *path)
+load_elf(const char *path)
 {
   char *data;
   Elf64_Ehdr *h;
@@ -53,21 +53,21 @@ load_elf(char *path)
       continue;
     }
 
-    ulong offset = p[i].p_vaddr & (PAGE_SIZE(PAGE_4KB) - 1);
-    ulong start = p[i].p_vaddr - offset;
+    ulong mask = PAGE_SIZE(PAGE_4KB) - 1;
+    ulong vaddr = p[i].p_vaddr & ~mask;
+    ulong offset = p[i].p_vaddr & mask;
     ulong size = p[i].p_memsz + offset;
+
+    /* TODO: permission */
 
     char *segment = kalloc(size);
     memcpy(segment + offset, data + p[i].p_offset, p[i].p_filesz);
 
-    vm_map(start, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+    vm_map(vaddr, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
-    map_top = MAX(map_top, start + size);
+    map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
   }
 
-  void *heapmem = kalloc(PAGE_SIZE(PAGE_2MB));
-  uint64_t heap = roundup(map_top, PAGE_SIZE(PAGE_2MB));
-  vm_map(heap, to_vmpa(heapmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
 
   void *stackmem = kalloc(PAGE_SIZE(PAGE_2MB));
   uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
