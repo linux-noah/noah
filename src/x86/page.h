@@ -8,6 +8,7 @@
 #define CR0_PG          0x80000000      // Paging
 #define CR4_PSE         0x00000010      // Page size extension
 #define CR4_PAE         0x00000020      
+#define CR4_OSFXSR      0x00000200
 #define CR4_VMXE        0x00002000      
 
 #define EFER_LME        0x00000100      // Lond Mode Enable
