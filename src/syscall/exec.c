@@ -18,7 +18,7 @@
 void init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux);
 
 int
-load_elf_interp(const char *path, ulong load_addr, uint64_t *entry)
+load_elf_interp(const char *path, ulong load_addr)
 {
   char *data;
   Elf64_Ehdr *h;
@@ -74,7 +74,7 @@ load_elf_interp(const char *path, ulong load_addr, uint64_t *entry)
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
   }
 
-  *entry = load_addr + h->e_entry;
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, load_addr + h->e_entry);
 
   return 0;
 }
@@ -143,8 +143,6 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
 
   assert(load_base_set);
 
-  uint64_t entry;
-
   int i;
   bool interp = false;
   for (i = 0; i < h->e_phnum; i++) {
@@ -158,13 +156,11 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
     memcpy(interp_path, data + p[i].p_offset, p[i].p_filesz);
     interp_path[p[i].p_filesz] = 0;
 
-    load_elf_interp(interp_path, map_top, &entry);
+    load_elf_interp(interp_path, map_top);
   }
   else {
-    entry = h->e_entry;
+    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, h->e_entry);
   }
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, entry);
 
   Elf64_Auxv aux[] = {
     { AT_PHDR, load_base + h->e_phoff },
