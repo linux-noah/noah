@@ -22,7 +22,7 @@ DEFINE_SYSCALL(read, int, fd, void *, buf, size_t, size)
 
 DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
 {
-  return open(path, flags, mode);
+  return open(copy_from_user(path), flags, mode);
 }
 
 DEFINE_SYSCALL(close, int, fd)
@@ -32,7 +32,7 @@ DEFINE_SYSCALL(close, int, fd)
 
 DEFINE_SYSCALL(stat, const char *, path, struct stat *, st)
 {
-  return stat(path, copy_from_user(st));
+  return stat(copy_from_user(path), copy_from_user(st));
 }
 
 DEFINE_SYSCALL(getcwd, char *, buf, unsigned long, size)
