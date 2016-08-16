@@ -199,7 +199,7 @@ init_page()
 
   uint64_t cr4;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_VMXE);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_VMXE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, to_vmpa(pml4));
   
