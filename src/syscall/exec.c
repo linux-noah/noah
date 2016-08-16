@@ -83,7 +83,7 @@ load_elf(const char *path)
 }
 
 uint64_t
-push(hv_vcpuid_t vcpuid, const void *data, size_t n)
+push(const void *data, size_t n)
 {
   uint64_t size = roundup(n, 8);
   uint64_t rsp;
@@ -134,32 +134,32 @@ init_userstack(int argc, char *argv[], char **envp)
     off += len + 1;
   }
 
-  uint64_t args_start = push(vcpuid, buf, total);
+  uint64_t args_start = push(buf, total);
   uint64_t args_end = args_start + args_total, env_end = args_start + total;
 
   /* set margin */
-  push(vcpuid, 0, 1024);
+  push(0, 1024);
 
-  push(vcpuid, 0, sizeof(uint64_t));
+  push(0, sizeof(uint64_t));
 
   uint64_t ptr = env_end;
   for (char **e = renvp - 1; e >= envp; --e) {
     ptr -= strlen(*e) + 1;
-    push(vcpuid, &ptr, sizeof ptr);
+    push(&ptr, sizeof ptr);
     assert(strcmp(buf + (ptr - args_start), *e) == 0);
   }
 
-  push(vcpuid, 0, sizeof(uint64_t));
+  push(0, sizeof(uint64_t));
 
   ptr = args_end;
   for (int i = argc - 1; i >= 0; --i) {
     ptr -= strlen(argv[i]) + 1;
-    push(vcpuid, &ptr, sizeof ptr);
+    push(&ptr, sizeof ptr);
     assert(strcmp(buf + (ptr - args_start), argv[i]) == 0);
   }
 
   uint64_t argc64 = argc;
-  push(vcpuid, &argc64, sizeof argc64);
+  push(&argc64, sizeof argc64);
 }
 
 void
