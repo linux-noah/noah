@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2016 Yuichi Nishiwaki.
  * Copyright (c) 1996-1998 John D. Polstra.
  * All rights reserved.
  *
@@ -244,5 +245,13 @@ typedef struct {
 	Elf64_Half	si_boundto;	/* direct bindings - symbol bound to */
 	Elf64_Half	si_flags;	/* per symbol flags */
 } Elf64_Syminfo;
+
+
+/* Linux Auxiliary Vector */
+
+typedef struct {
+	Elf64_Word	a_tag;
+	Elf64_Word	a_val;
+} Elf64_Auxv;
 
 #endif /* !_SYS_ELF64_H_ */

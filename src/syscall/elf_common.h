@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2016 Yuichi Nishiwaki.
  * Copyright (c) 2000, 2001, 2008, 2011, David E. O'Brien
  * Copyright (c) 1998 John D. Polstra.
  * All rights reserved.
@@ -991,6 +992,32 @@ typedef struct {
 #define	R_X86_64_GOTTPOFF	22	/* PC relative offset to IE GOT entry */
 #define	R_X86_64_TPOFF32	23	/* Offset in static TLS block */
 #define	R_X86_64_IRELATIVE	37
+
+
+/* Values for Auxiliary Vector */
+#define AT_NULL			0
+#define AT_IGNORE		1
+#define AT_EXECFD		2
+#define AT_PHDR		 	3
+#define AT_PHENT		4
+#define AT_PHNUM		5
+#define AT_PAGESZ		6
+#define AT_BASE			7
+#define AT_FLAGS		8
+#define AT_ENTRY		9
+#define AT_NOTELF		10
+#define AT_UID			11
+#define AT_EUID			12
+#define AT_GID			13
+#define AT_EGID			14
+#define AT_PLATFORM		15
+#define AT_HWCAP		16
+#define AT_CLKTCK		17
+#define AT_SECURE	 	23
+#define AT_BASE_PLATFORM 	24
+#define AT_RANDOM		25
+#define AT_HWCAP2		26
+#define AT_EXECFN		31
 
 
 #endif /* !_SYS_ELF_COMMON_H_ */
