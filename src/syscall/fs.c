@@ -1,4 +1,5 @@
 #include "common.h"
+#include "../common.h"
 #include "../sandbox.h"
 
 #include <stdio.h>
@@ -35,6 +36,7 @@ DEFINE_SYSCALL(rename, const char *, oldpath, const char *, newpath)
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
+  PRINTF("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
   return -1;
 }
 

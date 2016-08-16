@@ -108,6 +108,8 @@ vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64
 void
 vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm)
 {
+  PRINTF("vm_map: [0x%llx,0x%llx) => [0x%llx,0x%llx)\n", vmvaddr, roundup(vmvaddr + size, PAGE_SIZE(page_type)), vmpaddr, roundup(vmpaddr + size, PAGE_SIZE(page_type)));
+
   uint64_t offset = vmvaddr - rounddown(vmvaddr, PAGE_SIZE(page_type));
   int page_num = roundup(size + offset, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
   for (int i = 0; i < page_num; i++) {
@@ -356,18 +358,20 @@ print_regs()
 {
   uint64_t value;
 
+  hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
+  PRINTF("\trip = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RAX, &value);
-  PRINTF("rax = 0x%llx\n", value);
+  PRINTF("\trax = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBX, &value);
-  PRINTF("rbx = 0x%llx\n", value);
+  PRINTF("\trbx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RCX, &value);
-  PRINTF("rcx = 0x%llx\n", value);
+  PRINTF("\trcx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDX, &value);
-  PRINTF("rdx = 0x%llx\n", value);
+  PRINTF("\trdx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDI, &value);
-  PRINTF("rdi = 0x%llx\n", value);
+  PRINTF("\trdi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RSI, &value);
-  PRINTF("rsi = 0x%llx\n", value);
+  PRINTF("\trsi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
-  PRINTF("rbp = 0x%llx\n", value);
+  PRINTF("\trbp = 0x%llx\n", value);
 }

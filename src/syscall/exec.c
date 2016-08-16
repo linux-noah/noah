@@ -99,9 +99,6 @@ push(hv_vcpuid_t vcpuid, const void *data, size_t n)
     memset(stackmem - size, 0, n);
   }
 
-  PRINTF("guest: 0x%llx\n", rsp - size);
-  PRINTF("host:  %p\n", stackmem - size);
-
   return rsp - size;
 }
 
@@ -175,7 +172,6 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
   load_elf(elf_path);
   init_userstack(argc, argv, envp);
 
-  PUTS("now vm is ready");
 
   while (true) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
@@ -183,21 +179,15 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
       return;
     }
 
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
-    PRINTF("exit qualification = 0x%llx\n", value);
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-    PRINTF("guest-physical address = 0x%llx\n", value);
-
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
-    PRINTF("guest-rip = 0x%llx\n", value);
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &value);
-    PRINTF("exit reason = 0x%llx\n", value);
+    PRINTF("\tguest-rip = 0x%llx\n", value);
 
     print_regs();
 
-    switch (value) {
+    uint64_t exit_reason;
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &exit_reason);
+
+    switch (exit_reason) {
       uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
 
     case VMX_REASON_VMCALL:
@@ -244,10 +234,38 @@ do_exec(char *elf_path, int argc, char *argv[], char **envp)
       break;
     }
 
+    case VMX_REASON_EPT_VIOLATION:
+      PRINTF("reason: ept_violation\n");
+
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
+      PRINTF("guest-physical address = 0x%llx\n", value);
+
+      uint64_t qual;
+
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &qual);
+      PRINTF("exit qualification = 0x%llx\n", qual);
+
+      if (qual & (1 << 0)) PUTS("cause: data read");
+      if (qual & (1 << 1)) PUTS("cause: data write");
+      if (qual & (1 << 2)) PUTS("cause: inst fetch");
+
+      if (qual & (1 << 7)) {
+        hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_GUEST_LIN_ADDR, &value);
+        PRINTF("guest linear address = 0x%llx\n", value);
+      } else {
+        PUTS("guest linear address = (unavailable)");
+      }
+
+      break;
+
     default:
-      PRINTF("reason: %lld\n", value);
+      PRINTF("reason: %lld\n", exit_reason);
     }
 
+#if DEBUG_MODE
+    PUTS("[press <enter> to step or C-D to continue...]");
+    getchar();
+#endif
 
     PUTS("");
   }
