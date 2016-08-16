@@ -8,6 +8,21 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+DEFINE_SYSCALL(getpid)
+{
+  return 0;
+}
+
+DEFINE_SYSCALL(geteuid)
+{
+  return 0;
+}
+
+DEFINE_SYSCALL(getppid)
+{
+  return 0;
+}
+
 DEFINE_SYSCALL(exit, int, reason)
 {
   _exit(reason);

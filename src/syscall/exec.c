@@ -15,6 +15,8 @@
 #include "../x86/page.h"
 #include "elf.h"
 
+extern uint64_t brk_min;
+
 void init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux);
 
 int
@@ -75,6 +77,7 @@ load_elf_interp(const char *path, ulong load_addr)
   }
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, load_addr + h->e_entry);
+  brk_min = map_top;
 
   return 0;
 }
@@ -160,6 +163,7 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
   }
   else {
     hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, h->e_entry);
+    brk_min = map_top;
   }
 
   Elf64_Auxv aux[] = {

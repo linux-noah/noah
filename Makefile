@@ -9,6 +9,7 @@ SRCS := \
 	src/syscall/exec.c\
 	src/syscall/process.c\
 	src/syscall/mm.c\
+	src/syscall/signal.c\
 	src/sandbox.c
 
 TEST_UPROGS := \

@@ -5,6 +5,7 @@
   SYSCALL(1, write)                             \
   SYSCALL(2, open)                              \
   SYSCALL(3, close)                             \
+  SYSCALL(4, stat)                              \
   SYSCALL(5, unimplemented)                     \
   SYSCALL(6, unimplemented)                     \
   SYSCALL(7, unimplemented)                     \
@@ -12,9 +13,9 @@
   SYSCALL(9, unimplemented)                     \
   SYSCALL(10, mprotect)                         \
   SYSCALL(11, unimplemented)                    \
-  SYSCALL(12, unimplemented)                    \
-  SYSCALL(13, unimplemented)                    \
-  SYSCALL(14, unimplemented)                    \
+  SYSCALL(12, brk)                              \
+  SYSCALL(13, rt_sigaction)                     \
+  SYSCALL(14, rt_sigprocmask)                   \
   SYSCALL(15, unimplemented)                    \
   SYSCALL(16, ioctl)                            \
   SYSCALL(17, unimplemented)                    \
@@ -39,7 +40,7 @@
   SYSCALL(36, unimplemented)                    \
   SYSCALL(37, unimplemented)                    \
   SYSCALL(38, unimplemented)                    \
-  SYSCALL(39, unimplemented)                    \
+  SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
   SYSCALL(41, unimplemented)                    \
   SYSCALL(42, unimplemented)                    \
@@ -79,7 +80,7 @@
   SYSCALL(76, unimplemented)                    \
   SYSCALL(77, unimplemented)                    \
   SYSCALL(78, unimplemented)                    \
-  SYSCALL(79, unimplemented)                    \
+  SYSCALL(79, getcwd)                           \
   SYSCALL(80, unimplemented)                    \
   SYSCALL(81, unimplemented)                    \
   SYSCALL(82, rename)                           \
@@ -107,10 +108,10 @@
   SYSCALL(104, unimplemented)                   \
   SYSCALL(105, unimplemented)                   \
   SYSCALL(106, unimplemented)                   \
-  SYSCALL(107, unimplemented)                   \
+  SYSCALL(107, geteuid)                         \
   SYSCALL(108, unimplemented)                   \
   SYSCALL(109, unimplemented)                   \
-  SYSCALL(110, unimplemented)                   \
+  SYSCALL(110, getppid)                         \
   SYSCALL(111, unimplemented)                   \
   SYSCALL(112, unimplemented)                   \
   SYSCALL(113, unimplemented)                   \

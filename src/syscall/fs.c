@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/uio.h>
+#include <sys/stat.h>
 
 DEFINE_SYSCALL(write, int, fd, const void *, buf, size_t, size)
 {
@@ -27,6 +28,17 @@ DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
 DEFINE_SYSCALL(close, int, fd)
 {
   return close(fd);
+}
+
+DEFINE_SYSCALL(stat, const char *, path, struct stat *, st)
+{
+  return stat(path, copy_from_user(st));
+}
+
+DEFINE_SYSCALL(getcwd, char *, buf, unsigned long, size)
+{
+  getcwd(copy_from_user(buf), size);
+  return 0;
 }
 
 DEFINE_SYSCALL(rename, const char *, oldpath, const char *, newpath)
