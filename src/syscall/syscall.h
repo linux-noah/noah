@@ -73,7 +73,7 @@
   SYSCALL(69, unimplemented)                    \
   SYSCALL(70, unimplemented)                    \
   SYSCALL(71, unimplemented)                    \
-  SYSCALL(72, unimplemented)                    \
+  SYSCALL(72, fcntl)                            \
   SYSCALL(73, unimplemented)                    \
   SYSCALL(74, unimplemented)                    \
   SYSCALL(75, unimplemented)                    \

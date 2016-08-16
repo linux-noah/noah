@@ -52,6 +52,11 @@ DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
   return -1;
 }
 
+DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
+{
+  return fcntl(fd, cmd, arg);
+}
+
 DEFINE_SYSCALL(writev, int, fd, const struct iovec *, iov, int, iovcnt)
 {
   struct iovec *src = copy_from_user(iov), dst[iovcnt];
