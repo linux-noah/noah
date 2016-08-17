@@ -83,42 +83,27 @@ load_elf_interp(const char *path, ulong load_addr)
 }
 
 void
-load_elf(const char *path, int argc, char *argv[], char **envp)
+load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 {
-  char *data;
-  Elf64_Ehdr *h;
   uint64_t map_top = 0;
-  int fd;
-  struct stat st;
 
-  if ((fd = open(path, O_RDONLY)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", path);
-    return;
-  }
+  assert(IS_ELF(*ehdr));
 
-  stat(path, &st);
-
-  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
-
-  h = (Elf64_Ehdr *)data;
-
-  assert(IS_ELF(*h));
-
-  if (h->e_type != ET_EXEC) {
+  if (ehdr->e_type != ET_EXEC) {
     fprintf(stderr, "not an executable file");
     return;
   }
-  if (h->e_machine != EM_X86_64) {
+  if (ehdr->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
     return;
   }
 
-  Elf64_Phdr *p = (Elf64_Phdr *)(data + h->e_phoff);
+  Elf64_Phdr *p = (Elf64_Phdr *)((char *)ehdr + ehdr->e_phoff);
 
   uint64_t load_base = 0;
   bool load_base_set = false;
 
-  for (int i = 0; i < h->e_phnum; i++) {
+  for (int i = 0; i < ehdr->e_phnum; i++) {
     if (p[i].p_type != PT_LOAD) {
       continue;
     }
@@ -131,7 +116,7 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
     /* TODO: permission */
 
     char *segment = kalloc(size);
-    memcpy(segment + offset, data + p[i].p_offset, p[i].p_filesz);
+    memcpy(segment + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
     vm_map(vaddr, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
@@ -148,7 +133,7 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
 
   int i;
   bool interp = false;
-  for (i = 0; i < h->e_phnum; i++) {
+  for (i = 0; i < ehdr->e_phnum; i++) {
     if (p[i].p_type == PT_INTERP) {
       interp = true;
       break;
@@ -156,23 +141,23 @@ load_elf(const char *path, int argc, char *argv[], char **envp)
   }
   if (interp) {
     char interp_path[p[i].p_filesz + 1];
-    memcpy(interp_path, data + p[i].p_offset, p[i].p_filesz);
+    memcpy(interp_path, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
     interp_path[p[i].p_filesz] = 0;
 
     load_elf_interp(interp_path, map_top);
   }
   else {
-    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, h->e_entry);
+    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, ehdr->e_entry);
     brk_min = map_top;
   }
 
   Elf64_Auxv aux[] = {
-    { AT_PHDR, load_base + h->e_phoff },
-    { AT_PHENT, h->e_phentsize },
-    { AT_PHNUM, h->e_phnum },
+    { AT_PHDR, load_base + ehdr->e_phoff },
+    { AT_PHENT, ehdr->e_phentsize },
+    { AT_PHNUM, ehdr->e_phnum },
     { AT_PAGESZ, PAGE_SIZE(PAGE_4KB) },
     { AT_BASE, interp ? map_top : 0 },
-    { AT_ENTRY, h->e_entry },
+    { AT_ENTRY, ehdr->e_entry },
     { AT_NULL, 0 },
   };
 
@@ -274,113 +259,20 @@ init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
 }
 
 void
-do_exec(char *elf_path, int argc, char *argv[], char **envp)
+do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
-  hv_return_t ret;
-  uint64_t value;
+  int fd;
+  struct stat st;
+  Elf64_Ehdr *ehdr;
 
-  create_sandbox();
-
-  load_elf(elf_path, argc, argv, envp);
-
-  while (true) {
-    if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
-      PUTS("oops, hv_vcpu_run fails");
-      return;
-    }
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
-    PRINTF("\tguest-rip = 0x%llx\n", value);
-
-    print_regs();
-
-    uint64_t exit_reason;
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_REASON, &exit_reason);
-
-    switch (exit_reason) {
-      uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
-
-    case VMX_REASON_VMCALL:
-      PUTS("reason: vmcall");
-      assert(false);
-      break;
-
-    case VMX_REASON_EXC_NMI: {
-      uint64_t retval;
-
-      PUTS("reason: exc or nmi");
-      PUTS("");
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
-      PRINTF("idt info = %lld\n", value);
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
-      PRINTF("idt error = %lld\n", value);
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
-      PRINTF("guest int status = %lld\n", value);
-      PUTS("!!MAYBE A SYSENTER!!");
-
-      hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
-
-      if (rax >= NR_SYSCALLS) {
-        printf("unknown system call: %llu\n", rax);
-        exit(1);
-      }
-
-      hv_vcpu_read_register(vcpuid, HV_X86_RDI, &rdi);
-      hv_vcpu_read_register(vcpuid, HV_X86_RSI, &rsi);
-      hv_vcpu_read_register(vcpuid, HV_X86_RDX, &rdx);
-      hv_vcpu_read_register(vcpuid, HV_X86_R10, &r10);
-      hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
-      hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
-
-      PRINTF(">>>start syscall handling...: %llu\n", rax);
-      retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      PUTS("<<<done");
-
-      hv_vcpu_write_register(vcpuid, HV_X86_RAX, retval);
-
-      hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
-      hv_vcpu_write_register(vcpuid, HV_X86_RIP, value + 2);
-
-      break;
-    }
-
-    case VMX_REASON_EPT_VIOLATION:
-      PRINTF("reason: ept_violation\n");
-
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-      PRINTF("guest-physical address = 0x%llx\n", value);
-
-      uint64_t qual;
-
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &qual);
-      PRINTF("exit qualification = 0x%llx\n", qual);
-
-      if (qual & (1 << 0)) PUTS("cause: data read");
-      if (qual & (1 << 1)) PUTS("cause: data write");
-      if (qual & (1 << 2)) PUTS("cause: inst fetch");
-
-      if (qual & (1 << 7)) {
-        hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_GUEST_LIN_ADDR, &value);
-        PRINTF("guest linear address = 0x%llx\n", value);
-      } else {
-        PUTS("guest linear address = (unavailable)");
-      }
-
-      break;
-
-    default:
-      PRINTF("reason: %lld\n", exit_reason);
-    }
-
-#if DEBUG_MODE
-    PUTS("[press <enter> to step or C-D to continue...]");
-    getchar();
-#endif
-
-    PUTS("");
+  if ((fd = open(elf_path, O_RDONLY)) < 0) {
+    fprintf(stderr, "could not open file: %s\n", elf_path);
+    return;
   }
 
-  PUTS("exit...");
+  fstat(fd, &st);
 
-  destroy_sandbox();
+  ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+
+  load_elf(ehdr, argc, argv, envp);
 }
