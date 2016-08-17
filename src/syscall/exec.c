@@ -68,7 +68,7 @@ load_elf_interp(const char *path, ulong load_addr)
     char *segment = kalloc(size);
     memcpy(segment + offset, data + p[i].p_offset, p[i].p_filesz);
 
-    vm_map(vaddr, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+    vm_map(vaddr, host_to_guest(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
     PRINTF("interp: 0x%llx => 0x%lx\n", p[i].p_offset, vaddr);
 
@@ -117,7 +117,7 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     char *segment = kalloc(size);
     memcpy(segment + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
-    vm_map(vaddr, to_vmpa(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+    vm_map(vaddr, host_to_guest(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
     PRINTF("exec: 0x%llx => 0x%lx\n", p[i].p_offset, vaddr);
 
@@ -172,7 +172,7 @@ push(const void *data, size_t n)
   hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp - size);
 
-  char *stackmem = copy_from_user((void *)rsp);
+  char *stackmem = guest_to_host(rsp);
 
   if (data != 0) {
     memcpy(stackmem - size, data, n);
@@ -188,7 +188,7 @@ init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
 {
   void *stackmem = kalloc(PAGE_SIZE(PAGE_2MB));
   uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
-  vm_map(stack_top - PAGE_SIZE(PAGE_2MB), to_vmpa(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
+  vm_map(stack_top - PAGE_SIZE(PAGE_2MB), host_to_guest(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
   uint64_t stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
   PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
 

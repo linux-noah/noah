@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 
-DEFINE_SYSCALL(mprotect, void *, addr, size_t, len, int, prot)
+DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
   return 0;
 }
@@ -28,7 +28,7 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
 
   void *mem = kalloc(brk - current_brk);
 
-  vm_map(current_brk, to_vmpa(mem), brk - current_brk, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+  vm_map(current_brk, host_to_guest(mem), brk - current_brk, PAGE_4KB, PTE_W | PTE_P | PTE_U);
 
   return current_brk = brk;
 }

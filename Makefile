@@ -3,14 +3,14 @@ LDFLAGS += -framework Hypervisor
 
 SRCS := \
 	src/main.c\
+	src/vmm.c\
 	src/debug.c\
 	src/syscall/common.c\
 	src/syscall/fs.c\
 	src/syscall/exec.c\
 	src/syscall/process.c\
 	src/syscall/mm.c\
-	src/syscall/signal.c\
-	src/sandbox.c
+	src/syscall/signal.c
 
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib)\

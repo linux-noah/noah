@@ -5,8 +5,6 @@
 #include "noah.h"
 #include "syscall.h"
 
-void do_exec(const char *elf_path, int argc, char *argv[], char **envp);
-
 void
 main_loop()
 {
@@ -121,13 +119,13 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   }
 
-  create_sandbox();
+  vmm_create();
 
   do_exec(argv[1], argc - 1, argv + 1, envp);
 
   main_loop();
 
-  destroy_sandbox();
+  vmm_destroy();
 
   return 0;
 }

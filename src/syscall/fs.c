@@ -10,19 +10,19 @@
 #include <sys/uio.h>
 #include <sys/stat.h>
 
-DEFINE_SYSCALL(write, int, fd, const void *, buf, size_t, size)
+DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
 {
-  return write(fd, copy_from_user(buf), size);
+  return write(fd, guest_to_host(buf), size);
 }
 
-DEFINE_SYSCALL(read, int, fd, void *, buf, size_t, size)
+DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
 {
-  return read(fd, copy_from_user(buf), size);
+  return read(fd, guest_to_host(buf), size);
 }
 
-DEFINE_SYSCALL(open, const char *, path, int, flags, int, mode)
+DEFINE_SYSCALL(open, gaddr_t, path, int, flags, int, mode)
 {
-  return open(copy_from_user(path), flags, mode);
+  return open(guest_to_host(path), flags, mode);
 }
 
 DEFINE_SYSCALL(close, int, fd)
@@ -30,20 +30,20 @@ DEFINE_SYSCALL(close, int, fd)
   return close(fd);
 }
 
-DEFINE_SYSCALL(stat, const char *, path, struct stat *, st)
+DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
 {
-  return stat(copy_from_user(path), copy_from_user(st));
+  return stat(guest_to_host(path), guest_to_host(st));
 }
 
-DEFINE_SYSCALL(getcwd, char *, buf, unsigned long, size)
+DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
-  getcwd(copy_from_user(buf), size);
+  getcwd(guest_to_host(buf), size);
   return 0;
 }
 
-DEFINE_SYSCALL(rename, const char *, oldpath, const char *, newpath)
+DEFINE_SYSCALL(rename, gaddr_t, oldpath, gaddr_t, newpath)
 {
-  return rename(copy_from_user(oldpath), copy_from_user(newpath));
+  return rename(guest_to_host(oldpath), guest_to_host(newpath));
 }
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
@@ -57,12 +57,18 @@ DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
   return fcntl(fd, cmd, arg);
 }
 
-DEFINE_SYSCALL(writev, int, fd, const struct iovec *, iov, int, iovcnt)
+struct linux_iovec {
+  gaddr_t iov_base;
+  size_t iov_len;
+};
+
+DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
 {
-  struct iovec *src = copy_from_user(iov), dst[iovcnt];
+  struct linux_iovec *src = guest_to_host(iov);
+  struct iovec dst[iovcnt];
 
   for (int i = 0; i < iovcnt; ++i) {
-    dst[i].iov_base = copy_from_user(src[i].iov_base);
+    dst[i].iov_base = guest_to_host(src[i].iov_base);
     dst[i].iov_len = src[i].iov_len;
   }
   return writev(fd, dst, iovcnt);

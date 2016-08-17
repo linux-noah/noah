@@ -23,8 +23,8 @@ hv_vcpuid_t vcpuid;
 uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;
 
-uint64_t
-to_vmpa(void *haddr)
+gaddr_t
+host_to_guest(void *haddr)
 {
   uint64_t vmpaddr = ((1ULL << phys_addr_bit_num) - 1) & (uint64_t)haddr;
   // Assert truncated bits are all "1"
@@ -60,7 +60,7 @@ kalloc(size_t size)
       exit(1);
     }
   }
-  vmpaddr = to_vmpa(mem);
+  vmpaddr = host_to_guest(mem);
   hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
   if (ret != HV_SUCCESS) {
     PRINTF("mapping %p to 0x%016llx, size:0x%lx\n", mem, vmpaddr, size);
@@ -68,18 +68,6 @@ kalloc(size_t size)
     exit(1);
   }
   return mem;
-}
-
-uint64_t
-rounddown(uint64_t x, uint64_t y)
-{
-  return x / y * y;
-}
-
-uint64_t
-roundup(uint64_t x, uint64_t y)
-{
-  return (x + y - 1) / y * y;
 }
 
 void
@@ -96,7 +84,7 @@ vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64
     if (!(*table)[index]) {
       next = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
       bzero(next, sizeof(uint64_t[NR_PAGE_ENTRY]));
-      (*table)[index] = to_vmpa(next) | perm;
+      (*table)[index] = host_to_guest(next) | perm;
     } else {
       next = to_haddrp(rounddown((*table)[index], PAGE_SIZE(PAGE_4KB)));
     }
@@ -148,7 +136,7 @@ vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
 }
 
 void *
-copy_from_user(const void *vmvaddr)
+guest_to_host(gaddr_t vmvaddr)
 {
   uint64_t str_paddr;
   bool suc = vm_walk((uint64_t) vmvaddr, &str_paddr, NULL);
@@ -202,7 +190,7 @@ init_page()
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_VMXE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, to_vmpa(pml4));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
   
   uint64_t efer;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, &efer);
@@ -221,7 +209,7 @@ init_segment()
 
   memcpy(mem, &gdt, sizeof gdt);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, to_vmpa(mem));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(mem));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, 0);
@@ -280,7 +268,7 @@ init_idt()
 {
   struct gate_desc (*idt)[256] = kalloc(sizeof(struct gate_desc[256]));
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, to_vmpa(idt));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
 }
 
@@ -302,7 +290,7 @@ init_msr()
 }
 
 void
-create_sandbox()
+vmm_create()
 {
   hv_return_t ret;
 
@@ -331,7 +319,7 @@ create_sandbox()
 }
 
 void
-destroy_sandbox()
+vmm_destroy()
 {
   hv_return_t ret;
 
