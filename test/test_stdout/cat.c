@@ -1,4 +1,5 @@
-#include "noah.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 int writeall(int fd)
 {

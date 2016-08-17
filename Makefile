@@ -27,15 +27,16 @@ dev: build/noah
 build/noah: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h test/include/noah.S
+test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h
 	$(MAKE_TEST_UPROGS)
-test/test_stdout/build/%: test/test_stdout/%.c test/include/*.h test/include/noah.S
+test/test_stdout/build/%: test/test_stdout/%.c test/include/*.h
 	$(MAKE_TEST_UPROGS)
-test/test_shell/build/%: test/test_shell/%.c test/include/*.h test/include/noah.S
+test/test_shell/build/%: test/test_shell/%.c test/include/*.h
 	$(MAKE_TEST_UPROGS)
 
-MAKE_TEST_UPROGS = rsync $^ $(LINUX_BUILD_SERV):/tmp/$(USER)/;\
-                   ssh $(LINUX_BUILD_SERV) "gcc -nostdlib -static /tmp/$(USER)/$*.c /tmp/$(USER)/noah.S -o /tmp/$(USER)/$*";\
+MAKE_TEST_UPROGS = ssh $(LINUX_BUILD_SERV) "rm /tmp/$(USER)/*";\
+                   rsync $^ $(LINUX_BUILD_SERV):/tmp/$(USER)/;\
+                   ssh $(LINUX_BUILD_SERV) "musl-gcc /tmp/$(USER)/$*.c -o /tmp/$(USER)/$*";\
                    rsync $(LINUX_BUILD_SERV):/tmp/$(USER)/$* $@
 
 run: build/noah test/test_stdout/build/hello

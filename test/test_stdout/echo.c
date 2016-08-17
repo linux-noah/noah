@@ -1,4 +1,5 @@
-#include "noah.h"
+#include <string.h>
+#include <unistd.h>
 
 int print(const char *str)
 {
