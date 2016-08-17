@@ -1,7 +1,7 @@
 #include "common.h"
-#include "../common.h"
-#include "../sandbox.h"
-#include "../x86/page.h"
+
+#include "noah.h"
+#include "x86/page.h"
 
 #include <stdio.h>
 #include <string.h>

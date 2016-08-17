@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include "syscall.h"
 
 /*
  * ``_MAP(f, t0, v0, t1, v1, ...)'' => ``f(t0, v0), f(t1, v1), ...''

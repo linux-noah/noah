@@ -10,9 +10,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include "../common.h"
-#include "../sandbox.h"
-#include "../x86/page.h"
+#include "noah.h"
+#include "x86/page.h"
 #include "elf.h"
 
 extern uint64_t brk_min;

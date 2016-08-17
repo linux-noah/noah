@@ -6,8 +6,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 
-#include "common.h"
-#include "sandbox.h"
+#include "noah.h"
 
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>

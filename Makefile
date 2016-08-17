@@ -1,4 +1,4 @@
-CFLAGS += -g
+CFLAGS += -g -Iinclude
 LDFLAGS += -framework Hypervisor
 
 SRCS := \

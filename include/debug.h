@@ -1,12 +1,3 @@
-
-#if DEBUG_MODE
-#define PUTS(...) puts(__VA_ARGS__)
-#define PRINTF(...) printf(__VA_ARGS__)
-#else
-#define PUTS(...) 0
-#define PRINTF(...) 0
-#endif
-
 #include <stdio.h>
 #include <stdint.h>
 #include <Hypervisor/hv.h>

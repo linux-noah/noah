@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#include "common.h"
-#include "sandbox.h"
-#include "syscall/syscall.h"
+#include "noah.h"
+#include "syscall.h"
 
 void do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 
