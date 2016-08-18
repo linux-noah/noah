@@ -12,11 +12,12 @@
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
+#include "x86/specialreg.h"
 #include "x86/page.h"
 #include "x86/segment.h"
 #include "x86/idt.h"
 #include "x86/msr.h"
-#include "vmem.h"
+#include "x86/vmemparam.h"
 
 hv_vcpuid_t vcpuid;
 

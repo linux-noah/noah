@@ -12,6 +12,7 @@
 
 #include "noah.h"
 #include "x86/page.h"
+#include "x86/vmemparam.h"
 #include "elf.h"
 
 extern uint64_t brk_min;

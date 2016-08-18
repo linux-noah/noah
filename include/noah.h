@@ -26,7 +26,7 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
-#include "vmem.h"
+#include "x86/page.h"
 
 extern hv_vcpuid_t vcpuid;
 
