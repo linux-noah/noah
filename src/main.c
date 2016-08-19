@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <cpuid.h>
 
 #include "noah.h"
 #include "syscall.h"
@@ -95,6 +96,22 @@ main_loop()
       }
 
       break;
+
+    case VMX_REASON_CPUID: {
+      unsigned eax, ebx, ecx, edx;
+
+      __get_cpuid(rax, &eax, &ebx, &ecx, &edx);
+
+      hv_vcpu_write_register(vcpuid, HV_X86_RAX, eax);
+      hv_vcpu_write_register(vcpuid, HV_X86_RBX, ebx);
+      hv_vcpu_write_register(vcpuid, HV_X86_RCX, ecx);
+      hv_vcpu_write_register(vcpuid, HV_X86_RDX, edx);
+
+      hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
+      hv_vcpu_write_register(vcpuid, HV_X86_RIP, value + 2);
+
+      break;
+    }
 
     default:
       PRINTF("reason: %lld\n", exit_reason);
