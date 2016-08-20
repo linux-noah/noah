@@ -28,6 +28,16 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   return addr;
 }
 
+DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd, off_t, offset)
+{
+  if ((flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_ANON)) != 0) {
+    fprintf(stderr, "unsupported mmap flags: %x", flags);
+    _exit(1);
+  }
+
+  return do_mmap(addr, len, prot, flags, fd, offset);
+}
+
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
   return 0;

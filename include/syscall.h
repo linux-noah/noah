@@ -10,7 +10,7 @@
   SYSCALL(6, unimplemented)                     \
   SYSCALL(7, unimplemented)                     \
   SYSCALL(8, unimplemented)                     \
-  SYSCALL(9, unimplemented)                     \
+  SYSCALL(9, mmap)                              \
   SYSCALL(10, mprotect)                         \
   SYSCALL(11, unimplemented)                    \
   SYSCALL(12, brk)                              \
