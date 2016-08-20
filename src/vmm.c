@@ -21,130 +21,114 @@
 
 hv_vcpuid_t vcpuid;
 
-uint64_t (*pml4)[NR_PAGE_ENTRY];
-static int phys_addr_bit_num = 39;
+#define __page_aligned __attribute__((aligned(0x1000)))
+
+static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
+
+uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
+
+void
+page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
+{
+  uint64_t index, entry;
+  int shift;
+
+  assert((gaddr & (1ul << 47)) == 0); /* FIXME */
+
+  for (shift = 39; shift > 12; shift -= 9) {
+    index = (gaddr >> shift) & 0x1ff;
+    entry = table[index];
+    if ((entry & PTE_P) == 0) {
+      void *ptr = valloc(4096);
+      bzero(ptr, 4096);
+      table[index] = (uint64_t) ptr & 0x000ffffffffff000ul;
+      table[index] |= perm;
+    }
+    table = (void *)(table[index] & 0x000ffffffffff000ul);
+  }
+  index = (gaddr >> shift) & 0x1ff;
+  entry = table[index];
+  if (entry & PTE_P) {
+    fprintf(stderr, "oops");
+    exit(1);
+  }
+  table[index] = (haddr & 0x000ffffffffff000ul) | perm;
+}
+
+void
+vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
+{
+  assert(((uint64_t) haddr & 0xfff) == 0);
+  assert((gaddr & 0xfff) == 0);
+  assert((size & 0xfff) == 0);
+
+  hv_memory_flags_t flags = 0;
+  if (prot & PROT_READ) flags |= HV_MEMORY_READ;
+  if (prot & PROT_WRITE) flags |= HV_MEMORY_WRITE;
+  if (prot & PROT_EXEC) flags |= HV_MEMORY_EXEC;
+
+  hv_vm_map(haddr, gaddr, size, flags);
+
+  ulong perm = PTE_U | PTE_P;
+  if (prot & PROT_WRITE) perm |= PTE_W;
+  if ((prot & PROT_EXEC) == 0) perm |= PTE_NX;
+
+  for (uint64_t i = 0; i < size / 0x1000; i++) {
+    page_map_help(ept, (uint64_t) haddr, gaddr, perm);
+    page_map_help(rept, gaddr, (uint64_t) haddr, perm);
+    haddr = (char *) haddr + 0x1000;
+    gaddr += 0x1000;
+  }
+}
+
+bool
+page_walk(uint64_t *table, uint64_t addr, uint64_t *res, uint64_t *perm)
+{
+  uint64_t entry, mask;
+  int shift;
+
+  for (shift = 39; ; shift -= 9) {
+    entry = table[(addr >> shift) & 0x1ff];
+    if ((entry & PTE_P) == 0)
+      goto fail;
+    if ((entry & PTE_PS) != 0 || shift == 12)
+      goto hit;
+    table = (void *)(entry & 0x000ffffffffff000);
+  }
+
+ hit:
+  mask = (1ul << shift) - 1;
+  if (res != NULL) {
+    assert((entry & (1ul << 47)) == 0); /* FIXME */
+    *res = (entry & 0x000ffffffffff000) + (addr & mask);
+  }
+  if (perm != NULL) {
+    *perm = entry & mask;
+  }
+  return true;
+
+ fail:
+  return false;
+}
+
+void *
+guest_to_host(gaddr_t gaddr)
+{
+  uint64_t haddr;
+  if (! page_walk(ept, gaddr, &haddr, NULL)) {
+    return NULL;
+  }
+  return (void *) haddr;
+}
 
 gaddr_t
 host_to_guest(void *haddr)
 {
-  uint64_t vmpaddr = ((1ULL << phys_addr_bit_num) - 1) & (uint64_t)haddr;
-  // Assert truncated bits are all "1"
-  assert(((uint64_t)haddr >> phys_addr_bit_num) == ((1ULL << (47 - phys_addr_bit_num)) - 1));
-
-  return vmpaddr;
-}
-
-void*
-to_haddrp(uint64_t vmpaddr)
-{
-  // Assume the bits over max phys bits are all 1.
-  // Write serious "kalloc" after introducing multi-process model
-  return (void*)(vmpaddr | (CANONICAL_LOWER_END ^ ((1ULL << phys_addr_bit_num) - 1)));
-}
-
-void*
-kalloc(size_t size)
-{
-  void *mem;
-  uint64_t vmpaddr;
-
-  mem = valloc(size);
-  if (mem == NULL) {
-    PRINTF("could not valloc requested size: %ld\n", size);
-    exit(1);
+  uint64_t gaddr;
+  if (! page_walk(rept, (uint64_t) haddr, &gaddr, NULL)) {
+    return 0;
   }
-  if (!(((uint64_t)mem >> phys_addr_bit_num) == ((1ULL << (47 - phys_addr_bit_num)) - 1))) {
-    // If truncated bits are not all 1, fill them
-    mem = mmap((void*)(0x7f8000000000 | (uint64_t)mem), size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_FIXED | MAP_SHARED | MAP_ANON, -1, 0);
-    if (mem == NULL) {
-      PRINTF("could not mmap requested area\n");
-      exit(1);
-    }
-  }
-  vmpaddr = host_to_guest(mem);
-  hv_return_t ret = hv_vm_map(mem, vmpaddr, size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
-  if (ret != HV_SUCCESS) {
-    PRINTF("mapping %p to 0x%016llx, size:0x%lx\n", mem, vmpaddr, size);
-    PRINTF("could not map a memory region: error code %x\n", ret);
-    exit(1);
-  }
-  return mem;
-}
-
-void
-vm_map_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t vmpaddr, page_type_t page_type, int perm)
-{
-  page_type_t walking = PAGE_PML4E - depth;
-  int index = (vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff;
-
-  if (walking == page_type) {
-    perm |= (page_type == PAGE_4KB) ? 0 : PTE_PS;
-    (*table)[index] = rounddown(vmpaddr, PAGE_SIZE(page_type)) | perm;
-  } else {
-    uint64_t (*next)[NR_PAGE_ENTRY];
-    if (!(*table)[index]) {
-      next = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
-      bzero(next, sizeof(uint64_t[NR_PAGE_ENTRY]));
-      (*table)[index] = host_to_guest(next) | perm;
-    } else {
-      next = to_haddrp(rounddown((*table)[index], PAGE_SIZE(PAGE_4KB)));
-    }
-    vm_map_rec(depth + 1, next, vmvaddr, vmpaddr, page_type, perm);
-  }
-}
-
-void
-vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm)
-{
-  PRINTF("vm_map: [0x%llx,0x%llx) => [0x%llx,0x%llx)\n", vmvaddr, roundup(vmvaddr + size, PAGE_SIZE(page_type)), vmpaddr, roundup(vmpaddr + size, PAGE_SIZE(page_type)));
-
-  uint64_t offset = vmvaddr - rounddown(vmvaddr, PAGE_SIZE(page_type));
-  int page_num = roundup(size + offset, PAGE_SIZE(page_type)) / PAGE_SIZE(page_type);
-  for (int i = 0; i < page_num; i++) {
-    vm_map_rec(0, pml4, vmvaddr - offset, vmpaddr - offset, page_type, perm);
-    vmvaddr += PAGE_SIZE(page_type);
-    vmpaddr += PAGE_SIZE(page_type);
-  }
-}
-
-bool
-vm_walk_rec(int depth, uint64_t (*table)[NR_PAGE_ENTRY], uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
-{
-  page_type_t walking = PAGE_PML4E - depth;
-  uint64_t pt_entry = (*table)[(vmvaddr >> PAGE_SHIFT(walking)) & 0x1ff];
-
-  if (pt_entry & PTE_P) {
-    if (walking == PAGE_4KB || (pt_entry & PTE_PS)) {
-      uint64_t mask = (1 << PAGE_SHIFT(walking)) - 1;
-      if (vmpaddr != NULL) {
-        *vmpaddr = (pt_entry & ~mask) + (vmvaddr & mask);
-      }
-      if (perm != NULL) {
-        *perm = pt_entry & mask;
-      }
-      return true;
-    } else {
-      return vm_walk_rec(depth + 1, to_haddrp(rounddown(pt_entry, PAGE_SIZE(PAGE_4KB))), vmvaddr, vmpaddr, perm);
-    }
-  }
-  return false;
-}
-
-bool
-vm_walk(uint64_t vmvaddr, uint64_t *vmpaddr, uint64_t *perm)
-{
-  return vm_walk_rec(0, pml4, vmvaddr, vmpaddr, perm);
-}
-
-void *
-guest_to_host(gaddr_t vmvaddr)
-{
-  uint64_t str_paddr;
-  bool suc = vm_walk((uint64_t) vmvaddr, &str_paddr, NULL);
-  if (!suc) {
-    return NULL;
-  }
-  return to_haddrp(str_paddr);
+  return gaddr;
 }
 
 void
@@ -178,12 +162,21 @@ init_vmcs()
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_SHADOW, 0);
 }
 
+uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
+  [0] = PTE_U | PTE_W | PTE_P,
+};
+uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
+#include "vmm_pdp.h"
+};
+
 void
 init_page()
 {
-  pml4 = kalloc(sizeof(uint64_t[NR_PAGE_ENTRY]));
-  bzero(pml4, sizeof(uint64_t[NR_PAGE_ENTRY]));
-  vm_map(KERN_BASE, 0, UINT64_MAX - KERN_BASE, PAGE_1GB, PTE_W | PTE_P);
+  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, pml4);
+  noah_kern_brk += 0x1000;
+  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, pdp);
+  pml4[0] |= noah_kern_brk;
+  noah_kern_brk += 0x1000;
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
 
@@ -192,25 +185,25 @@ init_page()
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_VMXE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
-  
+
   uint64_t efer;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, &efer);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
 }
 
+uint64_t gdt[3] __page_aligned = {
+  [SEG_NULL] = 0, // NULL SEL
+  [SEG_CODE] = 0x0020980000000000, // CODE SEL
+  [SEG_DATA] = 0x0000900000000000, // DATA SEL
+};
+
 void
 init_segment()
 {
-  uint64_t gdt[3];
-  gdt[SEG_NULL] = 0; // NULL SEL
-  gdt[SEG_CODE] = 0x0020980000000000; // CODE SEL
-  gdt[SEG_DATA] = 0x0000900000000000; // DATA SEL
+  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, gdt);
+  noah_kern_brk += 0x1000;
 
-  void *mem = kalloc(sizeof gdt);
-
-  memcpy(mem, &gdt, sizeof gdt);
-
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(mem));
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_TR_BASE, 0);
@@ -264,10 +257,13 @@ init_segment()
   hv_vcpu_write_register(vcpuid, HV_X86_LDTR, 0);
 }
 
+struct gate_desc idt[256] __page_aligned;
+
 void
 init_idt()
 {
-  struct gate_desc (*idt)[256] = kalloc(sizeof(struct gate_desc[256]));
+  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, idt);
+  noah_kern_brk += 0x1000;
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
@@ -283,7 +279,7 @@ init_regs()
 void
 init_msr()
 {
-  if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS && 
+  if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
       hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
       hv_vcpu_enable_native_msr(vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
     PRINTF("MSR initialization failed.\n");
