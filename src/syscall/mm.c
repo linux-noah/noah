@@ -4,9 +4,29 @@
 #include "x86/page.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <assert.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+
+gaddr_t
+do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
+{
+  assert((addr & 0xfff) == 0);
+  assert((len & 0xfff) == 0);
+  assert((flags & MAP_FIXED));
+
+  void *ptr = mmap(0, len, PROT_READ | PROT_WRITE | PROT_EXEC, flags & ~MAP_FIXED, fd, offset);
+
+  PRINTF("do_mmap: addr = 0x%llx, len = %zu, haddr = %p\n", addr, len, ptr);
+
+  vmm_mmap(addr, len, prot, ptr);
+
+  return addr;
+}
 
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
@@ -26,9 +46,7 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
   if (brk < current_brk)
     return current_brk = brk;
 
-  void *mem = kalloc(brk - current_brk);
-
-  vm_map(current_brk, host_to_guest(mem), brk - current_brk, PAGE_4KB, PTE_W | PTE_P | PTE_U);
+  do_mmap(current_brk, brk - current_brk, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 
   return current_brk = brk;
 }

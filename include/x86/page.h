@@ -5,6 +5,7 @@
 #define PTE_W           0x002   // Writeable
 #define PTE_U           0x004   // User
 #define PTE_PS          0x080   // Page Size
+#define PTE_NX          0x8000000000000000UL // No Execute
 
 typedef enum {
   PAGE_4KB,

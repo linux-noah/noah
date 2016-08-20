@@ -57,14 +57,14 @@ DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
   return fcntl(fd, cmd, arg);
 }
 
-struct linux_iovec {
+struct l_iovec {
   gaddr_t iov_base;
   size_t iov_len;
 };
 
 DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
 {
-  struct linux_iovec *src = guest_to_host(iov);
+  struct l_iovec *src = guest_to_host(iov);
   struct iovec dst[iovcnt];
 
   for (int i = 0; i < iovcnt; ++i) {

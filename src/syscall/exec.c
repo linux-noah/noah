@@ -64,14 +64,14 @@ load_elf_interp(const char *path, ulong load_addr)
     ulong offset = p_vaddr & mask;
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
-    /* TODO: permission */
+    int prot = 0;
+    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= PROT_READ;
 
-    char *segment = kalloc(size);
-    memcpy(segment + offset, data + p[i].p_offset, p[i].p_filesz);
+    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 
-    vm_map(vaddr, host_to_guest(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
-
-    PRINTF("interp: 0x%llx => 0x%lx\n", p[i].p_offset, vaddr);
+    memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
   }
@@ -113,14 +113,14 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     ulong offset = p[i].p_vaddr & mask;
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
-    /* TODO: permission */
+    int prot = 0;
+    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= PROT_READ;
 
-    char *segment = kalloc(size);
-    memcpy(segment + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
+    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 
-    vm_map(vaddr, host_to_guest(segment), size, PAGE_4KB, PTE_W | PTE_P | PTE_U);
-
-    PRINTF("exec: 0x%llx => 0x%lx\n", p[i].p_offset, vaddr);
+    memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
     if (! load_base_set) {
       load_base = p[i].p_vaddr - p[i].p_offset;
@@ -171,30 +171,27 @@ push(const void *data, size_t n)
   uint64_t rsp;
 
   hv_vcpu_read_register(vcpuid, HV_X86_RSP, &rsp);
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp - size);
+  rsp -= size;
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, rsp);
 
   char *stackmem = guest_to_host(rsp);
 
   if (data != 0) {
-    memcpy(stackmem - size, data, n);
+    memcpy(stackmem, data, n);
   } else {
-    memset(stackmem - size, 0, n);
+    memset(stackmem, 0, n);
   }
 
-  return rsp - size;
+  return rsp;
 }
 
 void
 init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
 {
-  void *stackmem = kalloc(PAGE_SIZE(PAGE_2MB));
-  uint64_t stack_top = rounddown(CANONICAL_LOWER_END, PAGE_SIZE(PAGE_2MB));
-  vm_map(stack_top - PAGE_SIZE(PAGE_2MB), host_to_guest(stackmem), PAGE_SIZE(PAGE_2MB), PAGE_2MB, PTE_W | PTE_P | PTE_U);
-  uint64_t stack_base = stack_top - PAGE_SIZE(PAGE_4KB);
-  PRINTF("stack is from %p to %p in host\n", stackmem, stackmem + PAGE_SIZE(PAGE_2MB));
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
 
-  hv_vcpu_write_register(vcpuid, HV_X86_RSP, stack_base);
-  hv_vcpu_write_register(vcpuid, HV_X86_RBP, stack_base);
+  hv_vcpu_write_register(vcpuid, HV_X86_RSP, STACK_TOP);
+  hv_vcpu_write_register(vcpuid, HV_X86_RBP, STACK_TOP);
 
   char **renvp;
   for (renvp = envp; *renvp; ++renvp)

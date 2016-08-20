@@ -26,8 +26,6 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
-#include "x86/page.h"
-
 extern hv_vcpuid_t vcpuid;
 
 void vmm_create(void);
@@ -38,13 +36,15 @@ typedef uint64_t gaddr_t;
 gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
 
-void *kalloc(size_t size);
-void vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_type, int perm);
-
+void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 
 /* linux emulation */
 
 void do_exec(const char *elf_path, int argc, char *argv[], char **envp);
+gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
+
+#define STACK_SIZE (1 << 21)
+#define STACK_TOP  0x0000007fc0000000ULL
 
 
 /* debug */
