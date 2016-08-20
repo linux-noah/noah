@@ -1,13 +1,16 @@
 #include "common.h"
+#include "noah.h"
 
 #include <stdlib.h>
 #include <stdio.h>
 
-DEFINE_SYSCALL(unimplemented, int, ignore)
+DEFINE_SYSCALL(unimplemented)
 {
-  (void)ignore;
+  uint64_t rax;
 
-  fprintf(stderr, "unimplemented syscall\n");
+  hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
+
+  fprintf(stderr, "unimplemented syscall: %lld\n", rax);
   exit(1);
 }
 
