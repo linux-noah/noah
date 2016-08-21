@@ -10,7 +10,7 @@
 
 DEFINE_SYSCALL(getpid)
 {
-  return 0;
+  return getpid();
 }
 
 DEFINE_SYSCALL(getuid)
@@ -25,7 +25,7 @@ DEFINE_SYSCALL(getgid)
 
 DEFINE_SYSCALL(geteuid)
 {
-  return 0;
+  return geteuid();
 }
 
 DEFINE_SYSCALL(getegid)
@@ -35,7 +35,7 @@ DEFINE_SYSCALL(getegid)
 
 DEFINE_SYSCALL(getppid)
 {
-  return 0;
+  return getppid();
 }
 
 DEFINE_SYSCALL(exit, int, reason)
