@@ -10,17 +10,18 @@
 
 DEFINE_SYSCALL(getpid)
 {
-  return 0;
+  return getpid();
 }
 
 DEFINE_SYSCALL(geteuid)
 {
-  return 0;
+  return geteuid();
 }
 
 DEFINE_SYSCALL(getppid)
 {
-  return 0;
+  return getppid();
+}
 }
 
 DEFINE_SYSCALL(exit, int, reason)
