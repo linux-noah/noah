@@ -186,13 +186,16 @@ init_page()
   vm_map(KERN_BASE, 0, UINT64_MAX - KERN_BASE, PAGE_1GB, PTE_W | PTE_P);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
+}
 
+void
+init_special_regs()
+{
   uint64_t cr4;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_CR4, &cr4);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_VMXE);
 
-  hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
-  
   uint64_t efer;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, &efer);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
@@ -314,6 +317,7 @@ vmm_create()
   init_vmcs();
   init_msr();
   init_page();
+  init_special_regs();
   init_segment();
   init_idt();
   init_regs();
