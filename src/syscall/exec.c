@@ -17,7 +17,7 @@
 
 extern uint64_t brk_min;
 
-void init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux);
+void init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base);
 
 int
 load_elf_interp(const char *path, ulong load_addr)
@@ -28,16 +28,12 @@ load_elf_interp(const char *path, ulong load_addr)
   int fd;
   struct stat st;
 
-  char newpath[strlen(path) + sizeof "./mnt/"];
-  strcpy(newpath, "./mnt/");
-  strcat(newpath, path);
-
-  if ((fd = open(newpath, O_RDONLY)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", newpath);
+  if ((fd = do_open(path, O_RDONLY, 0)) < 0) {
+    fprintf(stderr, "could not open file: %s\n", path);
     return -1;
   }
 
-  stat(newpath, &st);
+  fstat(fd, &st);
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
@@ -65,11 +61,11 @@ load_elf_interp(const char *path, ulong load_addr)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
 
-    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
@@ -114,11 +110,11 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
 
-    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
@@ -151,17 +147,7 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     brk_min = map_top;
   }
 
-  Elf64_Auxv aux[] = {
-    { AT_PHDR, load_base + ehdr->e_phoff },
-    { AT_PHENT, ehdr->e_phentsize },
-    { AT_PHNUM, ehdr->e_phnum },
-    { AT_PAGESZ, PAGE_SIZE(PAGE_4KB) },
-    { AT_BASE, interp ? map_top : 0 },
-    { AT_ENTRY, ehdr->e_entry },
-    { AT_NULL, 0 },
-  };
-
-  init_userstack(argc, argv, envp, aux);
+  init_userstack(argc, argv, envp, load_base, ehdr, interp ? map_top : 0);
 }
 
 uint64_t
@@ -186,12 +172,16 @@ push(const void *data, size_t n)
 }
 
 void
-init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
+init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
 {
-  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, L_PROT_READ | L_PROT_WRITE, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, STACK_TOP);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, STACK_TOP);
+
+  char random[16];
+
+  uint64_t rand_ptr = push(random, sizeof random);
 
   char **renvp;
   for (renvp = envp; *renvp; ++renvp)
@@ -225,13 +215,18 @@ init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
   uint64_t args_start = push(buf, total);
   uint64_t args_end = args_start + args_total, env_end = args_start + total;
 
-  push(0, sizeof(Elf64_Auxv));
+  Elf64_Auxv aux[] = {
+    { AT_BASE, interp_base },
+    { AT_ENTRY, ehdr->e_entry },
+    { AT_PHDR, exe_base + ehdr->e_phoff },
+    { AT_PHENT, ehdr->e_phentsize },
+    { AT_PHNUM, ehdr->e_phnum },
+    { AT_PAGESZ, PAGE_SIZE(PAGE_4KB) },
+    { AT_RANDOM, rand_ptr },
+    { AT_NULL, 0 },
+  };
 
-  while (aux->a_tag != AT_NULL) {
-    push(&aux->a_val, sizeof aux->a_val);
-    push(&aux->a_tag, sizeof aux->a_tag);
-    aux++;
-  }
+  push(aux, sizeof aux);
 
   push(0, sizeof(uint64_t));
 

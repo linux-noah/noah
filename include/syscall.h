@@ -6,7 +6,7 @@
   SYSCALL(2, open)                              \
   SYSCALL(3, close)                             \
   SYSCALL(4, stat)                              \
-  SYSCALL(5, unimplemented)                     \
+  SYSCALL(5, fstat)                             \
   SYSCALL(6, unimplemented)                     \
   SYSCALL(7, unimplemented)                     \
   SYSCALL(8, unimplemented)                     \
@@ -22,7 +22,7 @@
   SYSCALL(18, unimplemented)                    \
   SYSCALL(19, unimplemented)                    \
   SYSCALL(20, writev)                           \
-  SYSCALL(21, unimplemented)                    \
+  SYSCALL(21, access)                           \
   SYSCALL(22, unimplemented)                    \
   SYSCALL(23, unimplemented)                    \
   SYSCALL(24, unimplemented)                    \
@@ -64,7 +64,7 @@
   SYSCALL(60, exit)                             \
   SYSCALL(61, unimplemented)                    \
   SYSCALL(62, unimplemented)                    \
-  SYSCALL(63, unimplemented)                    \
+  SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                    \
   SYSCALL(65, unimplemented)                    \
   SYSCALL(66, unimplemented)                    \

@@ -1273,8 +1273,8 @@ typedef struct {
 /* Linux Auxiliary Vector */
 
 typedef struct {
-	Elf64_Word	a_tag;
-	Elf64_Word	a_val;
+	Elf64_Lword	a_tag;
+	Elf64_Lword	a_val;
 } Elf64_Auxv;
 
 #endif /* !_SYS_ELF64_H_ */
