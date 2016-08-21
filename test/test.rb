@@ -11,6 +11,7 @@ require "shellwords"
 @shell_reports = []
 
 def main
+  targets = ARGV.empty? ? nil : ARGV
   puts <<-"EOS"
 
 ===============
@@ -18,15 +19,16 @@ Test Starts
 ===============
 
   EOS
-  test_assertion()
-  test_stdout()
-  test_shell()
+  test_assertion(targets)
+  test_stdout(targets)
+  test_shell(targets)
   puts("")
   report()
 end
 
-def test_assertion
+def test_assertion(targets = nil)
   Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
+    next if targets && !targets.include?(File.basename(target))
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape}")
     print(out)
     @assertion[:pass] += out.chars.count(".")
@@ -37,13 +39,14 @@ def test_assertion
     end
 
     unless err.empty? && status.success?
-      @assertion_reports << {name: File.basename(target), diff: nil, err: err, crash: !status.success?} # C assertion cannot print "diff" currently, so let it nil
+      @assertion_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: !status.success?}
     end
   end
 end
 
-def test_stdout
+def test_stdout(targets = nil)
   Dir.glob(__dir__ + "/test_stdout/build/*").each do |target|
+    next if targets && !targets.include?(target)
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
@@ -67,8 +70,9 @@ def test_stdout
   end
 end
 
-def test_shell
+def test_shell(targets = nil)
   Dir.glob(__dir__ + "/test_shell/build/*").each do |target|
+    next if targets && !targets.include?(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
     _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{target.shellescape} /bin/bash #{run.shellescape}")
