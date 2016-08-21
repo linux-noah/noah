@@ -64,7 +64,7 @@ int do_open(const char *path, int flags, int mode);
 #define L_MAP_TYPE       0x0f
 #define L_MAP_FIXED      0x10
 #define L_MAP_ANON       0x20
-#define L_MAP_ANONYMOUS  MAP_ANON
+#define L_MAP_ANONYMOUS  L_MAP_ANON
 #define L_MAP_NORESERVE  0x4000
 #define L_MAP_GROWSDOWN  0x0100
 #define L_MAP_DENYWRITE  0x0800
