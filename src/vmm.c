@@ -55,7 +55,7 @@ kalloc(size_t size)
   }
   if (!(((uint64_t)mem >> phys_addr_bit_num) == ((1ULL << (47 - phys_addr_bit_num)) - 1))) {
     // If truncated bits are not all 1, fill them
-    mem = mmap((void*)(0x7f8000000000 | (uint64_t)mem), size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_FIXED | MAP_SHARED | MAP_ANON, -1, 0);
+    mem = mmap((void*)(0x7f8000000000 | (uint64_t)mem), size, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
     if (mem == NULL) {
       PRINTF("could not mmap requested area\n");
       exit(1);
