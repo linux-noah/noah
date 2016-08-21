@@ -24,6 +24,12 @@ hv_vcpuid_t vcpuid;
 uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;
 
+struct vcpu {
+  hv_vcpuid_t id;
+  uint64_t regs_cache[NR_X86_REG_LIST];
+  uint64_t vmcs_cache[NR_VMCS_FIELD];
+} vcpu;
+
 gaddr_t
 host_to_guest(void *haddr)
 {
@@ -41,6 +47,15 @@ to_haddrp(uint64_t vmpaddr)
   // Write serious "kalloc" after introducing multi-process model
   return (void*)(vmpaddr | (CANONICAL_LOWER_END ^ ((1ULL << phys_addr_bit_num) - 1)));
 }
+
+// TODO: Workaround. Delete here after shared-memory model kalloc
+struct kalloc_list {
+  void *host;
+  uint64_t vmpaddr;
+  size_t size;
+  struct kalloc_list *next;
+};
+struct kalloc_list *kalloc_list = NULL;
 
 void*
 kalloc(size_t size)
@@ -68,6 +83,12 @@ kalloc(size_t size)
     PRINTF("could not map a memory region: error code %x\n", ret);
     exit(1);
   }
+
+  struct kalloc_list **p = &kalloc_list;
+  while (*p != NULL) p = &(*p)->next;
+  *p = malloc(sizeof(struct kalloc_list));
+  **p = (struct kalloc_list){mem, vmpaddr, size, NULL};
+
   return mem;
 }
 
@@ -311,6 +332,7 @@ vmm_create()
     PRINTF("could not create a vcpu: error code %x", ret);
     return;
   }
+  vcpu.id = vcpuid;
 
   PUTS("successfully created a vcpu");
 
@@ -366,4 +388,165 @@ print_regs()
   PRINTF("\trsi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
   PRINTF("\trbp = 0x%llx\n", value);
+}
+
+void
+save_regs(struct vcpu *vcpu)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    uint64_t value;
+    if (hv_vcpu_read_register(vcpu->id, x86_reg_list[i], &value) != HV_SUCCESS) {
+      PRINTF("store_regs failed\n");
+      return;
+    }
+    vcpu->regs_cache[i] = value;
+  }
+}
+
+bool
+clone_regs(struct vcpu *src, struct vcpu *dest)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_write_register(dest->id, x86_reg_list[i], src->regs_cache[i]) != HV_SUCCESS) {
+      PRINTF("clone regs failed\n");
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void
+save_vmcs(struct vcpu *vcpu)
+{
+  for (int i = 0; i < NR_VMCS_FIELD; i++) {
+    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpu->id, vmcs_field_list[i], &vcpu->vmcs_cache[i]);
+    if (success != HV_SUCCESS) {
+      PRINTF("store_vmcs failed\n");
+      return;
+    }
+  }
+}
+
+bool
+clone_vmcs(struct vcpu *src, struct vcpu *dest)
+{
+  const uint32_t clone_mask[] = {
+    VMCS_VPID,
+    VMCS_HOST_ES,
+    VMCS_HOST_CS,
+    VMCS_HOST_SS,
+    VMCS_HOST_DS,
+    VMCS_HOST_FS,
+    VMCS_HOST_GS,
+    VMCS_HOST_TR,
+    VMCS_HOST_IA32_PAT,
+    VMCS_HOST_IA32_EFER,
+    VMCS_HOST_IA32_PERF_GLOBAL_CTRL,
+    VMCS_GUEST_PHYSICAL_ADDRESS,
+    VMCS_RO_INSTR_ERROR,
+    VMCS_RO_EXIT_REASON,
+    VMCS_RO_VMEXIT_IRQ_INFO,
+    VMCS_RO_VMEXIT_IRQ_ERROR,
+    VMCS_RO_IDT_VECTOR_INFO,
+    VMCS_RO_IDT_VECTOR_ERROR,
+    VMCS_RO_VMEXIT_INSTR_LEN,
+    VMCS_RO_VMX_INSTR_INFO,
+    VMCS_RO_EXIT_QUALIFIC,
+    VMCS_RO_IO_RCX,
+    VMCS_RO_IO_RSI,
+    VMCS_RO_IO_RDI,
+    VMCS_RO_IO_RIP,
+    VMCS_RO_GUEST_LIN_ADDR,
+    VMCS_HOST_CR0,
+    VMCS_HOST_CR3,
+    VMCS_HOST_CR4,
+    VMCS_HOST_FS_BASE,
+    VMCS_HOST_GS_BASE,
+    VMCS_HOST_TR_BASE,
+    VMCS_HOST_GDTR_BASE,
+    VMCS_HOST_IDTR_BASE,
+    VMCS_HOST_IA32_SYSENTER_ESP,
+    VMCS_HOST_IA32_SYSENTER_EIP,
+    VMCS_HOST_RSP,
+    VMCS_HOST_RIP,
+  };
+
+  for (int i = 0; i < NR_VMCS_FIELD; i++) {
+    bool in = false;
+    for (int j = 0; j < sizeof(clone_mask) / sizeof(uint32_t); j++) {
+      if (clone_mask[j] == vmcs_field_list[i]) {
+        goto cont;
+      }
+    }
+    uint64_t success = hv_vmx_vcpu_write_vmcs(dest->id, vmcs_field_list[i], src->vmcs_cache[i]);
+    if (success != HV_SUCCESS) {
+      PRINTF("clone vmcs failed, %s\n", vmcs_field_str[i]);
+      return false;
+    }
+    cont: ;
+  }
+  return true;
+}
+
+bool
+clone_ept_map()
+{
+  struct kalloc_list *p = kalloc_list;
+  while (p != NULL) {
+    hv_return_t ret = hv_vm_map(p->host, p->vmpaddr, p->size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+    if (ret != HV_SUCCESS) {
+      PRINTF("cloning map %p to 0x%016llx, size:0x%lx\n", p->host, p->vmpaddr, p->size);
+      PRINTF("could not clone a memory mapping: error code %x\n", ret);
+      return false;
+    }
+    p = p->next;
+  }
+  return true;
+}
+
+void
+vmm_clone(void)
+{
+  struct vcpu clone;
+  hv_return_t ret;
+
+  PUTS("vmm_clone");
+  ret = hv_vm_create(HV_VM_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not create the vm: error code %x", ret);
+    return;
+  }
+
+  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not create a vcpu: error code %x", ret);
+    return;
+  }
+  clone.id = vcpuid;
+
+  init_msr();
+
+  if (!clone_vmcs(&vcpu, &clone))
+    exit(1);
+  PUTS("clone vmcs done");
+  if (!clone_ept_map())
+    exit(1);
+  PUTS("clone ept done");
+  if (!clone_regs(&vcpu, &clone))
+    exit(1);
+
+  PUTS("clone reg done");
+  vcpu = clone;
+  PUTS("clone done");
+}
+
+void
+dump_regs(struct vcpu *vcpu)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    uint64_t value;
+    hv_vcpu_read_register(vcpu->id, x86_reg_list[i], &value);
+    PRINTF("%s: 0x%llx\n", x86_reg_str[i], value);
+  }
 }
