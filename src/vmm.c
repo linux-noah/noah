@@ -59,9 +59,14 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 {
   assert(((uint64_t) haddr & 0xfff) == 0);
   assert((gaddr & 0xfff) == 0);
-  assert((size & 0xfff) == 0);
 
-  hv_vm_map(haddr, gaddr, size, prot);
+  size = roundup(size, PAGE_SIZE(PAGE_4KB));
+
+  hv_vm_unmap(gaddr, size);
+  if (hv_vm_map(haddr, gaddr, size, prot) != HV_SUCCESS) {
+    fprintf(stderr, "hv_vm_map failed\n");
+    exit(1);
+  }
 
   ulong perm = PTE_U | PTE_P;
   if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
