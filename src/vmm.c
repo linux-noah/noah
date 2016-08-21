@@ -49,8 +49,7 @@ page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
   index = (gaddr >> shift) & 0x1ff;
   entry = table[index];
   if (entry & PTE_P) {
-    fprintf(stderr, "oops");
-    exit(1);
+    return;
   }
   table[index] = (haddr & 0x000ffffffffff000ul) | perm;
 }
