@@ -42,12 +42,15 @@ void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 
 void do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
+int do_open(const char *path, int flags, int mode);
 
 #define STACK_SIZE (1 << 21)
 #define STACK_TOP  0x0000007fc0000000ULL
 
 #define LINUX_RELEASE "4.6.4"
 #define LINUX_VERSION "#1 SMP PREEMPT Mon Jul 11 19:12:32 CEST 2016" /* FIXME */
+
+#define L_PATH_MAX 4096         /* including null */
 
 /* debug */
 

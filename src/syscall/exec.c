@@ -28,12 +28,8 @@ load_elf_interp(const char *path, ulong load_addr)
   int fd;
   struct stat st;
 
-  char newpath[strlen(path) + sizeof "./mnt/"];
-  strcpy(newpath, "./mnt/");
-  strcat(newpath, path);
-
-  if ((fd = open(newpath, O_RDONLY)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", newpath);
+  if ((fd = do_open(path, O_RDONLY, 0)) < 0) {
+    fprintf(stderr, "could not open file: %s\n", path);
     return -1;
   }
 

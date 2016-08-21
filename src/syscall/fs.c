@@ -20,9 +20,22 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
   return read(fd, guest_to_host(buf), size);
 }
 
+int
+do_open(const char *path, int flags, int mode)
+{
+  char buf[L_PATH_MAX + sizeof "./mnt/" - 1];
+
+  if (path[0] == '/') {
+    strcpy(buf, "./mnt/");
+    strcat(buf, path);
+    path = buf;
+  }
+  return open(path, flags, mode);
+}
+
 DEFINE_SYSCALL(open, gaddr_t, path, int, flags, int, mode)
 {
-  return open(guest_to_host(path), flags, mode);
+  return do_open(guest_to_host(path), flags, mode);
 }
 
 DEFINE_SYSCALL(close, int, fd)
