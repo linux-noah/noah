@@ -35,6 +35,16 @@ DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
   return stat(guest_to_host(path), guest_to_host(st));
 }
 
+DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
+{
+  return fstat(fd, guest_to_host(st));
+}
+
+DEFINE_SYSCALL(access, gaddr_t, path, int, mode)
+{
+  return access(guest_to_host(path), mode);
+}
+
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
   getcwd(guest_to_host(buf), size);

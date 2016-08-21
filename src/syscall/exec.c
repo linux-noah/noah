@@ -37,7 +37,7 @@ load_elf_interp(const char *path, ulong load_addr)
     return -1;
   }
 
-  stat(newpath, &st);
+  fstat(fd, &st);
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
