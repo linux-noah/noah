@@ -37,6 +37,8 @@ load_elf_interp(const char *path, ulong load_addr)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
+  close(fd);
+
   h = (Elf64_Ehdr *)data;
 
   assert(IS_ELF(*h));
@@ -74,6 +76,8 @@ load_elf_interp(const char *path, ulong load_addr)
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, load_addr + h->e_entry);
   brk_min = map_top;
+
+  munmap(data, st.st_size);
 
   return 0;
 }
@@ -266,5 +270,9 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
+  close(fd);
+
   load_elf(ehdr, argc, argv, envp);
+
+  munmap(ehdr, st.st_size);
 }
