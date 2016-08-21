@@ -18,17 +18,21 @@
 #include "x86/idt.h"
 #include "x86/msr.h"
 #include "x86/vmemparam.h"
+#include "x86/vmx.h"
 
 hv_vcpuid_t vcpuid;
-
 uint64_t (*pml4)[NR_PAGE_ENTRY];
 static int phys_addr_bit_num = 39;
+struct kalloc_list *ept_map;
 
-struct vcpu {
-  hv_vcpuid_t id;
-  uint64_t regs_cache[NR_X86_REG_LIST];
-  uint64_t vmcs_cache[NR_VMCS_FIELD];
-} vcpu;
+struct vcpu_snapshot {
+  uint64_t reg_snapshot[NR_X86_REG_LIST];
+  uint64_t vmcs_snapshot[NR_VMCS_FIELD];
+};
+
+struct vm_snapshot {
+  struct vcpu_snapshot vcpu_snapshot;
+};
 
 gaddr_t
 host_to_guest(void *haddr)
@@ -55,7 +59,6 @@ struct kalloc_list {
   size_t size;
   struct kalloc_list *next;
 };
-struct kalloc_list *kalloc_list = NULL;
 
 void*
 kalloc(size_t size)
@@ -84,7 +87,7 @@ kalloc(size_t size)
     exit(1);
   }
 
-  struct kalloc_list **p = &kalloc_list;
+  struct kalloc_list **p = &ept_map;
   while (*p != NULL) p = &(*p)->next;
   *p = malloc(sizeof(struct kalloc_list));
   **p = (struct kalloc_list){mem, vmpaddr, size, NULL};
@@ -332,7 +335,7 @@ vmm_create()
     PRINTF("could not create a vcpu: error code %x", ret);
     return;
   }
-  vcpu.id = vcpuid;
+  vcpuid = vcpuid;
 
   PUTS("successfully created a vcpu");
 
@@ -391,36 +394,21 @@ print_regs()
 }
 
 void
-save_regs(struct vcpu *vcpu)
+reg_snapshot(vm_snapshot_t snapshot)
 {
   for (int i = 0; i < NR_X86_REG_LIST; i++) {
-    uint64_t value;
-    if (hv_vcpu_read_register(vcpu->id, x86_reg_list[i], &value) != HV_SUCCESS) {
+    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
       PRINTF("store_regs failed\n");
       return;
     }
-    vcpu->regs_cache[i] = value;
   }
-}
-
-bool
-clone_regs(struct vcpu *src, struct vcpu *dest)
-{
-  for (int i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_write_register(dest->id, x86_reg_list[i], src->regs_cache[i]) != HV_SUCCESS) {
-      PRINTF("clone regs failed\n");
-      return false;
-    }
-  }
-
-  return true;
 }
 
 void
-save_vmcs(struct vcpu *vcpu)
+vmcs_snapshot(vm_snapshot_t snapshot)
 {
   for (int i = 0; i < NR_VMCS_FIELD; i++) {
-    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpu->id, vmcs_field_list[i], &vcpu->vmcs_cache[i]);
+    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &snapshot->vcpu_snapshot.vmcs_snapshot[i]);
     if (success != HV_SUCCESS) {
       PRINTF("store_vmcs failed\n");
       return;
@@ -428,8 +416,27 @@ save_vmcs(struct vcpu *vcpu)
   }
 }
 
+void
+vmm_snapshot(vm_snapshot_t *snapshot)
+{
+  *snapshot = malloc(sizeof(struct vm_snapshot));
+  reg_snapshot(*snapshot);
+  vmcs_snapshot(*snapshot);
+}
+
+void
+reg_clone(vm_snapshot_t snapshot)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
+      PRINTF("clone regs failed\n");
+      return;
+    }
+  }
+}
+
 bool
-clone_vmcs(struct vcpu *src, struct vcpu *dest)
+vmcs_clone(vm_snapshot_t snapshot)
 {
   const uint32_t clone_mask[] = {
     VMCS_VPID,
@@ -479,7 +486,7 @@ clone_vmcs(struct vcpu *src, struct vcpu *dest)
         goto cont;
       }
     }
-    uint64_t success = hv_vmx_vcpu_write_vmcs(dest->id, vmcs_field_list[i], src->vmcs_cache[i]);
+    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], snapshot->vcpu_snapshot.vmcs_snapshot[i]);
     if (success != HV_SUCCESS) {
       PRINTF("clone vmcs failed, %s\n", vmcs_field_str[i]);
       return false;
@@ -490,9 +497,9 @@ clone_vmcs(struct vcpu *src, struct vcpu *dest)
 }
 
 bool
-clone_ept_map()
+clone_ept_map(vm_snapshot_t snapshot)
 {
-  struct kalloc_list *p = kalloc_list;
+  struct kalloc_list *p = ept_map;
   while (p != NULL) {
     hv_return_t ret = hv_vm_map(p->host, p->vmpaddr, p->size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
     if (ret != HV_SUCCESS) {
@@ -506,9 +513,8 @@ clone_ept_map()
 }
 
 void
-vmm_clone(void)
+vmm_clone(vm_snapshot_t snapshot)
 {
-  struct vcpu clone;
   hv_return_t ret;
 
   PUTS("vmm_clone");
@@ -523,30 +529,20 @@ vmm_clone(void)
     PRINTF("could not create a vcpu: error code %x", ret);
     return;
   }
-  clone.id = vcpuid;
+  vcpuid = vcpuid;
 
   init_msr();
 
-  if (!clone_vmcs(&vcpu, &clone))
-    exit(1);
-  PUTS("clone vmcs done");
-  if (!clone_ept_map())
-    exit(1);
-  PUTS("clone ept done");
-  if (!clone_regs(&vcpu, &clone))
-    exit(1);
-
-  PUTS("clone reg done");
-  vcpu = clone;
-  PUTS("clone done");
+  vmcs_clone(snapshot);
+  PUTS("vmcs_clone done");
+  clone_ept_map(snapshot);
+  PUTS("ept_clone done");
+  reg_clone(snapshot);
+  PUTS("reg_clone done");
 }
 
 void
-dump_regs(struct vcpu *vcpu)
+vmm_snapshot_destroy(vm_snapshot_t snapshot)
 {
-  for (int i = 0; i < NR_X86_REG_LIST; i++) {
-    uint64_t value;
-    hv_vcpu_read_register(vcpu->id, x86_reg_list[i], &value);
-    PRINTF("%s: 0x%llx\n", x86_reg_str[i], value);
-  }
+  free(snapshot);
 }
