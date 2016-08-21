@@ -1,12 +1,11 @@
-#include "common.h"
-
-#include "noah.h"
-
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include "common.h"
+#include "noah.h"
 
 DEFINE_SYSCALL(getpid)
 {
@@ -78,17 +77,29 @@ DEFINE_SYSCALL(uname, gaddr_t, buf)
 #define ARCH_GET_FS 0x1003
 #define ARCH_GET_GS 0x1004
 
-DEFINE_SYSCALL(arch_prctl, int, code, uint64_t, addr)
+DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   switch (code) {
   case ARCH_SET_GS:
-    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr);
+    if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr) != HV_SUCCESS) {
+      return -1;
+    }
     return 0;
   case ARCH_SET_FS:
-    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr);
+    if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr) != HV_SUCCESS) {
+      return -1;
+    }
     return 0;
   case ARCH_GET_FS:
+    if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
+      return -1;
+    }
+    return 0;
   case ARCH_GET_GS:
+    if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
+      return -1;
+    }
+    return 0;
   default:
     return -1;
   }
