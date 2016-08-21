@@ -62,16 +62,11 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
   assert((gaddr & 0xfff) == 0);
   assert((size & 0xfff) == 0);
 
-  hv_memory_flags_t flags = 0;
-  if (prot & PROT_READ) flags |= HV_MEMORY_READ;
-  if (prot & PROT_WRITE) flags |= HV_MEMORY_WRITE;
-  if (prot & PROT_EXEC) flags |= HV_MEMORY_EXEC;
-
-  hv_vm_map(haddr, gaddr, size, flags);
+  hv_vm_map(haddr, gaddr, size, prot);
 
   ulong perm = PTE_U | PTE_P;
-  if (prot & PROT_WRITE) perm |= PTE_W;
-  if ((prot & PROT_EXEC) == 0) perm |= PTE_NX;
+  if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
+  if ((prot & HV_MEMORY_EXEC) == 0) perm |= PTE_NX;
 
   for (uint64_t i = 0; i < size / 0x1000; i++) {
     page_map_help(ept, (uint64_t) haddr, gaddr, perm);
@@ -172,9 +167,9 @@ uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
 void
 init_page()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, pml4);
+  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, pml4);
   noah_kern_brk += 0x1000;
-  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, pdp);
+  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, pdp);
   pml4[0] |= noah_kern_brk;
   noah_kern_brk += 0x1000;
 
@@ -200,7 +195,7 @@ uint64_t gdt[3] __page_aligned = {
 void
 init_segment()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, gdt);
+  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, gdt);
   noah_kern_brk += 0x1000;
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
@@ -262,7 +257,7 @@ struct gate_desc idt[256] __page_aligned;
 void
 init_idt()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, PROT_READ | PROT_WRITE, idt);
+  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, idt);
   noah_kern_brk += 0x1000;
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, host_to_guest(idt));

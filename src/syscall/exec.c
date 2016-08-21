@@ -61,11 +61,11 @@ load_elf_interp(const char *path, ulong load_addr)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
 
-    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
@@ -110,11 +110,11 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
 
-    do_mmap(vaddr, size, prot, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
@@ -184,7 +184,7 @@ push(const void *data, size_t n)
 void
 init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
 {
-  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, L_PROT_READ | L_PROT_WRITE, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
 
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, STACK_TOP);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, STACK_TOP);
