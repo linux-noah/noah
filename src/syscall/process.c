@@ -33,6 +33,31 @@ DEFINE_SYSCALL(exit_group, int, reason)
   _exit(reason);
 }
 
+struct utsname {
+  char sysname[65];
+  char nodename[65];
+  char release[65];
+  char version[65];
+  char machine[65];
+  char domainname[65];
+};
+
+DEFINE_SYSCALL(uname, gaddr_t, buf)
+{
+  struct utsname *_buf = guest_to_host(buf);
+
+  strncpy(_buf->sysname, "Linux", sizeof _buf->sysname - 1);
+  strncpy(_buf->release, LINUX_RELEASE, sizeof _buf->release - 1);
+  strncpy(_buf->version, LINUX_VERSION, sizeof _buf->version - 1);
+  strncpy(_buf->machine, "x86_64", sizeof _buf->machine - 1);
+  strncpy(_buf->domainname, "GNU/Linux", sizeof _buf->domainname - 1);
+
+  if (gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0) {
+    return -1;
+  }
+  return 0;
+}
+
 #define ARCH_SET_GS 0x1001
 #define ARCH_SET_FS 0x1002
 #define ARCH_GET_FS 0x1003
