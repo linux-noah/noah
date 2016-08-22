@@ -12,7 +12,17 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-uint64_t current_mmap_top = 0x00000000c0000000;
+gaddr_t
+alloc_region(size_t len)
+{
+  static uint64_t current_mmap_top = 0x00000000c0000000;
+
+  len = roundup(len, PAGE_SIZE(PAGE_4KB));
+
+  current_mmap_top += len;
+
+  return current_mmap_top - len;
+}
 
 gaddr_t
 do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
@@ -30,9 +40,12 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
     fprintf(stderr, "unsupported mmap flags: %x\n", flags);
     _exit(1);
   }
+  if (flags & L_MAP_ANON) {
+    fd = -1;
+    offset = 0;
+  }
   if ((flags & L_MAP_FIXED) == 0) {
-    addr = current_mmap_top;    /* FIXME */
-    current_mmap_top += roundup(len, PAGE_SIZE(PAGE_4KB));
+    addr = alloc_region(len);
   }
 
   int mflags = 0;
