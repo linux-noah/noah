@@ -23,7 +23,7 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   flags &= ~L_MAP_DENYWRITE;
   flags &= ~L_MAP_EXECUTABLE;
 
-  /* intentionally no-op, as the linux kernel does */
+  /* the linux kernel does nothing for L_MAP_STACK */
   flags &= ~L_MAP_STACK;
 
   if ((flags & ~(L_MAP_SHARED | L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANON)) != 0) {
