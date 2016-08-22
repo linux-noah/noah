@@ -128,7 +128,9 @@ main(int argc, char *argv[], char **envp)
 
   vmm_create();
 
-  do_exec(argv[1], argc - 1, argv + 1, envp);
+  if (do_exec(argv[1], argc - 1, argv + 1, envp) < 0) {
+    exit(1);
+  };
 
   main_loop();
 
