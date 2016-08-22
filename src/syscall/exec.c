@@ -329,6 +329,9 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
     load_script(data, st.st_size, argc, argv, envp);
   }
+  else {
+    return;                     /* unsupported file type */
+  }
 
   munmap(data, st.st_size);
 }
