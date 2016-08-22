@@ -59,17 +59,17 @@ int do_open(const char *path, int flags, int mode);
 #define L_PROT_EXEC  0x4
 
 #define L_MAP_FILE       0
-#define L_MAP_SHARED     0x01
-#define L_MAP_PRIVATE    0x02
-#define L_MAP_TYPE       0x0f
+#define L_MAP_SHARED     0x1
+#define L_MAP_PRIVATE    0x2
+#define L_MAP_TYPE       0xf
 #define L_MAP_FIXED      0x10
 #define L_MAP_ANON       0x20
 #define L_MAP_ANONYMOUS  L_MAP_ANON
-#define L_MAP_NORESERVE  0x4000
 #define L_MAP_GROWSDOWN  0x0100
 #define L_MAP_DENYWRITE  0x0800
 #define L_MAP_EXECUTABLE 0x1000
 #define L_MAP_LOCKED     0x2000
+#define L_MAP_NORESERVE  0x4000
 #define L_MAP_POPULATE   0x8000
 #define L_MAP_NONBLOCK   0x10000
 #define L_MAP_STACK      0x20000
