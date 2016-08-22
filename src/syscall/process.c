@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #include "common.h"
 #include "noah.h"
@@ -21,6 +22,10 @@ DEFINE_SYSCALL(getppid)
 {
   return getppid();
 }
+
+DEFINE_SYSCALL(gettid)
+{
+  return getpid();
 }
 
 DEFINE_SYSCALL(exit, int, reason)
@@ -69,4 +74,12 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 DEFINE_SYSCALL(set_tid_address, int *, tidptr)
 {
   return 0;
+}
+
+DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage)
+{
+  int *status = (int*)guest_to_host(gstatus);
+  struct rusage *rusage = (struct rusage*)guest_to_host(grusage);
+
+  return wait4(pid, status, options, rusage);
 }
