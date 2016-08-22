@@ -42,8 +42,8 @@
   SYSCALL(38, unimplemented)                    \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
-  SYSCALL(41, unimplemented)                    \
-  SYSCALL(42, unimplemented)                    \
+  SYSCALL(41, socket)                           \
+  SYSCALL(42, connect)                          \
   SYSCALL(43, unimplemented)                    \
   SYSCALL(44, unimplemented)                    \
   SYSCALL(45, unimplemented)                    \
@@ -55,8 +55,8 @@
   SYSCALL(51, unimplemented)                    \
   SYSCALL(52, unimplemented)                    \
   SYSCALL(53, unimplemented)                    \
-  SYSCALL(54, unimplemented)                    \
-  SYSCALL(55, unimplemented)                    \
+  SYSCALL(54, setsockopt)                       \
+  SYSCALL(55, getsockopt)                       \
   SYSCALL(56, unimplemented)                    \
   SYSCALL(57, fork)                             \
   SYSCALL(58, unimplemented)                    \
