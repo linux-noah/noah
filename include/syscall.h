@@ -90,7 +90,7 @@
   SYSCALL(86, unimplemented)                    \
   SYSCALL(87, unimplemented)                    \
   SYSCALL(88, unimplemented)                    \
-  SYSCALL(89, unimplemented)                    \
+  SYSCALL(89, readlink)                         \
   SYSCALL(90, unimplemented)                    \
   SYSCALL(91, unimplemented)                    \
   SYSCALL(92, unimplemented)                    \

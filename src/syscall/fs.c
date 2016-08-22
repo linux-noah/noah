@@ -96,3 +96,8 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
   }
   return writev(fd, dst, iovcnt);
 }
+
+DEFINE_SYSCALL(readlink, gaddr_t, pathname, gaddr_t, buf, int, bufsize)
+{
+  return -1;
+}
