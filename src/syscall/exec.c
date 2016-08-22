@@ -82,20 +82,33 @@ load_elf_interp(const char *path, ulong load_addr)
   return 0;
 }
 
-void
-load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
+int
+load_elf(const char *elf_path, int argc, char *argv[], char **envp)
 {
+  int fd;
+  struct stat st;
+  Elf64_Ehdr *ehdr;
+
+  if ((fd = open(elf_path, O_RDONLY)) < 0) {
+    fprintf(stderr, "could not open file: %s\n", elf_path);
+    return -1;
+  }
+
+  fstat(fd, &st);
+
+  ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
+
   uint64_t map_top = 0;
 
   assert(IS_ELF(*ehdr));
 
   if (ehdr->e_type != ET_EXEC) {
     fprintf(stderr, "not an executable file");
-    return;
+    return -1;
   }
   if (ehdr->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
-    return;
+    return -1;
   }
 
   Elf64_Phdr *p = (Elf64_Phdr *)((char *)ehdr + ehdr->e_phoff);
@@ -144,7 +157,9 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     memcpy(interp_path, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
     interp_path[p[i].p_filesz] = 0;
 
-    load_elf_interp(interp_path, map_top);
+    if (load_elf_interp(interp_path, map_top) < 0) {
+      return -1;
+    }
   }
   else {
     hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, ehdr->e_entry);
@@ -162,6 +177,8 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
   };
 
   init_userstack(argc, argv, envp, aux);
+
+  return 1;
 }
 
 uint64_t
@@ -256,27 +273,6 @@ init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
 
   uint64_t argc64 = argc;
   push(&argc64, sizeof argc64);
-}
-
-int
-do_exec(const char *elf_path, int argc, char *argv[], char **envp)
-{
-  int fd;
-  struct stat st;
-  Elf64_Ehdr *ehdr;
-
-  if ((fd = open(elf_path, O_RDONLY)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", elf_path);
-    return -1;
-  }
-
-  fstat(fd, &st);
-
-  ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
-
-  load_elf(ehdr, argc, argv, envp);
-
-  return 0;
 }
 
 DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)

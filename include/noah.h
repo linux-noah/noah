@@ -50,8 +50,7 @@ void vm_map(uint64_t vmvaddr, uint64_t vmpaddr, size_t size, page_type_t page_ty
 
 /* linux emulation */
 
-int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
-
+int load_elf(const char *elf_path, int argc, char *argv[], char **envp);
 
 /* debug */
 
