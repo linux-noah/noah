@@ -28,7 +28,10 @@ do_open(const char *path, int flags, int mode)
   if (path[0] == '/') {
     strcpy(buf, "./mnt/");
     strcat(buf, path);
-    path = buf;
+    int fd = open(buf, flags, mode);
+    if (fd >= 0)
+      return fd;
+    /* fall through... */
   }
   return open(path, flags, mode);
 }
