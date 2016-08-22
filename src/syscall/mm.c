@@ -74,6 +74,8 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
   if (current_brk == 0)
     current_brk = brk_min;
 
+  brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
+
   if (brk < brk_min)
     return brk_min;
 
