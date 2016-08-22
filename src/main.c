@@ -20,6 +20,9 @@ main_loop()
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
     PRINTF("\tguest-rip = 0x%llx\n", value);
 
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &value);
+    PRINTF("\tinstr length = 0x%llx\n", value);
+
     print_regs();
 
     uint64_t exit_reason;
@@ -44,6 +47,8 @@ main_loop()
       PRINTF("idt error = %lld\n", value);
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
       PRINTF("guest int status = %lld\n", value);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
+      PRINTF("exit qualification = 0x%llx\n", value);
       PUTS("!!MAYBE A SYSENTER!!");
 
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
@@ -118,6 +123,8 @@ main(int argc, char *argv[], char **envp)
     fprintf(stderr, "usage: %s elf_file ...\n", argv[0]);
     exit(1);
   }
+
+  noah_path = argv[0];
 
   vmm_create();
 

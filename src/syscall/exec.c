@@ -258,7 +258,7 @@ init_userstack(int argc, char *argv[], char **envp, Elf64_Auxv *aux)
   push(&argc64, sizeof argc64);
 }
 
-void
+int
 do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
   int fd;
@@ -267,7 +267,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   if ((fd = open(elf_path, O_RDONLY)) < 0) {
     fprintf(stderr, "could not open file: %s\n", elf_path);
-    return;
+    return -1;
   }
 
   fstat(fd, &st);
@@ -275,4 +275,30 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
   load_elf(ehdr, argc, argv, envp);
+
+  return 0;
+}
+
+DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
+{
+  int argc = 0, envc = 0;
+  while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
+  while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
+
+  const char *elf_path;
+  char *argv[argc + 2], *envp[envc + 1];
+
+  elf_path = (const char*)guest_to_host(gelf_path);
+  for (int i = 0; i < argc; i++) {
+    argv[i + 1] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  }
+  argv[0] = noah_path;
+  argv[argc + 1] = NULL;
+  for (int i = 0; i < envc; i++) {
+    envp[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(genvp))[i]);
+  }
+  envp[envc] = NULL;
+
+  vmm_destroy(); // Avoid Apple Hypervisor suspicious behavior
+  return execve("./build/noah", argv, envp);
 }
