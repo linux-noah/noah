@@ -21,10 +21,6 @@
 
 hv_vcpuid_t vcpuid;
 
-#define __page_aligned __attribute__((aligned(0x1000)))
-
-static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
-
 uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
 
 void
@@ -161,21 +157,37 @@ init_vmcs()
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_CTRL_CR4_SHADOW, 0);
 }
 
+#define __page_aligned __attribute__((aligned(0x1000)))
+
+static gaddr_t
+kmap(void *ptr, size_t size, hv_memory_flags_t flags)
+{
+  static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
+
+  assert((size & 0xfff) == 0);
+  assert(((uint64_t) ptr & 0xfff) == 0);
+
+  vmm_mmap(noah_kern_brk, size, flags, ptr);
+
+  noah_kern_brk += size;
+
+  return noah_kern_brk - size;
+}
+
 uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
   [0] = PTE_U | PTE_W | PTE_P,
 };
+
 uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
 #include "vmm_pdp.h"
 };
 
+
 void
 init_page()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, pml4);
-  noah_kern_brk += 0x1000;
-  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, pdp);
-  pml4[0] |= noah_kern_brk;
-  noah_kern_brk += 0x1000;
+  kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
+  pml4[0] |= kmap(pdp, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE) & 0x000ffffffffff000ul;
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
@@ -202,8 +214,7 @@ uint64_t gdt[3] __page_aligned = {
 void
 init_segment()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, gdt);
-  noah_kern_brk += 0x1000;
+  kmap(gdt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
@@ -264,8 +275,7 @@ struct gate_desc idt[256] __page_aligned;
 void
 init_idt()
 {
-  vmm_mmap(noah_kern_brk, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE, idt);
-  noah_kern_brk += 0x1000;
+  kmap(idt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
   hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
