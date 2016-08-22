@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -154,6 +155,56 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
   init_userstack(argc, argv, envp, load_base, ehdr, interp ? map_top : 0);
 }
 
+#define SB_ARGC_MAX 2
+
+void
+load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
+{
+  const char *script_end = script + len;
+  char sb_argv[SB_ARGC_MAX][L_PATH_MAX];
+  int sb_argc;
+  size_t n;
+
+  script += 2;                  /* skip shebang */
+
+  for (sb_argc = 0; sb_argc < SB_ARGC_MAX; ++sb_argc) {
+    while (isspace(*script) && *script != '\n') {
+      if (script == script_end)
+        goto parse_end;
+      script++;
+    }
+
+    for (n = 0; ! isspace(script[n]); ++n) {
+      if (script + n == script_end)
+        goto parse_end;
+    }
+    if (n == 0) {
+      goto parse_end;
+    }
+    if (n > L_PATH_MAX - 1) {
+      return;
+    }
+    strncpy(sb_argv[sb_argc], script, n);
+    sb_argv[sb_argc][n] = 0;
+
+    script += n;                /* skip interp */
+  }
+
+ parse_end:
+  if (sb_argc == 0) {
+    return;
+  }
+
+  int newargc = sb_argc + argc;
+  char *newargv[newargc];
+  for (int i = 0; i < sb_argc; ++i) {
+    newargv[i] = sb_argv[i];
+  }
+  memcpy(newargv + sb_argc, argv, argc * sizeof(char *));
+
+  do_exec(newargv[0], newargc, newargv, envp);
+}
+
 uint64_t
 push(const void *data, size_t n)
 {
@@ -259,20 +310,25 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
   int fd;
   struct stat st;
-  Elf64_Ehdr *ehdr;
+  char *data;
 
-  if ((fd = open(elf_path, O_RDONLY)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", elf_path);
+  if ((fd = do_open(elf_path, O_RDONLY, 0)) < 0) {
+    fprintf(stderr, "do_exec: could not open file: %s\n", elf_path);
     return;
   }
 
   fstat(fd, &st);
 
-  ehdr = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
 
   close(fd);
 
-  load_elf(ehdr, argc, argv, envp);
+  if (4 <= st.st_size && memcmp(data, ELFMAG, 4) == 0) {
+    load_elf((Elf64_Ehdr *) data, argc, argv, envp);
+  }
+  else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
+    load_script(data, st.st_size, argc, argv, envp);
+  }
 
-  munmap(ehdr, st.st_size);
+  munmap(data, st.st_size);
 }
