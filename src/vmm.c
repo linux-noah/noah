@@ -179,9 +179,9 @@ uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
 };
 
 uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
+  /* straight mapping */
 #include "vmm_pdp.h"
 };
-
 
 void
 init_page()
@@ -206,7 +206,7 @@ init_special_regs()
 }
 
 uint64_t gdt[3] __page_aligned = {
-  [SEG_NULL] = 0, // NULL SEL
+  [SEG_NULL] = 0,                  // NULL SEL
   [SEG_CODE] = 0x0020980000000000, // CODE SEL
   [SEG_DATA] = 0x0000900000000000, // DATA SEL
 };
