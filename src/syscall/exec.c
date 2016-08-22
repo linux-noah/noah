@@ -36,7 +36,7 @@ load_elf_interp(const char *path, ulong load_addr)
 
   fstat(fd, &st);
 
-  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
   close(fd);
 
@@ -319,7 +319,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   fstat(fd, &st);
 
-  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+  data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
   close(fd);
 
