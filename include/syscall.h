@@ -103,13 +103,13 @@
   SYSCALL(99, unimplemented)                    \
   SYSCALL(100, unimplemented)                   \
   SYSCALL(101, unimplemented)                   \
-  SYSCALL(102, unimplemented)                   \
+  SYSCALL(102, getuid)                          \
   SYSCALL(103, unimplemented)                   \
-  SYSCALL(104, unimplemented)                   \
+  SYSCALL(104, getgid)                          \
   SYSCALL(105, unimplemented)                   \
   SYSCALL(106, unimplemented)                   \
   SYSCALL(107, geteuid)                         \
-  SYSCALL(108, unimplemented)                   \
+  SYSCALL(108, getegid)                         \
   SYSCALL(109, unimplemented)                   \
   SYSCALL(110, getppid)                         \
   SYSCALL(111, unimplemented)                   \

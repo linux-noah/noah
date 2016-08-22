@@ -13,7 +13,22 @@ DEFINE_SYSCALL(getpid)
   return 0;
 }
 
+DEFINE_SYSCALL(getuid)
+{
+  return 0;
+}
+
+DEFINE_SYSCALL(getgid)
+{
+  return 0;
+}
+
 DEFINE_SYSCALL(geteuid)
+{
+  return 0;
+}
+
+DEFINE_SYSCALL(getegid)
 {
   return 0;
 }
