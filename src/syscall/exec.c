@@ -161,7 +161,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
 #define SB_ARGC_MAX 2
 
-void
+int
 load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
 {
   const char *script_end = script + len;
@@ -186,7 +186,7 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
       goto parse_end;
     }
     if (n > L_PATH_MAX - 1) {
-      return;
+      return -1;
     }
     strncpy(sb_argv[sb_argc], script, n);
     sb_argv[sb_argc][n] = 0;
@@ -196,7 +196,7 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
 
  parse_end:
   if (sb_argc == 0) {
-    return;
+    return -1;
   }
 
   int newargc = sb_argc + argc;
@@ -207,6 +207,8 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
   memcpy(newargv + sb_argc, argv, argc * sizeof(char *));
 
   do_exec(newargv[0], newargc, newargv, envp);
+
+  return 0;
 }
 
 uint64_t

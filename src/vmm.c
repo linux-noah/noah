@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 
 #include "noah.h"
+#include "util/list.h"
 
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
@@ -20,19 +21,20 @@
 #include "x86/vmemparam.h"
 #include "x86/vmx.h"
 
-// TODO: Workaround. Delete here after shared-memory model kalloc
-struct kalloc_list {
-  void *host;
-  uint64_t vmpaddr;
-  size_t size;
-  struct kalloc_list *next;
-};
-
 hv_vcpuid_t vcpuid;
 
 uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
 
-struct kalloc_list *ept_map;
+// TODO: Workaround. Delete here after shared-memory model kalloc
+struct vmm_vm_region {
+  void *haddr;
+  gaddr_t gaddr;
+  size_t size;
+  int prot;
+  struct list_head list;
+};
+
+struct list_head vmm_vm_regions;
 
 struct vcpu_snapshot {
   uint64_t reg_snapshot[NR_X86_REG_LIST];
@@ -42,6 +44,66 @@ struct vcpu_snapshot {
 struct vm_snapshot {
   struct vcpu_snapshot vcpu_snapshot;
 };
+
+void
+record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
+{
+  struct list_head *list, *t;
+  struct vmm_vm_region *region, *r;
+
+  region = malloc(sizeof *region);
+  region->haddr = haddr;
+  region->gaddr = gaddr;
+  region->size = size;
+  region->prot = prot;
+
+  if (list_empty(&vmm_vm_regions)) { /* fast path */
+    list_add(&region->list, &vmm_vm_regions);
+    return;
+  }
+  /* unmap */
+  list_for_each_safe (list, t, &vmm_vm_regions) {
+    r = list_entry(list, struct vmm_vm_region, list);
+    if (gaddr + size <= r->gaddr)
+      break;
+    if (r->gaddr + r->size <= gaddr)
+      continue;
+    list_del(list);
+    if (gaddr <= r->gaddr && r->gaddr + r->size <= gaddr + size) {
+      free(r);
+      continue;
+    }
+    /* split r */
+    if (r->gaddr < gaddr) {
+      struct vmm_vm_region *s = malloc(sizeof *s);
+      s->haddr = r->haddr;
+      s->gaddr = r->gaddr;
+      s->size = gaddr - r->gaddr;
+      s->prot = prot;
+      list_add(&s->list, list->prev);
+    }
+    if (gaddr + size < r->gaddr + r->size) {
+      uint64_t offset = gaddr + size - r->gaddr;
+      struct vmm_vm_region *s = malloc(sizeof *s);
+      s->haddr = (char *) r->haddr + offset;
+      s->gaddr = r->gaddr + offset;
+      s->size = r->size - offset;
+      s->prot = prot;
+      list_add_tail(&s->list, list->next);
+    }
+  }
+  /* map */
+  gaddr_t prev = 0;
+  list_for_each (list, &vmm_vm_regions) {
+    r = list_entry(list, struct vmm_vm_region, list);
+    if (prev <= gaddr && gaddr + size <= r->gaddr) {
+      list_add(&region->list, list->prev);
+      return;
+    }
+    prev = r->gaddr + r->size;
+  }
+  list_add_tail(&region->list, list);
+}
 
 void
 page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
@@ -83,6 +145,7 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
     fprintf(stderr, "hv_vm_map failed\n");
     exit(1);
   }
+  record_region(haddr, gaddr, size, prot);
 
   ulong perm = PTE_U | PTE_P;
   if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
@@ -339,6 +402,8 @@ vmm_create()
 
   PUTS("successfully created a vcpu");
 
+  INIT_LIST_HEAD(&vmm_vm_regions);
+
   init_vmcs();
   init_msr();
   init_page();
@@ -480,7 +545,6 @@ vmcs_clone(vm_snapshot_t snapshot)
   };
 
   for (int i = 0; i < NR_VMCS_FIELD; i++) {
-    bool in = false;
     for (int j = 0; j < sizeof(clone_mask) / sizeof(uint32_t); j++) {
       if (clone_mask[j] == vmcs_field_list[i]) {
         goto cont;
@@ -499,15 +563,16 @@ vmcs_clone(vm_snapshot_t snapshot)
 bool
 clone_ept_map(vm_snapshot_t snapshot)
 {
-  struct kalloc_list *p = ept_map;
-  while (p != NULL) {
-    hv_return_t ret = hv_vm_map(p->host, p->vmpaddr, p->size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+  struct list_head *list;
+
+  list_for_each (list, &vmm_vm_regions) {
+    struct vmm_vm_region *p = list_entry(list, struct vmm_vm_region, list);
+    hv_return_t ret = hv_vm_map(p->haddr, p->gaddr, p->size, p->prot);
     if (ret != HV_SUCCESS) {
       PRINTF("cloning map %p to 0x%016llx, size:0x%lx\n", p->host, p->vmpaddr, p->size);
       PRINTF("could not clone a memory mapping: error code %x\n", ret);
       return false;
     }
-    p = p->next;
   }
   return true;
 }
