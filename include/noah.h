@@ -26,9 +26,17 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
+#include "x86/page.h"
+
+typedef struct vm_snapshot *vm_snapshot_t;
 extern hv_vcpuid_t vcpuid;
 
+char *noah_path;
+
 void vmm_create(void);
+void vmm_clone(vm_snapshot_t snapshot);
+void vmm_snapshot(vm_snapshot_t *snapshot);
+void vmm_snapshot_destroy(vm_snapshot_t snapshot);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;
@@ -41,7 +49,7 @@ void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 
 /* linux emulation */
 
-void do_exec(const char *elf_path, int argc, char *argv[], char **envp);
+int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
 int do_open(const char *path, int flags, int mode);
 

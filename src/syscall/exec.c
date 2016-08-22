@@ -83,8 +83,8 @@ load_elf_interp(const char *path, ulong load_addr)
   return 0;
 }
 
-void
-load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
+int
+load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 {
   uint64_t map_top = 0;
 
@@ -92,11 +92,11 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
   if (ehdr->e_type != ET_EXEC) {
     fprintf(stderr, "not an executable file");
-    return;
+    return -1;
   }
   if (ehdr->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
-    return;
+    return -1;
   }
 
   Elf64_Phdr *p = (Elf64_Phdr *)((char *)ehdr + ehdr->e_phoff);
@@ -145,7 +145,9 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     memcpy(interp_path, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
     interp_path[p[i].p_filesz] = 0;
 
-    load_elf_interp(interp_path, map_top);
+    if (load_elf_interp(interp_path, map_top) < 0) {
+      return -1;
+    }
   }
   else {
     hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, ehdr->e_entry);
@@ -153,6 +155,8 @@ load_elf(const Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
   }
 
   init_userstack(argc, argv, envp, load_base, ehdr, interp ? map_top : 0);
+
+  return 1;
 }
 
 #define SB_ARGC_MAX 2
@@ -305,7 +309,7 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
   push(&argc64, sizeof argc64);
 }
 
-void
+int
 do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
   int fd;
@@ -314,7 +318,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   if ((fd = do_open(elf_path, O_RDONLY, 0)) < 0) {
     fprintf(stderr, "do_exec: could not open file: %s\n", elf_path);
-    return;
+    return -1;
   }
 
   fstat(fd, &st);
@@ -324,14 +328,42 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   close(fd);
 
   if (4 <= st.st_size && memcmp(data, ELFMAG, 4) == 0) {
-    load_elf((Elf64_Ehdr *) data, argc, argv, envp);
+    if (load_elf((Elf64_Ehdr *) data, argc, argv, envp) < 0)
+      return -1;
   }
   else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
-    load_script(data, st.st_size, argc, argv, envp);
+    if (load_script(data, st.st_size, argc, argv, envp) < 0)
+      return -1;
   }
   else {
-    return;                     /* unsupported file type */
+    return -1;                  /* unsupported file type */
   }
 
   munmap(data, st.st_size);
+
+  return 0;
+}
+
+DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
+{
+  int argc = 0, envc = 0;
+  while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
+  while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
+
+  const char *elf_path;
+  char *argv[argc + 2], *envp[envc + 1];
+
+  elf_path = (const char*)guest_to_host(gelf_path);
+  for (int i = 0; i < argc; i++) {
+    argv[i + 1] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  }
+  argv[0] = noah_path;
+  argv[argc + 1] = NULL;
+  for (int i = 0; i < envc; i++) {
+    envp[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(genvp))[i]);
+  }
+  envp[envc] = NULL;
+
+  vmm_destroy(); // Avoid Apple Hypervisor suspicious behavior
+  return execve("./build/noah", argv, envp);
 }

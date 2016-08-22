@@ -58,11 +58,11 @@
   SYSCALL(54, unimplemented)                    \
   SYSCALL(55, unimplemented)                    \
   SYSCALL(56, unimplemented)                    \
-  SYSCALL(57, unimplemented)                    \
+  SYSCALL(57, fork)                             \
   SYSCALL(58, unimplemented)                    \
-  SYSCALL(59, unimplemented)                    \
+  SYSCALL(59, execve)                    \
   SYSCALL(60, exit)                             \
-  SYSCALL(61, unimplemented)                    \
+  SYSCALL(61, wait4)                    \
   SYSCALL(62, unimplemented)                    \
   SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                    \
@@ -187,7 +187,7 @@
   SYSCALL(183, unimplemented)                   \
   SYSCALL(184, unimplemented)                   \
   SYSCALL(185, unimplemented)                   \
-  SYSCALL(186, unimplemented)                   \
+  SYSCALL(186, gettid)                          \
   SYSCALL(187, unimplemented)                   \
   SYSCALL(188, unimplemented)                   \
   SYSCALL(189, unimplemented)                   \

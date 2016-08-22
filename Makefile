@@ -8,12 +8,13 @@ SRCS := \
 	src/syscall/common.c\
 	src/syscall/fs.c\
 	src/syscall/exec.c\
+	src/syscall/fork.c\
 	src/syscall/process.c\
 	src/syscall/mm.c\
 	src/syscall/signal.c
 
 TEST_UPROGS := \
-	$(addprefix test/test_assertion/build/, fib)\
+	$(addprefix test/test_assertion/build/, fib test_fork)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
 	$(addprefix test/test_shell/build/, mv env)
 
@@ -21,7 +22,7 @@ LINUX_BUILD_SERV := idylls.jp
 
 all: build/noah
 
-dev: CFLAGS += -DDEBUG_MODE=1
+dev: CFLAGS += -DDEBUG_MODE=1 -O0
 dev: build/noah
 
 build/noah: $(SRCS)
@@ -36,7 +37,7 @@ test/test_shell/build/%: test/test_shell/%.c test/include/*.h
 
 MAKE_TEST_UPROGS = ssh $(LINUX_BUILD_SERV) "rm /tmp/$(USER)/*";\
                    rsync $^ $(LINUX_BUILD_SERV):/tmp/$(USER)/;\
-                   ssh $(LINUX_BUILD_SERV) "musl-gcc /tmp/$(USER)/$*.c -o /tmp/$(USER)/$*";\
+                   ssh $(LINUX_BUILD_SERV) "musl-gcc -g -O0 /tmp/$(USER)/$*.c -o /tmp/$(USER)/$*";\
                    rsync $(LINUX_BUILD_SERV):/tmp/$(USER)/$* $@
 
 run: build/noah test/test_stdout/build/hello

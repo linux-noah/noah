@@ -18,10 +18,30 @@
 #include "x86/idt.h"
 #include "x86/msr.h"
 #include "x86/vmemparam.h"
+#include "x86/vmx.h"
+
+// TODO: Workaround. Delete here after shared-memory model kalloc
+struct kalloc_list {
+  void *host;
+  uint64_t vmpaddr;
+  size_t size;
+  struct kalloc_list *next;
+};
 
 hv_vcpuid_t vcpuid;
 
 uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
+
+struct kalloc_list *ept_map;
+
+struct vcpu_snapshot {
+  uint64_t reg_snapshot[NR_X86_REG_LIST];
+  uint64_t vmcs_snapshot[NR_VMCS_FIELD];
+};
+
+struct vm_snapshot {
+  struct vcpu_snapshot vcpu_snapshot;
+};
 
 void
 page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
@@ -371,4 +391,157 @@ print_regs()
   PRINTF("\trsi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
   PRINTF("\trbp = 0x%llx\n", value);
+}
+
+void
+reg_snapshot(vm_snapshot_t snapshot)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
+      PRINTF("store_regs failed\n");
+      return;
+    }
+  }
+}
+
+void
+vmcs_snapshot(vm_snapshot_t snapshot)
+{
+  for (int i = 0; i < NR_VMCS_FIELD; i++) {
+    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &snapshot->vcpu_snapshot.vmcs_snapshot[i]);
+    if (success != HV_SUCCESS) {
+      PRINTF("store_vmcs failed\n");
+      return;
+    }
+  }
+}
+
+void
+vmm_snapshot(vm_snapshot_t *snapshot)
+{
+  *snapshot = malloc(sizeof(struct vm_snapshot));
+  reg_snapshot(*snapshot);
+  vmcs_snapshot(*snapshot);
+}
+
+void
+reg_clone(vm_snapshot_t snapshot)
+{
+  for (int i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
+      PRINTF("clone regs failed\n");
+      return;
+    }
+  }
+}
+
+bool
+vmcs_clone(vm_snapshot_t snapshot)
+{
+  const uint32_t clone_mask[] = {
+    VMCS_VPID,
+    VMCS_HOST_ES,
+    VMCS_HOST_CS,
+    VMCS_HOST_SS,
+    VMCS_HOST_DS,
+    VMCS_HOST_FS,
+    VMCS_HOST_GS,
+    VMCS_HOST_TR,
+    VMCS_HOST_IA32_PAT,
+    VMCS_HOST_IA32_EFER,
+    VMCS_HOST_IA32_PERF_GLOBAL_CTRL,
+    VMCS_GUEST_PHYSICAL_ADDRESS,
+    VMCS_RO_INSTR_ERROR,
+    VMCS_RO_EXIT_REASON,
+    VMCS_RO_VMEXIT_IRQ_INFO,
+    VMCS_RO_VMEXIT_IRQ_ERROR,
+    VMCS_RO_IDT_VECTOR_INFO,
+    VMCS_RO_IDT_VECTOR_ERROR,
+    VMCS_RO_VMEXIT_INSTR_LEN,
+    VMCS_RO_VMX_INSTR_INFO,
+    VMCS_RO_EXIT_QUALIFIC,
+    VMCS_RO_IO_RCX,
+    VMCS_RO_IO_RSI,
+    VMCS_RO_IO_RDI,
+    VMCS_RO_IO_RIP,
+    VMCS_RO_GUEST_LIN_ADDR,
+    VMCS_HOST_CR0,
+    VMCS_HOST_CR3,
+    VMCS_HOST_CR4,
+    VMCS_HOST_FS_BASE,
+    VMCS_HOST_GS_BASE,
+    VMCS_HOST_TR_BASE,
+    VMCS_HOST_GDTR_BASE,
+    VMCS_HOST_IDTR_BASE,
+    VMCS_HOST_IA32_SYSENTER_ESP,
+    VMCS_HOST_IA32_SYSENTER_EIP,
+    VMCS_HOST_RSP,
+    VMCS_HOST_RIP,
+  };
+
+  for (int i = 0; i < NR_VMCS_FIELD; i++) {
+    bool in = false;
+    for (int j = 0; j < sizeof(clone_mask) / sizeof(uint32_t); j++) {
+      if (clone_mask[j] == vmcs_field_list[i]) {
+        goto cont;
+      }
+    }
+    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], snapshot->vcpu_snapshot.vmcs_snapshot[i]);
+    if (success != HV_SUCCESS) {
+      PRINTF("clone vmcs failed, %s\n", vmcs_field_str[i]);
+      return false;
+    }
+    cont: ;
+  }
+  return true;
+}
+
+bool
+clone_ept_map(vm_snapshot_t snapshot)
+{
+  struct kalloc_list *p = ept_map;
+  while (p != NULL) {
+    hv_return_t ret = hv_vm_map(p->host, p->vmpaddr, p->size, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC);
+    if (ret != HV_SUCCESS) {
+      PRINTF("cloning map %p to 0x%016llx, size:0x%lx\n", p->host, p->vmpaddr, p->size);
+      PRINTF("could not clone a memory mapping: error code %x\n", ret);
+      return false;
+    }
+    p = p->next;
+  }
+  return true;
+}
+
+void
+vmm_clone(vm_snapshot_t snapshot)
+{
+  hv_return_t ret;
+
+  PUTS("vmm_clone");
+  ret = hv_vm_create(HV_VM_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not create the vm: error code %x", ret);
+    return;
+  }
+
+  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    PRINTF("could not create a vcpu: error code %x", ret);
+    return;
+  }
+
+  init_msr();
+
+  vmcs_clone(snapshot);
+  PUTS("vmcs_clone done");
+  clone_ept_map(snapshot);
+  PUTS("ept_clone done");
+  reg_clone(snapshot);
+  PUTS("reg_clone done");
+}
+
+void
+vmm_snapshot_destroy(vm_snapshot_t snapshot)
+{
+  free(snapshot);
 }
