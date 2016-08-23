@@ -10,6 +10,8 @@
 #include "linux/misc.h"
 #include "linux/errno.h"
 
+struct task task;
+
 DEFINE_SYSCALL(getpid)
 {
   return getpid();
@@ -149,8 +151,9 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
   }
 }
 
-DEFINE_SYSCALL(set_tid_address, int *, tidptr)
+DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 {
+  task.clear_child_tid = tidptr;
   return 0;
 }
 

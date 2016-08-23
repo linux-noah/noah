@@ -57,7 +57,7 @@
   SYSCALL(53, unimplemented)                    \
   SYSCALL(54, setsockopt)                       \
   SYSCALL(55, getsockopt)                       \
-  SYSCALL(56, unimplemented)                    \
+  SYSCALL(56, clone)                            \
   SYSCALL(57, fork)                             \
   SYSCALL(58, unimplemented)                    \
   SYSCALL(59, execve)                           \

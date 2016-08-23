@@ -64,7 +64,9 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   if (prot & L_PROT_READ) mprot |= HV_MEMORY_READ;
   if (prot & L_PROT_WRITE) mprot |= HV_MEMORY_WRITE;
   if (prot & L_PROT_EXEC) mprot |= HV_MEMORY_EXEC;
-  vmm_mmap(addr, len, mprot, ptr);
+  /* FIXME */
+  /* vmm_mmap(addr, len, mprot, ptr); */
+  vmm_mmap(addr, len, HV_MEMORY_READ | HV_MEMORY_WRITE | HV_MEMORY_EXEC, ptr);
 
   return addr;
 }

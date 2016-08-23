@@ -45,6 +45,12 @@ void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 
 /* linux emulation */
 
+struct task {
+  gaddr_t set_child_tid, clear_child_tid;
+};
+
+extern struct task task;
+
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
 int do_open(const char *path, int flags, int mode);
