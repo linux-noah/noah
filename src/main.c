@@ -141,8 +141,6 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   }
 
-  noah_path = argv[0];
-
   vmm_create();
 
   if (do_exec(argv[1], argc - 1, argv + 1, envp) < 0) {

@@ -346,26 +346,38 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   return 0;
 }
 
+#include <mach-o/dyld.h>
+
 DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int argc = 0, envc = 0;
   while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
   while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
 
-  const char *elf_path;
-  char *argv[argc + 2], *envp[envc + 1];
+  /* get this executable's path */
+  uint32_t bufsize;
+  _NSGetExecutablePath(NULL, &bufsize);
+  char noah_path[bufsize];
+  if (_NSGetExecutablePath(noah_path, &bufsize)) {
+    return -1;
+  }
 
-  elf_path = (const char*)guest_to_host(gelf_path);
+  const char *elf_path = guest_to_host(gelf_path);;
+
+  char *argv[argc + 2];
+  argv[0] = noah_path;
   for (int i = 0; i < argc; i++) {
     argv[i + 1] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
   }
-  argv[0] = noah_path;
   argv[argc + 1] = NULL;
+
+  char *envp[envc + 1];
   for (int i = 0; i < envc; i++) {
     envp[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(genvp))[i]);
   }
   envp[envc] = NULL;
 
-  vmm_destroy(); // Avoid Apple Hypervisor suspicious behavior
-  return execve("./build/noah", argv, envp);
+  vmm_destroy();
+
+  return execve(noah_path, argv, envp);
 }

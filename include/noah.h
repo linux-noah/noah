@@ -31,8 +31,6 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 typedef struct vm_snapshot *vm_snapshot_t;
 extern hv_vcpuid_t vcpuid;
 
-char *noah_path;
-
 void vmm_create(void);
 void vmm_clone(vm_snapshot_t snapshot);
 void vmm_snapshot(vm_snapshot_t *snapshot);
