@@ -362,7 +362,7 @@ DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     return -1;
   }
 
-  const char *elf_path = guest_to_host(gelf_path);;
+  const char *elf_path = guest_to_host(gelf_path);
 
   char *argv[argc + 2];
   argv[0] = noah_path;
