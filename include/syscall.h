@@ -5,9 +5,9 @@
   SYSCALL(1, write)                             \
   SYSCALL(2, open)                              \
   SYSCALL(3, close)                             \
-  SYSCALL(4, stat)                              \
-  SYSCALL(5, fstat)                             \
-  SYSCALL(6, unimplemented)                     \
+  SYSCALL(4, newstat)                           \
+  SYSCALL(5, newfstat)                          \
+  SYSCALL(6, newlstat)                          \
   SYSCALL(7, unimplemented)                     \
   SYSCALL(8, unimplemented)                     \
   SYSCALL(9, mmap)                              \
@@ -79,7 +79,7 @@
   SYSCALL(75, unimplemented)                    \
   SYSCALL(76, unimplemented)                    \
   SYSCALL(77, unimplemented)                    \
-  SYSCALL(78, unimplemented)                    \
+  SYSCALL(78, getdents)                         \
   SYSCALL(79, getcwd)                           \
   SYSCALL(80, unimplemented)                    \
   SYSCALL(81, unimplemented)                    \

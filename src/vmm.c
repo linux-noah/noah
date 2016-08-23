@@ -567,12 +567,8 @@ clone_ept_map(vm_snapshot_t snapshot)
 
   list_for_each (list, &vmm_vm_regions) {
     struct vmm_vm_region *p = list_entry(list, struct vmm_vm_region, list);
-    hv_return_t ret = hv_vm_map(p->haddr, p->gaddr, p->size, p->prot);
-    if (ret != HV_SUCCESS) {
-      PRINTF("cloning map %p to 0x%016llx, size:0x%lx\n", p->host, p->vmpaddr, p->size);
-      PRINTF("could not clone a memory mapping: error code %x\n", ret);
+    if (hv_vm_map(p->haddr, p->gaddr, p->size, p->prot) != HV_SUCCESS)
       return false;
-    }
   }
   return true;
 }

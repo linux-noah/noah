@@ -1,14 +1,50 @@
+/*-
+ * Copyright (c) 2016 Yuichi Nishiwaki and Takaya Saeki
+ * Copyright (c) 1994-1995 Søren Schmidt
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer
+ *    in this position and unchanged.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 #include "common.h"
 
 #include "noah.h"
+#include "linux/fs.h"
+#include "linux/misc.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/syscall.h>
+#include <dirent.h>
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
 {
@@ -21,9 +57,45 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
 }
 
 int
-do_open(const char *path, int flags, int mode)
+do_open(const char *path, int l_flags, int mode)
 {
   char buf[L_PATH_MAX + sizeof "./mnt/" - 1];
+
+  int flags = 0;
+  switch (l_flags & LINUX_O_ACCMODE) {
+  case LINUX_O_WRONLY:
+    flags |= O_WRONLY;
+    break;
+  case LINUX_O_RDWR:
+    flags |= O_RDWR;
+    break;
+  default:                      /* Note: LINUX_O_RDONLY == 0 */
+    flags |= O_RDONLY;
+  }
+  if (l_flags & LINUX_O_NDELAY)
+    flags |= O_NONBLOCK;
+  if (l_flags & LINUX_O_APPEND)
+    flags |= O_APPEND;
+  if (l_flags & LINUX_O_SYNC)
+    flags |= O_FSYNC;
+  if (l_flags & LINUX_O_NONBLOCK)
+    flags |= O_NONBLOCK;
+  if (l_flags & LINUX_FASYNC)
+    flags |= O_ASYNC;
+  if (l_flags & LINUX_O_CREAT)
+    flags |= O_CREAT;
+  if (l_flags & LINUX_O_TRUNC)
+    flags |= O_TRUNC;
+  if (l_flags & LINUX_O_EXCL)
+    flags |= O_EXCL;
+  if (l_flags & LINUX_O_NOCTTY)
+    flags |= O_NOCTTY;
+  /* if (l_flags & LINUX_O_DIRECT) */
+  /*   flags |= O_DIRECT; */
+  if (l_flags & LINUX_O_NOFOLLOW)
+    flags |= O_NOFOLLOW;
+  if (l_flags & LINUX_O_DIRECTORY)
+    flags |= O_DIRECTORY;
 
   if (path[0] == '/') {
     strcpy(buf, "./mnt/");
@@ -46,19 +118,108 @@ DEFINE_SYSCALL(close, int, fd)
   return close(fd);
 }
 
-DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
+static void
+newstat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
 {
-  return stat(guest_to_host(path), guest_to_host(st));
+  lstat->st_dev = minor(stat->st_dev) | (major(stat->st_dev) << 8);
+  lstat->st_ino = stat->st_ino;
+  lstat->st_mode = stat->st_mode;
+  lstat->st_nlink = stat->st_nlink;
+  lstat->st_uid = stat->st_uid;
+  lstat->st_gid = stat->st_gid;
+  lstat->st_rdev = stat->st_rdev;
+  lstat->st_size = stat->st_size;
+  lstat->st_atim.tv_sec = stat->st_atimespec.tv_sec;
+  lstat->st_atim.tv_nsec = stat->st_atimespec.tv_nsec;
+  lstat->st_mtim.tv_sec = stat->st_mtimespec.tv_sec;
+  lstat->st_mtim.tv_nsec = stat->st_mtimespec.tv_nsec;
+  lstat->st_ctim.tv_sec = stat->st_ctimespec.tv_sec;
+  lstat->st_ctim.tv_nsec = stat->st_ctimespec.tv_nsec;
+  lstat->st_blksize = stat->st_blksize;
+  lstat->st_blocks = stat->st_blocks;
 }
 
-DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
+DEFINE_SYSCALL(newstat, gaddr_t, path, gaddr_t, st)
 {
-  return fstat(fd, guest_to_host(st));
+  const char *l_path = guest_to_host(path);
+  struct l_newstat *l_st = guest_to_host(st);
+  struct stat d_st;
+
+  int ret = stat(l_path, &d_st);
+  if (ret < 0)
+    return ret;
+
+  newstat_darwin_to_linux(&d_st, l_st);
+
+  return 0;
+}
+
+DEFINE_SYSCALL(newfstat, int, fd, gaddr_t, st)
+{
+  struct l_newstat *l_st = guest_to_host(st);
+  struct stat d_st;
+
+  int ret = fstat(fd, &d_st);
+  if (ret < 0)
+    return ret;
+
+  newstat_darwin_to_linux(&d_st, l_st);
+
+  return 0;
+}
+
+DEFINE_SYSCALL(newlstat, gaddr_t, path, gaddr_t, st)
+{
+  const char *l_path = guest_to_host(path);
+  struct l_newstat *l_st = guest_to_host(st);
+  struct stat d_st;
+
+  int ret = lstat(l_path, &d_st);
+  if (ret < 0)
+    return ret;
+
+  newstat_darwin_to_linux(&d_st, l_st);
+
+  return 0;
 }
 
 DEFINE_SYSCALL(access, gaddr_t, path, int, mode)
 {
   return access(guest_to_host(path), mode);
+}
+
+DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
+{
+  long base;
+  char buf[count];
+  struct dirent *d;
+  int bpos;
+
+  struct l_dirent *l_d;
+  char *l_buf = guest_to_host(dirent_ptr);
+  unsigned int l_bpos = 0;
+
+  int nread = syscall(SYS_getdirentries64, fd, buf, count, &base);
+  if (nread < 0) {
+    return -1;
+  }
+  for (bpos = 0; bpos < nread; bpos += d->d_reclen) {
+    d = (struct dirent *) (buf + bpos);
+
+    size_t l_reclen = roundup(offsetof(struct l_dirent, d_name) + d->d_namlen + 2, 8);
+    assert(l_bpos + l_reclen <= count);
+
+    /* fill dirent buffer */
+    l_d = (struct l_dirent *) (l_buf + l_bpos);
+    l_d->d_ino = d->d_ino;
+    l_d->d_reclen = l_reclen;
+    l_d->d_off = d->d_seekoff;
+    memcpy(l_d->d_name, d->d_name, d->d_namlen + 1);
+    (l_buf + l_bpos)[l_d->d_reclen - 1] = d->d_type;
+
+    l_bpos += l_d->d_reclen;
+  }
+  return l_bpos;
 }
 
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
