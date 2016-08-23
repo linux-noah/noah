@@ -28,13 +28,11 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 
 #include "x86/page.h"
 
-typedef struct vm_snapshot *vm_snapshot_t;
 extern hv_vcpuid_t vcpuid;
 
 void vmm_create(void);
-void vmm_clone(vm_snapshot_t snapshot);
-void vmm_snapshot(vm_snapshot_t *snapshot);
-void vmm_snapshot_destroy(vm_snapshot_t snapshot);
+void vmm_snapshot(void);
+void vmm_restore(void);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;

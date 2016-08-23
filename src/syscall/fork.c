@@ -9,20 +9,17 @@ DEFINE_SYSCALL(fork)
 {
   // Because Apple Hypervisor Framwork won't let us use multiple VMs,
   // we destroy the current vm and restore it later
-  vm_snapshot_t snapshot;
-  vmm_snapshot(&snapshot);
+  vmm_snapshot();
   vmm_destroy();
 
   pid_t pid = fork();
   if (pid > 0) {
     PRINTF("fork parent, pid:%d\n", getpid());
-    vmm_clone(snapshot);
-    vmm_snapshot_destroy(snapshot);
+    vmm_restore();
     return pid;
   } else if (pid == 0) {
     PRINTF("fork child, pid:%d\n", getpid());
-    vmm_clone(snapshot);
-    vmm_snapshot_destroy(snapshot);
+    vmm_restore();
     return 0;
   } else {
     fprintf(stderr, "fork failed");
