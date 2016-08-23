@@ -22,7 +22,7 @@ DEFINE_SYSCALL(fork)
     ret = pid;
   }
 
-  vmm_restore();
+  vmm_reentry();
 
   return ret;
 }

@@ -32,7 +32,7 @@ extern hv_vcpuid_t vcpuid;
 
 void vmm_create(void);
 void vmm_snapshot(void);
-void vmm_restore(void);
+void vmm_reentry(void);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;

@@ -559,7 +559,7 @@ restore_ept()
 }
 
 void
-vmm_restore()
+vmm_reentry()
 {
   hv_return_t ret;
 
