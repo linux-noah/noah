@@ -222,7 +222,7 @@
   SYSCALL(218, set_tid_address)                 \
   SYSCALL(219, unimplemented)                   \
   SYSCALL(220, unimplemented)                   \
-  SYSCALL(221, unimplemented)                   \
+  SYSCALL(221, fadvise64)                       \
   SYSCALL(222, unimplemented)                   \
   SYSCALL(223, unimplemented)                   \
   SYSCALL(224, unimplemented)                   \

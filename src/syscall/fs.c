@@ -104,3 +104,8 @@ DEFINE_SYSCALL(readlink, gaddr_t, pathname, gaddr_t, buf, int, bufsize)
 {
   return -1;
 }
+
+DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
+{
+  return -1;
+}
