@@ -2,6 +2,7 @@
  * Copyright (c) 2016 Yuichi Nishiwaki
  * Copyright (c) 2015 Dmitry Chagin
  * Copyright (c) 2013 Dmitry Chagin
+ * Copyright (c) 2002 Doug Rabson
  * Copyright (c) 1994-1996 Søren Schmidt
  * All rights reserved.
  *
@@ -549,6 +550,25 @@ struct linux_robust_list_head {
 	struct linux_robust_list	list;
 	l_long				futex_offset;
 	l_uintptr_t			pending_list;
+};
+
+/* linux sysinfo */
+struct l_sysinfo {
+	l_long		uptime;		/* Seconds since boot */
+	l_ulong		loads[3];	/* 1, 5, and 15 minute load averages */
+#define LINUX_SYSINFO_LOADS_SCALE 65536
+	l_ulong		totalram;	/* Total usable main memory size */
+	l_ulong		freeram;	/* Available memory size */
+	l_ulong		sharedram;	/* Amount of shared memory */
+	l_ulong		bufferram;	/* Memory used by buffers */
+	l_ulong		totalswap;	/* Total swap space size */
+	l_ulong		freeswap;	/* swap space still available */
+	l_ushort	procs;		/* Number of current processes */
+	l_ushort	pads;
+	l_ulong		totalhigh;
+	l_ulong		freehigh;
+	l_uint		mem_unit;
+	char		_f[20-2*sizeof(l_long)-sizeof(l_int)];	/* padding */
 };
 
 #endif /* !_AMD64_LINUX_H_ */

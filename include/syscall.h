@@ -100,7 +100,7 @@
   SYSCALL(96, unimplemented)                    \
   SYSCALL(97, unimplemented)                    \
   SYSCALL(98, unimplemented)                    \
-  SYSCALL(99, unimplemented)                    \
+  SYSCALL(99, sysinfo)                          \
   SYSCALL(100, unimplemented)                   \
   SYSCALL(101, unimplemented)                   \
   SYSCALL(102, getuid)                          \
