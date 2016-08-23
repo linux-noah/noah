@@ -377,6 +377,9 @@ DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   }
   envp[envc] = NULL;
 
+  /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
+  argv[1] = (char *) elf_path;
+
   vmm_destroy();
 
   return execve(noah_path, argv, envp);
