@@ -222,6 +222,11 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   return l_bpos;
 }
 
+DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
+{
+  return dup2(fd1, fd2);
+}
+
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
   getcwd(guest_to_host(buf), size);

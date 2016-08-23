@@ -7,6 +7,8 @@
 
 #include "common.h"
 #include "noah.h"
+#include "linux/misc.h"
+#include "linux/errno.h"
 
 DEFINE_SYSCALL(getpid)
 {
@@ -15,12 +17,22 @@ DEFINE_SYSCALL(getpid)
 
 DEFINE_SYSCALL(getuid)
 {
-  return 0;
+  return getuid();
 }
 
 DEFINE_SYSCALL(getgid)
 {
-  return 0;
+  return getgid();
+}
+
+DEFINE_SYSCALL(setuid, l_uid_t, uid)
+{
+  return setuid(uid);
+}
+
+DEFINE_SYSCALL(setgid, l_gid_t, gid)
+{
+  return setgid(gid);
 }
 
 DEFINE_SYSCALL(geteuid)
@@ -30,7 +42,7 @@ DEFINE_SYSCALL(geteuid)
 
 DEFINE_SYSCALL(getegid)
 {
-  return 0;
+  return getegid();
 }
 
 DEFINE_SYSCALL(getppid)
@@ -38,9 +50,35 @@ DEFINE_SYSCALL(getppid)
   return getppid();
 }
 
+DEFINE_SYSCALL(getpgrp)
+{
+  return getpgrp();
+}
+
 DEFINE_SYSCALL(gettid)
 {
-  return getpid();
+  return getpid();              /* FIXME */
+}
+
+DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
+{
+  struct rlimit *l_rl = guest_to_host(rl_ptr);
+
+  int resource = 0;
+  switch (l_resource) {
+  case LINUX_RLIMIT_CPU: resource = RLIMIT_CPU; break;
+  case LINUX_RLIMIT_FSIZE: resource = RLIMIT_FSIZE; break;
+  case LINUX_RLIMIT_DATA: resource = RLIMIT_DATA; break;
+  case LINUX_RLIMIT_STACK: resource = RLIMIT_STACK; break;
+  case LINUX_RLIMIT_CORE: resource = RLIMIT_CORE; break;
+  case LINUX_RLIMIT_RSS: resource = RLIMIT_RSS; break;
+  case LINUX_RLIMIT_NPROC: resource = RLIMIT_NPROC; break;
+  case LINUX_RLIMIT_NOFILE: resource = RLIMIT_NOFILE; break;
+  case LINUX_RLIMIT_MEMLOCK: resource = RLIMIT_MEMLOCK; break;
+  case LINUX_RLIMIT_AS: resource = RLIMIT_AS; break;
+  }
+
+  return getrlimit(resource, l_rl);
 }
 
 DEFINE_SYSCALL(exit, int, reason)

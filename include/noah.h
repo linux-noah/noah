@@ -28,13 +28,11 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 
 #include "x86/page.h"
 
-typedef struct vm_snapshot *vm_snapshot_t;
 extern hv_vcpuid_t vcpuid;
 
 void vmm_create(void);
-void vmm_clone(vm_snapshot_t snapshot);
-void vmm_snapshot(vm_snapshot_t *snapshot);
-void vmm_snapshot_destroy(vm_snapshot_t snapshot);
+void vmm_snapshot(void);
+void vmm_restore(void);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;
@@ -80,6 +78,65 @@ int do_open(const char *path, int flags, int mode);
 #define L_MAP_NONBLOCK   0x10000
 #define L_MAP_STACK      0x20000
 #define L_MAP_HUGETLB    0x40000
+
+#define L_SOCK_STREAM    1
+#define L_SOCK_DGRAM     2
+#define L_SOCK_RAW       3
+#define L_SOCK_RDM       4
+#define L_SOCK_SEQPACKET 5
+#define L_SOCK_DCCP      6
+#define L_SOCK_PACKET    10
+
+#define L_SOCK_NONBLOCK  0x800
+#define L_SOCK_CLOEXEC   0x80000
+
+
+#define L_AF_UNSPEC     0
+#define L_AF_LOCAL      1
+#define L_AF_UNIX       L_AF_LOCAL
+#define L_AF_FILE       L_AF_LOCAL
+#define L_AF_INET       2
+#define L_AF_AX25       3
+#define L_AF_IPX        4
+#define L_AF_APPLETALK  5
+#define L_AF_NETROM     6
+#define L_AF_BRIDGE     7
+#define L_AF_ATMPVC     8
+#define L_AF_X25        9
+#define L_AF_INET6      10
+#define L_AF_ROSE       11
+#define L_AF_DECnet     12
+#define L_AF_NETBEUI    13
+#define L_AF_SECURITY   14
+#define L_AF_KEY        15
+#define L_AF_NETLINK    16
+#define L_AF_ROUTE      L_AF_NETLINK
+#define L_AF_PACKET     17
+#define L_AF_ASH        18
+#define L_AF_ECONET     19
+#define L_AF_ATMSVC     20
+#define L_AF_RDS        21
+#define L_AF_SNA        22
+#define L_AF_IRDA       23
+#define L_AF_PPPOX      24
+#define L_AF_WANPIPE    25
+#define L_AF_LLC        26
+#define L_AF_IB         27
+#define L_AF_MPLS       28
+#define L_AF_CAN        29
+#define L_AF_TIPC       30
+#define L_AF_BLUETOOTH  31
+#define L_AF_IUCV       32
+#define L_AF_RXRPC      33
+#define L_AF_ISDN       34
+#define L_AF_PHONET     35
+#define L_AF_IEEE802154 36
+#define L_AF_CAIF       37
+#define L_AF_ALG        38
+#define L_AF_NFC        39
+#define L_AF_VSOCK      40
+#define L_AF_KCM        41
+#define L_AF_MAX        42
 
 /* debug */
 

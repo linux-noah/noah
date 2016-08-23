@@ -36,15 +36,6 @@ struct vmm_vm_region {
 
 struct list_head vmm_vm_regions;
 
-struct vcpu_snapshot {
-  uint64_t reg_snapshot[NR_X86_REG_LIST];
-  uint64_t vmcs_snapshot[NR_VMCS_FIELD];
-};
-
-struct vm_snapshot {
-  struct vcpu_snapshot vcpu_snapshot;
-};
-
 void
 record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
 {
@@ -458,22 +449,24 @@ print_regs()
   PRINTF("\trbp = 0x%llx\n", value);
 }
 
+struct vm_snapshot {
+  uint64_t vcpu_reg[NR_X86_REG_LIST];
+  uint64_t vmcs[NR_VMCS_FIELD];
+} _vmm_snapshot;
+
 void
-reg_snapshot(vm_snapshot_t snapshot)
+vmm_snapshot()
 {
-  for (int i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
+  /* snapshot registers */
+  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &_vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
       PRINTF("store_regs failed\n");
       return;
     }
   }
-}
-
-void
-vmcs_snapshot(vm_snapshot_t snapshot)
-{
-  for (int i = 0; i < NR_VMCS_FIELD; i++) {
-    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &snapshot->vcpu_snapshot.vmcs_snapshot[i]);
+  /* snapshot vmcs */
+  for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
+    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &_vmm_snapshot.vmcs[i]);
     if (success != HV_SUCCESS) {
       PRINTF("store_vmcs failed\n");
       return;
@@ -482,28 +475,20 @@ vmcs_snapshot(vm_snapshot_t snapshot)
 }
 
 void
-vmm_snapshot(vm_snapshot_t *snapshot)
+reg_restore()
 {
-  *snapshot = malloc(sizeof(struct vm_snapshot));
-  reg_snapshot(*snapshot);
-  vmcs_snapshot(*snapshot);
-}
-
-void
-reg_clone(vm_snapshot_t snapshot)
-{
-  for (int i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], snapshot->vcpu_snapshot.reg_snapshot[i]) != HV_SUCCESS) {
-      PRINTF("clone regs failed\n");
+  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], _vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
+      PRINTF("restore regs failed\n");
       return;
     }
   }
 }
 
 bool
-vmcs_clone(vm_snapshot_t snapshot)
+vmcs_restore()
 {
-  const uint32_t clone_mask[] = {
+  static const uint32_t restore_mask[] = {
     VMCS_VPID,
     VMCS_HOST_ES,
     VMCS_HOST_CS,
@@ -544,15 +529,15 @@ vmcs_clone(vm_snapshot_t snapshot)
     VMCS_HOST_RIP,
   };
 
-  for (int i = 0; i < NR_VMCS_FIELD; i++) {
-    for (int j = 0; j < sizeof(clone_mask) / sizeof(uint32_t); j++) {
-      if (clone_mask[j] == vmcs_field_list[i]) {
+  for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
+    for (uint64_t j = 0; j < sizeof restore_mask / sizeof restore_mask[0]; j++) {
+      if (restore_mask[j] == vmcs_field_list[i]) {
         goto cont;
       }
     }
-    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], snapshot->vcpu_snapshot.vmcs_snapshot[i]);
+    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], _vmm_snapshot.vmcs[i]);
     if (success != HV_SUCCESS) {
-      PRINTF("clone vmcs failed, %s\n", vmcs_field_str[i]);
+      PRINTF("restore vmcs failed, %s\n", vmcs_field_str[i]);
       return false;
     }
     cont: ;
@@ -561,7 +546,7 @@ vmcs_clone(vm_snapshot_t snapshot)
 }
 
 bool
-clone_ept_map(vm_snapshot_t snapshot)
+restore_ept()
 {
   struct list_head *list;
 
@@ -574,11 +559,11 @@ clone_ept_map(vm_snapshot_t snapshot)
 }
 
 void
-vmm_clone(vm_snapshot_t snapshot)
+vmm_restore()
 {
   hv_return_t ret;
 
-  PUTS("vmm_clone");
+  PUTS("vmm_restore");
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
     PRINTF("could not create the vm: error code %x", ret);
@@ -593,16 +578,10 @@ vmm_clone(vm_snapshot_t snapshot)
 
   init_msr();
 
-  vmcs_clone(snapshot);
-  PUTS("vmcs_clone done");
-  clone_ept_map(snapshot);
-  PUTS("ept_clone done");
-  reg_clone(snapshot);
-  PUTS("reg_clone done");
-}
-
-void
-vmm_snapshot_destroy(vm_snapshot_t snapshot)
-{
-  free(snapshot);
+  vmcs_restore();
+  PUTS("vmcs_restore done");
+  restore_ept();
+  PUTS("ept_restore done");
+  reg_restore();
+  PUTS("reg_restore done");
 }

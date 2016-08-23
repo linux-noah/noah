@@ -34,7 +34,7 @@
   SYSCALL(30, unimplemented)                    \
   SYSCALL(31, unimplemented)                    \
   SYSCALL(32, unimplemented)                    \
-  SYSCALL(33, unimplemented)                    \
+  SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, unimplemented)                    \
   SYSCALL(36, unimplemented)                    \
@@ -42,8 +42,8 @@
   SYSCALL(38, unimplemented)                    \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
-  SYSCALL(41, unimplemented)                    \
-  SYSCALL(42, unimplemented)                    \
+  SYSCALL(41, socket)                           \
+  SYSCALL(42, connect)                          \
   SYSCALL(43, unimplemented)                    \
   SYSCALL(44, unimplemented)                    \
   SYSCALL(45, unimplemented)                    \
@@ -55,14 +55,14 @@
   SYSCALL(51, unimplemented)                    \
   SYSCALL(52, unimplemented)                    \
   SYSCALL(53, unimplemented)                    \
-  SYSCALL(54, unimplemented)                    \
-  SYSCALL(55, unimplemented)                    \
+  SYSCALL(54, setsockopt)                       \
+  SYSCALL(55, getsockopt)                       \
   SYSCALL(56, unimplemented)                    \
   SYSCALL(57, fork)                             \
   SYSCALL(58, unimplemented)                    \
-  SYSCALL(59, execve)                    \
+  SYSCALL(59, execve)                           \
   SYSCALL(60, exit)                             \
-  SYSCALL(61, wait4)                    \
+  SYSCALL(61, wait4)                            \
   SYSCALL(62, unimplemented)                    \
   SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                    \
@@ -97,22 +97,22 @@
   SYSCALL(93, unimplemented)                    \
   SYSCALL(94, unimplemented)                    \
   SYSCALL(95, unimplemented)                    \
-  SYSCALL(96, unimplemented)                    \
-  SYSCALL(97, unimplemented)                    \
+  SYSCALL(96, gettimeofday)                     \
+  SYSCALL(97, getrlimit)                        \
   SYSCALL(98, unimplemented)                    \
-  SYSCALL(99, unimplemented)                    \
+  SYSCALL(99, sysinfo)                          \
   SYSCALL(100, unimplemented)                   \
   SYSCALL(101, unimplemented)                   \
   SYSCALL(102, getuid)                          \
   SYSCALL(103, unimplemented)                   \
   SYSCALL(104, getgid)                          \
-  SYSCALL(105, unimplemented)                   \
-  SYSCALL(106, unimplemented)                   \
+  SYSCALL(105, setuid)                          \
+  SYSCALL(106, setgid)                          \
   SYSCALL(107, geteuid)                         \
   SYSCALL(108, getegid)                         \
   SYSCALL(109, unimplemented)                   \
   SYSCALL(110, getppid)                         \
-  SYSCALL(111, unimplemented)                   \
+  SYSCALL(111, getpgrp)                         \
   SYSCALL(112, unimplemented)                   \
   SYSCALL(113, unimplemented)                   \
   SYSCALL(114, unimplemented)                   \
@@ -202,7 +202,7 @@
   SYSCALL(198, unimplemented)                   \
   SYSCALL(199, unimplemented)                   \
   SYSCALL(200, unimplemented)                   \
-  SYSCALL(201, unimplemented)                   \
+  SYSCALL(201, time)                            \
   SYSCALL(202, unimplemented)                   \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, unimplemented)                   \
