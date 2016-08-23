@@ -106,8 +106,8 @@
   SYSCALL(102, getuid)                          \
   SYSCALL(103, unimplemented)                   \
   SYSCALL(104, getgid)                          \
-  SYSCALL(105, unimplemented)                   \
-  SYSCALL(106, unimplemented)                   \
+  SYSCALL(105, setuid)                          \
+  SYSCALL(106, setgid)                          \
   SYSCALL(107, geteuid)                         \
   SYSCALL(108, getegid)                         \
   SYSCALL(109, unimplemented)                   \

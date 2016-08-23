@@ -7,6 +7,8 @@
 
 #include "common.h"
 #include "noah.h"
+#include "linux/misc.h"
+#include "linux/errno.h"
 
 DEFINE_SYSCALL(getpid)
 {
@@ -15,12 +17,22 @@ DEFINE_SYSCALL(getpid)
 
 DEFINE_SYSCALL(getuid)
 {
-  return 0;
+  return getuid();
 }
 
 DEFINE_SYSCALL(getgid)
 {
-  return 0;
+  return getgid();
+}
+
+DEFINE_SYSCALL(setuid, l_uid_t, uid)
+{
+  return setuid(uid);
+}
+
+DEFINE_SYSCALL(setgid, l_gid_t, gid)
+{
+  return setgid(gid);
 }
 
 DEFINE_SYSCALL(geteuid)
@@ -30,7 +42,7 @@ DEFINE_SYSCALL(geteuid)
 
 DEFINE_SYSCALL(getegid)
 {
-  return 0;
+  return getegid();
 }
 
 DEFINE_SYSCALL(getppid)
@@ -40,7 +52,7 @@ DEFINE_SYSCALL(getppid)
 
 DEFINE_SYSCALL(gettid)
 {
-  return getpid();
+  return getpid();              /* FIXME */
 }
 
 DEFINE_SYSCALL(exit, int, reason)
