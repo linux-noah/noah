@@ -80,6 +80,11 @@ DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
   return 0;
 }
 
+DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
+{
+  return 0;
+}
+
 uint64_t brk_min, current_brk;
 
 DEFINE_SYSCALL(brk, unsigned long, brk)

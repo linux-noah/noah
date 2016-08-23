@@ -12,7 +12,7 @@
   SYSCALL(8, unimplemented)                     \
   SYSCALL(9, mmap)                              \
   SYSCALL(10, mprotect)                         \
-  SYSCALL(11, unimplemented)                    \
+  SYSCALL(11, munmap)                           \
   SYSCALL(12, brk)                              \
   SYSCALL(13, rt_sigaction)                     \
   SYSCALL(14, rt_sigprocmask)                   \
