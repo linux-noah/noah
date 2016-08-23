@@ -11,7 +11,8 @@ SRCS := \
 	src/syscall/fork.c\
 	src/syscall/process.c\
 	src/syscall/mm.c\
-	src/syscall/signal.c
+	src/syscall/signal.c\
+	src/syscall/time.c
 
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib test_fork)\

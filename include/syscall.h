@@ -202,7 +202,7 @@
   SYSCALL(198, unimplemented)                   \
   SYSCALL(199, unimplemented)                   \
   SYSCALL(200, unimplemented)                   \
-  SYSCALL(201, unimplemented)                   \
+  SYSCALL(201, time)                            \
   SYSCALL(202, unimplemented)                   \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, unimplemented)                   \
