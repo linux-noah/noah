@@ -110,7 +110,7 @@
   SYSCALL(106, setgid)                          \
   SYSCALL(107, geteuid)                         \
   SYSCALL(108, getegid)                         \
-  SYSCALL(109, unimplemented)                   \
+  SYSCALL(109, setpgid)                         \
   SYSCALL(110, getppid)                         \
   SYSCALL(111, getpgrp)                         \
   SYSCALL(112, unimplemented)                   \

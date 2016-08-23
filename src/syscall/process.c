@@ -47,6 +47,11 @@ DEFINE_SYSCALL(getegid)
   return getegid();
 }
 
+DEFINE_SYSCALL(setpgid, pid_t, pid, pid_t, pgid)
+{
+  return setpgid(pid, pgid);
+}
+
 DEFINE_SYSCALL(getppid)
 {
   return getppid();
