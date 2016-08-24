@@ -144,3 +144,8 @@ DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, g
   // Darwin's optval is compatible with that of Linux
   return getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len));
 }
+
+DEFINE_SYSCALL(shutdown, int, socket, int, how)
+{
+  return shutdown(socket, how);
+}

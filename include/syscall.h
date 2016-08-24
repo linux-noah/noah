@@ -49,7 +49,7 @@
   SYSCALL(45, unimplemented)                    \
   SYSCALL(46, unimplemented)                    \
   SYSCALL(47, unimplemented)                    \
-  SYSCALL(48, unimplemented)                    \
+  SYSCALL(48, shutdown)                         \
   SYSCALL(49, unimplemented)                    \
   SYSCALL(50, unimplemented)                    \
   SYSCALL(51, unimplemented)                    \
