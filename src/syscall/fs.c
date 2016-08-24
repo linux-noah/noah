@@ -28,8 +28,9 @@
  */
 
 #include "common.h"
-
 #include "noah.h"
+
+#include "linux/common.h"
 #include "linux/fs.h"
 #include "linux/misc.h"
 
@@ -119,7 +120,7 @@ DEFINE_SYSCALL(close, int, fd)
 }
 
 static void
-newstat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
+stat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
 {
   lstat->st_dev = minor(stat->st_dev) | (major(stat->st_dev) << 8);
   lstat->st_ino = stat->st_ino;
@@ -139,7 +140,7 @@ newstat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
   lstat->st_blocks = stat->st_blocks;
 }
 
-DEFINE_SYSCALL(newstat, gaddr_t, path, gaddr_t, st)
+DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
 {
   const char *l_path = guest_to_host(path);
   struct l_newstat *l_st = guest_to_host(st);
@@ -149,12 +150,12 @@ DEFINE_SYSCALL(newstat, gaddr_t, path, gaddr_t, st)
   if (ret < 0)
     return ret;
 
-  newstat_darwin_to_linux(&d_st, l_st);
+  stat_darwin_to_linux(&d_st, l_st);
 
   return 0;
 }
 
-DEFINE_SYSCALL(newfstat, int, fd, gaddr_t, st)
+DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
 {
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
@@ -163,12 +164,12 @@ DEFINE_SYSCALL(newfstat, int, fd, gaddr_t, st)
   if (ret < 0)
     return ret;
 
-  newstat_darwin_to_linux(&d_st, l_st);
+  stat_darwin_to_linux(&d_st, l_st);
 
   return 0;
 }
 
-DEFINE_SYSCALL(newlstat, gaddr_t, path, gaddr_t, st)
+DEFINE_SYSCALL(lstat, gaddr_t, path, gaddr_t, st)
 {
   const char *l_path = guest_to_host(path);
   struct l_newstat *l_st = guest_to_host(st);
@@ -178,7 +179,7 @@ DEFINE_SYSCALL(newlstat, gaddr_t, path, gaddr_t, st)
   if (ret < 0)
     return ret;
 
-  newstat_darwin_to_linux(&d_st, l_st);
+  stat_darwin_to_linux(&d_st, l_st);
 
   return 0;
 }
@@ -245,7 +246,7 @@ DEFINE_SYSCALL(rename, gaddr_t, oldpath, gaddr_t, newpath)
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
-  PRINTF("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  printf("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
   return -1;
 }
 

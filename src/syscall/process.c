@@ -8,6 +8,8 @@
 
 #include "common.h"
 #include "noah.h"
+
+#include "linux/common.h"
 #include "linux/misc.h"
 #include "linux/errno.h"
 

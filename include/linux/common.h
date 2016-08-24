@@ -75,4 +75,6 @@ typedef l_int		l_mqd_t;
 typedef l_size_t	l_socklen_t;
 typedef	l_ulong		l_fd_mask;
 
+#define	LINUX_NAME_MAX		255
+
 #endif

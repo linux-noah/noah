@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Takaya Saeki
+ * Copyright (c) 2016 Takaya Saeki, Yuichi Nishiwaki
  * Copyright (c) 2000 Assar Westerlund
  * All rights reserved.
  *
@@ -31,6 +31,101 @@
 
 #ifndef _LINUX_SOCKET_H_
 #define _LINUX_SOCKET_H_
+
+/*
+ * Socket defines
+ */
+
+#define	LINUX_SOL_SOCKET	1
+#define	LINUX_SOL_IP		0
+#define	LINUX_SOL_IPX		256
+#define	LINUX_SOL_AX25		257
+#define	LINUX_SOL_TCP		6
+#define	LINUX_SOL_UDP		17
+
+#define	LINUX_SO_DEBUG		1
+#define	LINUX_SO_REUSEADDR	2
+#define	LINUX_SO_TYPE		3
+#define	LINUX_SO_ERROR		4
+#define	LINUX_SO_DONTROUTE	5
+#define	LINUX_SO_BROADCAST	6
+#define	LINUX_SO_SNDBUF		7
+#define	LINUX_SO_RCVBUF		8
+#define	LINUX_SO_KEEPALIVE	9
+#define	LINUX_SO_OOBINLINE	10
+#define	LINUX_SO_NO_CHECK	11
+#define	LINUX_SO_PRIORITY	12
+#define	LINUX_SO_LINGER		13
+#define	LINUX_SO_PASSCRED	16
+#define	LINUX_SO_PEERCRED	17
+#define	LINUX_SO_RCVLOWAT	18
+#define	LINUX_SO_SNDLOWAT	19
+#define	LINUX_SO_RCVTIMEO	20
+#define	LINUX_SO_SNDTIMEO	21
+#define	LINUX_SO_TIMESTAMP	29
+#define	LINUX_SO_ACCEPTCONN	30
+
+#define	LINUX_IP_TOS		1
+#define	LINUX_IP_TTL		2
+#define	LINUX_IP_HDRINCL	3
+#define	LINUX_IP_OPTIONS	4
+
+#define	LINUX_IP_MULTICAST_IF		32
+#define	LINUX_IP_MULTICAST_TTL		33
+#define	LINUX_IP_MULTICAST_LOOP		34
+#define	LINUX_IP_ADD_MEMBERSHIP		35
+#define	LINUX_IP_DROP_MEMBERSHIP	36
+
+struct l_sockaddr {
+	l_ushort	sa_family;
+	char		sa_data[14];
+};
+
+struct l_ifmap {
+	l_ulong		mem_start;
+	l_ulong		mem_end;
+	l_ushort	base_addr;
+	u_char		irq;
+	u_char		dma;
+	u_char		port;
+} __packed;
+
+#define	LINUX_IFHWADDRLEN	6
+#define	LINUX_IFNAMSIZ		16
+
+struct l_ifreq {
+	union {
+		char	ifrn_name[LINUX_IFNAMSIZ];
+	} ifr_ifrn;
+
+	union {
+		struct l_sockaddr	ifru_addr;
+		struct l_sockaddr	ifru_dstaddr;
+		struct l_sockaddr	ifru_broadaddr;
+		struct l_sockaddr	ifru_netmask;
+		struct l_sockaddr	ifru_hwaddr;
+		l_short		ifru_flags[1];
+		l_int		ifru_metric;
+		l_int		ifru_mtu;
+		struct l_ifmap	ifru_map;
+		char		ifru_slave[LINUX_IFNAMSIZ];
+		l_uintptr_t	ifru_data;
+	} ifr_ifru;
+} __packed;
+
+#define	ifr_name	ifr_ifrn.ifrn_name	/* Interface name */
+#define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
+
+struct l_ifconf {
+	int	ifc_len;
+	union {
+		l_uintptr_t	ifcu_buf;
+		l_uintptr_t	ifcu_req;
+	} ifc_ifcu;
+};
+
+#define	ifc_buf		ifc_ifcu.ifcu_buf
+#define	ifc_req		ifc_ifcu.ifcu_req
 
 /* msg flags in recvfrom/recvmsg */
 
