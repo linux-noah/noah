@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2016 Takaya Saeki
  * Copyright (c) 2000 Assar Westerlund
  * All rights reserved.
  *
@@ -111,6 +112,7 @@ struct l_cmsghdr {
 
 #define	LINUX_AF_UNSPEC		0
 #define	LINUX_AF_UNIX		1
+#define LINUX_AF_FILE		1
 #define	LINUX_AF_INET		2
 #define	LINUX_AF_AX25		3
 #define	LINUX_AF_IPX		4
@@ -131,141 +133,14 @@ struct l_cmsghdr {
 
 /* Flags for socket, socketpair, accept4 */
 
-#define	LINUX_SOCK_CLOEXEC	LINUX_O_CLOEXEC
-#define	LINUX_SOCK_NONBLOCK	LINUX_O_NONBLOCK
+#define LINUX_SOCK_NONBLOCK  0x800
+#define LINUX_SOCK_CLOEXEC   0x80000
 
 struct l_ucred {
 	uint32_t	pid;
 	uint32_t	uid;
 	uint32_t	gid;
 };
-
-#if defined(__i386__) || (defined(__amd64__) && defined(COMPAT_LINUX32))
-
-struct linux_sendto_args {
-	int s;
-	l_uintptr_t msg;
-	int len;
-	int flags;
-	l_uintptr_t to;
-	int tolen;
-};
-
-struct linux_socket_args {
-	int domain;
-	int type;
-	int protocol;
-};
-
-struct linux_bind_args {
-	int s;
-	l_uintptr_t name;
-	int namelen;
-};
-
-struct linux_connect_args {
-	int s;
-	l_uintptr_t name;
-	int namelen;
-};
-
-struct linux_listen_args {
-	int s;
-	int backlog;
-};
-
-struct linux_accept_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-};
-
-struct linux_accept4_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-	int flags;
-};
-
-struct linux_getsockname_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-};
-
-struct linux_getpeername_args {
-	int s;
-	l_uintptr_t addr;
-	l_uintptr_t namelen;
-};
-
-struct linux_socketpair_args {
-	int domain;
-	int type;
-	int protocol;
-	l_uintptr_t rsv;
-};
-
-struct linux_recvfrom_args {
-	int s;
-	l_uintptr_t buf;
-	int len;
-	int flags;
-	l_uintptr_t from;
-	l_uintptr_t fromlen;
-};
-
-struct linux_sendmsg_args {
-	int s;
-	l_uintptr_t msg;
-	int flags;
-};
-
-struct linux_recvmsg_args {
-	int s;
-	l_uintptr_t msg;
-	int flags;
-};
-
-struct linux_shutdown_args {
-	int s;
-	int how;
-};
-
-struct linux_setsockopt_args {
-	int s;
-	int level;
-	int optname;
-	l_uintptr_t optval;
-	int optlen;
-};
-
-struct linux_getsockopt_args {
-	int s;
-	int level;
-	int optname;
-	l_uintptr_t optval;
-	l_uintptr_t optlen;
-};
-
-int linux_socket(struct thread *td, struct linux_socket_args *args);
-int linux_bind(struct thread *td, struct linux_bind_args *args);
-int linux_connect(struct thread *, struct linux_connect_args *);
-int linux_listen(struct thread *td, struct linux_listen_args *args);
-int linux_accept(struct thread *td, struct linux_accept_args *args);
-int linux_accept4(struct thread *td, struct linux_accept4_args *args);
-int linux_getsockname(struct thread *td, struct linux_getsockname_args *args);
-int linux_getpeername(struct thread *td, struct linux_getpeername_args *args);
-int linux_socketpair(struct thread *td, struct linux_socketpair_args *args);
-int linux_sendto(struct thread *td, struct linux_sendto_args *args);
-int linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args);
-int linux_sendmsg(struct thread *td, struct linux_sendmsg_args *args);
-int linux_recvmsg(struct thread *td, struct linux_recvmsg_args *args);
-int linux_shutdown(struct thread *td, struct linux_shutdown_args *args);
-int linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args);
-int linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args);
-
-#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 /* Operations for socketcall */
 
