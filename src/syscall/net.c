@@ -55,7 +55,7 @@ DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
     struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)sockaddr;
     if (sockaddr_un->sun_path[0] == '\0') {
       // Linux abstract namespace starts with NULL, which we do not support yet
-      PRINTF("Abstract namespace: %20s\n", sockaddr_un->sun_path[1]);
+      PRINTF("Abstract namespace: %20s\n", &sockaddr_un->sun_path[1]);
       slen = strnlen(&sockaddr_un->sun_path[1], addrlen - offsetof(struct sockaddr_un, sun_path) - 1);
     } else {
       slen = strnlen(sockaddr_un->sun_path, addrlen - offsetof(struct sockaddr_un, sun_path));
