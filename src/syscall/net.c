@@ -201,3 +201,37 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
 
   return ret;
 }
+
+DEFINE_SYSCALL(listen, int, socket, int, backlog)
+{
+  return listen(socket, backlog);
+}
+
+DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+{
+  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+  socklen_t *sockaddrlen = guest_to_host(addrlen);
+
+  int ret = accept(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
+
+  if (ret >= 0 && l_sockaddr != NULL) {
+    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
+    l_sockaddr->sa_family = family;
+  }
+
+  return ret;
+}
+
+DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
+{
+  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+
+  int ret = bind(sockfd, (struct sockaddr*)l_sockaddr, addrlen);
+
+  if (ret >= 0 && l_sockaddr != NULL) {
+    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
+    l_sockaddr->sa_family = family;
+  }
+
+  return ret;
+}

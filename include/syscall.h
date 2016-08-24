@@ -44,14 +44,14 @@
   SYSCALL(40, unimplemented)                    \
   SYSCALL(41, socket)                           \
   SYSCALL(42, connect)                          \
-  SYSCALL(43, unimplemented)                    \
+  SYSCALL(43, accept)                           \
   SYSCALL(44, sendto)                           \
   SYSCALL(45, recvfrom)                         \
   SYSCALL(46, unimplemented)                    \
   SYSCALL(47, unimplemented)                    \
   SYSCALL(48, shutdown)                         \
-  SYSCALL(49, unimplemented)                    \
-  SYSCALL(50, unimplemented)                    \
+  SYSCALL(49, bind)                             \
+  SYSCALL(50, listen)                           \
   SYSCALL(51, unimplemented)                    \
   SYSCALL(52, unimplemented)                    \
   SYSCALL(53, unimplemented)                    \
