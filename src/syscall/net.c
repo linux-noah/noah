@@ -11,16 +11,16 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
   int nfamily;
   switch (family) {
-  case L_AF_UNIX: nfamily = AF_UNIX; break;
-  case L_AF_INET: nfamily = AF_INET; break;
-  case L_AF_INET6: nfamily = AF_INET6; break;
+  case LINUX_AF_UNIX: nfamily = AF_UNIX; break;
+  case LINUX_AF_INET: nfamily = AF_INET; break;
+  case LINUX_AF_INET6: nfamily = AF_INET6; break;
   default:
     return -1;
   }
 
   /* FIXME */
-  type &= ~L_SOCK_NONBLOCK;
-  type &= ~L_SOCK_CLOEXEC;
+  type &= ~LINUX_SOCK_NONBLOCK;
+  type &= ~LINUX_SOCK_CLOEXEC;
 
   return socket(nfamily, type, protocol);
 }
@@ -33,9 +33,9 @@ DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
   memcpy(buf, guest_to_host(addr), addrlen);
 
   switch (naddr->sa_family) {
-  case L_AF_UNIX: naddr->sa_family = AF_UNIX; break;
-  case L_AF_INET: naddr->sa_family = AF_INET; break;
-  case L_AF_INET6: naddr->sa_family = AF_INET6; break;
+  case LINUX_AF_UNIX: naddr->sa_family = AF_UNIX; break;
+  case LINUX_AF_INET: naddr->sa_family = AF_INET; break;
+  case LINUX_AF_INET6: naddr->sa_family = AF_INET6; break;
   default:
     return -1;
   }

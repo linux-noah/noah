@@ -64,11 +64,11 @@ load_elf_interp(const char *path, ulong load_addr)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= LINUX_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
@@ -115,11 +115,11 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
-    if (p[i].p_flags & PF_X) prot |= L_PROT_EXEC;
-    if (p[i].p_flags & PF_W) prot |= L_PROT_WRITE;
-    if (p[i].p_flags & PF_R) prot |= L_PROT_READ;
+    if (p[i].p_flags & PF_X) prot |= LINUX_PROT_EXEC;
+    if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
+    if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
@@ -165,7 +165,7 @@ int
 load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
 {
   const char *script_end = script + len;
-  char sb_argv[SB_ARGC_MAX][L_PATH_MAX];
+  char sb_argv[SB_ARGC_MAX][LINUX_PATH_MAX];
   int sb_argc;
   size_t n;
 
@@ -185,7 +185,7 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
     if (n == 0) {
       goto parse_end;
     }
-    if (n > L_PATH_MAX - 1) {
+    if (n > LINUX_PATH_MAX - 1) {
       return -1;
     }
     strncpy(sb_argv[sb_argc], script, n);
@@ -235,7 +235,7 @@ push(const void *data, size_t n)
 void
 init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
 {
-  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, L_PROT_READ | L_PROT_WRITE, L_MAP_PRIVATE | L_MAP_FIXED | L_MAP_ANONYMOUS, -1, 0);
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
   hv_vcpu_write_register(vcpuid, HV_X86_RSP, STACK_TOP);
   hv_vcpu_write_register(vcpuid, HV_X86_RBP, STACK_TOP);

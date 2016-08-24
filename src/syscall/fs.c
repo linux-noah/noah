@@ -59,7 +59,7 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
 int
 do_open(const char *path, int l_flags, int mode)
 {
-  char buf[L_PATH_MAX + sizeof "./mnt/" - 1];
+  char buf[LINUX_PATH_MAX + sizeof "./mnt/" - 1];
 
   int flags = 0;
   switch (l_flags & LINUX_O_ACCMODE) {
