@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <pthread.h>
 
 #include "common.h"
 #include "noah.h"
@@ -64,7 +65,9 @@ DEFINE_SYSCALL(getpgrp)
 
 DEFINE_SYSCALL(gettid)
 {
-  return getpid();              /* FIXME */
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+  return tid;
 }
 
 DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
