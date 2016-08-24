@@ -135,10 +135,12 @@ to_host_sockopt_name(int name)
 
 DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, int, opt_len)
 {
+  // Darwin's optval is compatible with that of Linux
   return setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len);
 }
 
-DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, gaddr_t, option)
+DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, gaddr_t, opt_len)
 {
-  return -1;
+  // Darwin's optval is compatible with that of Linux
+  return getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len));
 }

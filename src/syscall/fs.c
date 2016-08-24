@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/syscall.h>
+#include <sys/select.h>
 #include <dirent.h>
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
@@ -280,4 +281,14 @@ DEFINE_SYSCALL(readlink, gaddr_t, pathname, gaddr_t, buf, int, bufsize)
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 {
   return -1;
+}
+
+DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, errorfds, gaddr_t, timeout)
+{
+  struct timeval *h_timeout = (struct timeval*)guest_to_host(timeout);
+
+  // Darwin's fd_set is compatible with that of Linux
+  fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
+
+  return select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout);
 }
