@@ -123,30 +123,25 @@ DEFINE_SYSCALL(uname, gaddr_t, buf)
   return 0;
 }
 
-#define ARCH_SET_GS 0x1001
-#define ARCH_SET_FS 0x1002
-#define ARCH_GET_FS 0x1003
-#define ARCH_GET_GS 0x1004
-
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   switch (code) {
-  case ARCH_SET_GS:
+  case LINUX_ARCH_SET_GS:
     if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr) != HV_SUCCESS) {
       return -1;
     }
     return 0;
-  case ARCH_SET_FS:
+  case LINUX_ARCH_SET_FS:
     if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr) != HV_SUCCESS) {
       return -1;
     }
     return 0;
-  case ARCH_GET_FS:
+  case LINUX_ARCH_GET_FS:
     if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
       return -1;
     }
     return 0;
-  case ARCH_GET_GS:
+  case LINUX_ARCH_GET_GS:
     if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
       return -1;
     }
