@@ -23,7 +23,7 @@
   SYSCALL(19, unimplemented)                    \
   SYSCALL(20, writev)                           \
   SYSCALL(21, access)                           \
-  SYSCALL(22, unimplemented)                    \
+  SYSCALL(22, pipe)                             \
   SYSCALL(23, unimplemented)                    \
   SYSCALL(24, unimplemented)                    \
   SYSCALL(25, unimplemented)                    \
