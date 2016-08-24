@@ -66,9 +66,9 @@ main_loop()
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
 
-      PRINTF(">>>start syscall handling...: %llu\n", rax);
+      PRINTF(">>>start syscall handling...: %s (%llu)\n", sc_name_table[rax], rax);
       retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      PUTS("<<<done");
+      PRINTF("<<<done: %llu\n", retval);
 
       hv_vcpu_write_register(vcpuid, HV_X86_RAX, retval);
 
