@@ -79,13 +79,13 @@ extern struct mtx futex_mtx;
 
 /* robust futexes */
 struct linux_robust_list {
-	l_uintptr_t			next;
+  l_uintptr_t			next;
 };
 
 struct linux_robust_list_head {
-	struct linux_robust_list	list;
-	l_long				futex_offset;
-	l_uintptr_t			pending_list;
+  struct linux_robust_list	list;
+  l_long			futex_offset;
+  l_uintptr_t			pending_list;
 };
 
 #endif	/* !_LINUX_FUTEX_H */

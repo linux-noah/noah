@@ -84,21 +84,21 @@
 				   message sizes, etc. */
 
 union l_semun {
-	l_int		val;
-	l_uintptr_t	buf;
-	l_uintptr_t	array;
-	l_uintptr_t	__buf;
-	l_uintptr_t	__pad;
+  l_int		val;
+  l_uintptr_t	buf;
+  l_uintptr_t	array;
+  l_uintptr_t	__buf;
+  l_uintptr_t	__pad;
 };
 
 struct l_ipc_perm {
-	l_key_t		key;
-	l_uid_t		uid;
-	l_gid_t		gid;
-	l_uid_t		cuid;
-	l_gid_t		cgid;
-	l_ushort	mode;
-	l_ushort	seq;
+  l_key_t	key;
+  l_uid_t	uid;
+  l_gid_t	gid;
+  l_uid_t	cuid;
+  l_gid_t	cgid;
+  l_ushort	mode;
+  l_ushort	seq;
 };
 
 #endif /* _LINUX_IPC_H_ */

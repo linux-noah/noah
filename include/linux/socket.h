@@ -77,51 +77,51 @@
 #define	LINUX_IP_DROP_MEMBERSHIP	36
 
 struct l_sockaddr {
-	l_ushort	sa_family;
-	char		sa_data[14];
+  l_ushort	sa_family;
+  char		sa_data[14];
 };
 
 struct l_ifmap {
-	l_ulong		mem_start;
-	l_ulong		mem_end;
-	l_ushort	base_addr;
-	u_char		irq;
-	u_char		dma;
-	u_char		port;
+  l_ulong	mem_start;
+  l_ulong	mem_end;
+  l_ushort	base_addr;
+  u_char	irq;
+  u_char	dma;
+  u_char	port;
 } __packed;
 
 #define	LINUX_IFHWADDRLEN	6
 #define	LINUX_IFNAMSIZ		16
 
 struct l_ifreq {
-	union {
-		char	ifrn_name[LINUX_IFNAMSIZ];
-	} ifr_ifrn;
+  union {
+    char	ifrn_name[LINUX_IFNAMSIZ];
+  } ifr_ifrn;
 
-	union {
-		struct l_sockaddr	ifru_addr;
-		struct l_sockaddr	ifru_dstaddr;
-		struct l_sockaddr	ifru_broadaddr;
-		struct l_sockaddr	ifru_netmask;
-		struct l_sockaddr	ifru_hwaddr;
-		l_short		ifru_flags[1];
-		l_int		ifru_metric;
-		l_int		ifru_mtu;
-		struct l_ifmap	ifru_map;
-		char		ifru_slave[LINUX_IFNAMSIZ];
-		l_uintptr_t	ifru_data;
-	} ifr_ifru;
+  union {
+    struct l_sockaddr	ifru_addr;
+    struct l_sockaddr	ifru_dstaddr;
+    struct l_sockaddr	ifru_broadaddr;
+    struct l_sockaddr	ifru_netmask;
+    struct l_sockaddr	ifru_hwaddr;
+    l_short		ifru_flags[1];
+    l_int		ifru_metric;
+    l_int		ifru_mtu;
+    struct l_ifmap	ifru_map;
+    char		ifru_slave[LINUX_IFNAMSIZ];
+    l_uintptr_t		ifru_data;
+  } ifr_ifru;
 } __packed;
 
 #define	ifr_name	ifr_ifrn.ifrn_name	/* Interface name */
 #define	ifr_hwaddr	ifr_ifru.ifru_hwaddr	/* MAC address */
 
 struct l_ifconf {
-	int	ifc_len;
-	union {
-		l_uintptr_t	ifcu_buf;
-		l_uintptr_t	ifcu_req;
-	} ifc_ifcu;
+  int	ifc_len;
+  union {
+    l_uintptr_t	ifcu_buf;
+    l_uintptr_t	ifcu_req;
+  } ifc_ifcu;
 };
 
 #define	ifc_buf		ifc_ifcu.ifcu_buf
@@ -154,25 +154,25 @@ struct l_ifconf {
 #define LINUX_SCM_TIMESTAMP	0x1D
 
 struct l_msghdr {
-	l_uintptr_t	msg_name;
-	l_int		msg_namelen;
-	l_uintptr_t	msg_iov;
-	l_size_t	msg_iovlen;
-	l_uintptr_t	msg_control;
-	l_size_t	msg_controllen;
-	l_uint		msg_flags;
+  l_uintptr_t	msg_name;
+  l_int		msg_namelen;
+  l_uintptr_t	msg_iov;
+  l_size_t	msg_iovlen;
+  l_uintptr_t	msg_control;
+  l_size_t	msg_controllen;
+  l_uint	msg_flags;
 };
 
 struct l_mmsghdr {
-	struct l_msghdr	msg_hdr;
-	l_uint		msg_len;
+  struct l_msghdr	msg_hdr;
+  l_uint		msg_len;
 
 };
 
 struct l_cmsghdr {
-	l_size_t	cmsg_len;
-	l_int		cmsg_level;
-	l_int		cmsg_type;
+  l_size_t	cmsg_len;
+  l_int		cmsg_level;
+  l_int		cmsg_type;
 };
 
 /* Ancillary data object information macros */
@@ -232,9 +232,9 @@ struct l_cmsghdr {
 #define LINUX_SOCK_CLOEXEC   0x80000
 
 struct l_ucred {
-	uint32_t	pid;
-	uint32_t	uid;
-	uint32_t	gid;
+  uint32_t	pid;
+  uint32_t	uid;
+  uint32_t	gid;
 };
 
 /* Operations for socketcall */

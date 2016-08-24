@@ -36,12 +36,12 @@
 #define	_AMD64_LINUX_H_
 
 typedef struct {
-	l_int		val[2];
+  l_int		val[2];
 } l_fsid_t;
 
 typedef struct {
-	l_time_t	tv_sec;
-	l_suseconds_t	tv_usec;
+  l_time_t	tv_sec;
+  l_suseconds_t	tv_usec;
 } l_timeval;
 
 #define	l_fd_set	fd_set
@@ -55,13 +55,13 @@ typedef struct {
 
 struct l___sysctl_args
 {
-	l_uintptr_t	name;
-	l_int		nlen;
-	l_uintptr_t	oldval;
-	l_uintptr_t	oldlenp;
-	l_uintptr_t	newval;
-	l_size_t	newlen;
-	l_ulong		__spare[4];
+  l_uintptr_t	name;
+  l_int		nlen;
+  l_uintptr_t	oldval;
+  l_uintptr_t	oldlenp;
+  l_uintptr_t	newval;
+  l_size_t	newlen;
+  l_ulong	__spare[4];
 };
 
 /* Scheduling policies */
@@ -84,8 +84,8 @@ struct l___sysctl_args
 #define	LINUX_RLIM_NLIMITS	10
 
 struct l_rlimit {
-	l_ulong		rlim_cur;
-	l_ulong		rlim_max;
+  l_ulong		rlim_cur;
+  l_ulong		rlim_max;
 };
 
 /*
@@ -104,9 +104,9 @@ struct l_rlimit {
 #define	LINUX_POLLMSG		0x0400
 
 struct l_pollfd {
-	l_int		fd;
-	l_short		events;
-	l_short		revents;
+  l_int		fd;
+  l_short	events;
+  l_short	revents;
 };
 
 
@@ -130,21 +130,21 @@ struct l_pollfd {
 
 /* linux sysinfo */
 struct l_sysinfo {
-	l_long		uptime;		/* Seconds since boot */
-	l_ulong		loads[3];	/* 1, 5, and 15 minute load averages */
+  l_long		uptime;		/* Seconds since boot */
+  l_ulong		loads[3];	/* 1, 5, and 15 minute load averages */
 #define LINUX_SYSINFO_LOADS_SCALE 65536
-	l_ulong		totalram;	/* Total usable main memory size */
-	l_ulong		freeram;	/* Available memory size */
-	l_ulong		sharedram;	/* Amount of shared memory */
-	l_ulong		bufferram;	/* Memory used by buffers */
-	l_ulong		totalswap;	/* Total swap space size */
-	l_ulong		freeswap;	/* swap space still available */
-	l_ushort	procs;		/* Number of current processes */
-	l_ushort	pads;
-	l_ulong		totalhigh;
-	l_ulong		freehigh;
-	l_uint		mem_unit;
-	char		_f[20-2*sizeof(l_long)-sizeof(l_int)];	/* padding */
+  l_ulong		totalram;	/* Total usable main memory size */
+  l_ulong		freeram;	/* Available memory size */
+  l_ulong		sharedram;	/* Amount of shared memory */
+  l_ulong		bufferram;	/* Memory used by buffers */
+  l_ulong		totalswap;	/* Total swap space size */
+  l_ulong		freeswap;	/* swap space still available */
+  l_ushort		procs;		/* Number of current processes */
+  l_ushort		pads;
+  l_ulong		totalhigh;
+  l_ulong		freehigh;
+  l_uint		mem_unit;
+  char			_f[20-2*sizeof(l_long)-sizeof(l_int)];	/* padding */
 };
 
 #endif /* !_AMD64_LINUX_H_ */

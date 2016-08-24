@@ -156,28 +156,28 @@ struct l_dirent64 {
  * stat family of syscalls
  */
 struct l_timespec {
-	l_time_t	tv_sec;
-	l_long		tv_nsec;
+  l_time_t	tv_sec;
+  l_long	tv_nsec;
 };
 
 struct l_newstat {
-	l_dev_t		st_dev;
-	l_ino_t		st_ino;
-	l_ulong		st_nlink;
-	l_uint		st_mode;
-	l_uid_t		st_uid;
-	l_gid_t		st_gid;
-	l_uint		__st_pad1;
-	l_dev_t		st_rdev;
-	l_off_t		st_size;
-	l_long		st_blksize;
-	l_long		st_blocks;
-	struct l_timespec	st_atim;
-	struct l_timespec	st_mtim;
-	struct l_timespec	st_ctim;
-	l_long		__unused1;
-	l_long		__unused2;
-	l_long		__unused3;
+  l_dev_t		st_dev;
+  l_ino_t		st_ino;
+  l_ulong		st_nlink;
+  l_uint		st_mode;
+  l_uid_t		st_uid;
+  l_gid_t		st_gid;
+  l_uint		__st_pad1;
+  l_dev_t		st_rdev;
+  l_off_t		st_size;
+  l_long		st_blksize;
+  l_long		st_blocks;
+  struct l_timespec	st_atim;
+  struct l_timespec	st_mtim;
+  struct l_timespec	st_ctim;
+  l_long		__unused1;
+  l_long		__unused2;
+  l_long		__unused3;
 };
 
 #endif	/* !_LINUX_FILE_H_ */
