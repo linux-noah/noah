@@ -235,3 +235,33 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
 
   return ret;
 }
+
+DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+{
+  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+  socklen_t *sockaddrlen = guest_to_host(addrlen);
+
+  int ret = getsockname(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
+
+  if (ret >= 0 && l_sockaddr != NULL) {
+    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
+    l_sockaddr->sa_family = family;
+  }
+
+  return ret;
+}
+
+DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+{
+  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+  socklen_t *sockaddrlen = guest_to_host(addrlen);
+
+  int ret = getpeername(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
+
+  if (ret >= 0 && l_sockaddr != NULL) {
+    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
+    l_sockaddr->sa_family = family;
+  }
+
+  return ret;
+}

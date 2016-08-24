@@ -22,3 +22,8 @@ DEFINE_SYSCALL(gettimeofday, gaddr_t, tp, gaddr_t, tzp)
 {
   return gettimeofday(guest_to_host(tp), guest_to_host(tzp));
 }
+
+DEFINE_SYSCALL(nanosleep, gaddr_t, rqtp, gaddr_t, rmtp)
+{
+  return nanosleep(guest_to_host(rqtp), guest_to_host(rmtp));
+}

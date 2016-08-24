@@ -36,7 +36,7 @@
   SYSCALL(32, unimplemented)                    \
   SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
-  SYSCALL(35, unimplemented)                    \
+  SYSCALL(35, nanosleep)                        \
   SYSCALL(36, unimplemented)                    \
   SYSCALL(37, unimplemented)                    \
   SYSCALL(38, unimplemented)                    \
@@ -52,8 +52,8 @@
   SYSCALL(48, shutdown)                         \
   SYSCALL(49, bind)                             \
   SYSCALL(50, listen)                           \
-  SYSCALL(51, unimplemented)                    \
-  SYSCALL(52, unimplemented)                    \
+  SYSCALL(51, getsockname)                      \
+  SYSCALL(52, getpeername)                      \
   SYSCALL(53, unimplemented)                    \
   SYSCALL(54, setsockopt)                       \
   SYSCALL(55, getsockopt)                       \
