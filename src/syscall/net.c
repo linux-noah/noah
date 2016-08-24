@@ -67,7 +67,7 @@ to_host_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr **sockaddr, size
   assert(offsetof(struct sockaddr, sa_data) == offsetof(struct l_sockaddr, sa_data));
   (*sockaddr)->sa_family = l_sockaddr->sa_family;
 
-  switch ((*sockaddr)->sa_family) {
+  switch (to_host_sa_family(l_sockaddr->sa_family)) {
   case AF_UNIX: {
     int slen;
     struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)*sockaddr;
@@ -196,7 +196,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
 
   if (ret >= 0 && l_sockaddr != NULL) {
     int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = family;
+    l_sockaddr->sa_family = to_linux_sa_family(family);
   }
 
   return ret;
@@ -216,7 +216,7 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 
   if (ret >= 0 && l_sockaddr != NULL) {
     int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = family;
+    l_sockaddr->sa_family = to_linux_sa_family(family);
   }
 
   return ret;
@@ -230,7 +230,7 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
 
   if (ret >= 0 && l_sockaddr != NULL) {
     int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = family;
+    l_sockaddr->sa_family = to_linux_sa_family(family);
   }
 
   return ret;
@@ -245,7 +245,7 @@ DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 
   if (ret >= 0 && l_sockaddr != NULL) {
     int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = family;
+    l_sockaddr->sa_family = to_linux_sa_family(family);
   }
 
   return ret;
@@ -260,7 +260,7 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 
   if (ret >= 0 && l_sockaddr != NULL) {
     int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = family;
+    l_sockaddr->sa_family = to_linux_sa_family(family);
   }
 
   return ret;
