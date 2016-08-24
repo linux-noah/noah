@@ -45,8 +45,8 @@
   SYSCALL(41, socket)                           \
   SYSCALL(42, connect)                          \
   SYSCALL(43, unimplemented)                    \
-  SYSCALL(44, unimplemented)                    \
-  SYSCALL(45, unimplemented)                    \
+  SYSCALL(44, sendto)                           \
+  SYSCALL(45, recvfrom)                         \
   SYSCALL(46, unimplemented)                    \
   SYSCALL(47, unimplemented)                    \
   SYSCALL(48, shutdown)                         \

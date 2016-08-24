@@ -30,6 +30,21 @@ to_host_sa_family(int family)
   }
 }
 
+int
+to_linux_sa_family(int family)
+{
+  switch (family) {
+  case AF_UNIX:
+    return LINUX_AF_UNIX;
+  case AF_INET:
+    return LINUX_AF_INET;
+  case AF_INET6:
+    return LINUX_AF_INET6;
+  default:
+    return -1;
+  }
+}
+
 DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
   /* FIXME */
@@ -39,43 +54,60 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
   return socket(to_host_sa_family(family), type, protocol);
 }
 
-DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
+int
+to_host_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr **sockaddr, size_t l_sockaddr_len)
 {
-  int host_addrlen;
-  struct sockaddr *sockaddr = malloc(addrlen);
-  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+  if (l_sockaddr == NULL) {
+    return -1;
+  }
 
-  memcpy((char*)sockaddr, l_sockaddr, addrlen);
+  *sockaddr = malloc(l_sockaddr_len);
+
+  memcpy(*sockaddr, l_sockaddr, l_sockaddr_len);
   assert(offsetof(struct sockaddr, sa_data) == offsetof(struct l_sockaddr, sa_data));
-  sockaddr->sa_family = l_sockaddr->sa_family;
+  (*sockaddr)->sa_family = l_sockaddr->sa_family;
 
-  switch (sockaddr->sa_family) {
+  switch ((*sockaddr)->sa_family) {
   case AF_UNIX: {
     int slen;
-    struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)sockaddr;
+    struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)*sockaddr;
     if (sockaddr_un->sun_path[0] == '\0') {
       // Linux abstract namespace starts with NULL, which we do not support yet
       PRINTF("Abstract namespace: %20s\n", &sockaddr_un->sun_path[1]);
-      slen = strnlen(&sockaddr_un->sun_path[1], addrlen - offsetof(struct sockaddr_un, sun_path) - 1);
+      slen = strnlen(&sockaddr_un->sun_path[1], l_sockaddr_len - offsetof(struct sockaddr_un, sun_path) - 1);
     } else {
-      slen = strnlen(sockaddr_un->sun_path, addrlen - offsetof(struct sockaddr_un, sun_path));
+      slen = strnlen(sockaddr_un->sun_path, l_sockaddr_len - offsetof(struct sockaddr_un, sun_path));
     }
-    host_addrlen = sizeof(struct sockaddr_un);
-    if (host_addrlen < offsetof(struct sockaddr_un, sun_path) + slen) {
+    (*sockaddr)->sa_len = sizeof(struct sockaddr_un);
+    if ((*sockaddr)->sa_len < offsetof(struct sockaddr_un, sun_path) + slen) {
       // Name too long
-      return -1;
+      goto err;
     }
     break;
   }
   case AF_INET:
-    host_addrlen = sizeof(struct sockaddr_in);
+    (*sockaddr)->sa_len = sizeof(struct sockaddr_in);
     break;
   default:
     fprintf(stderr, "Unimplemented sa_family");
+    goto err;
+  }
+
+  return 0;
+
+err:
+  free(*sockaddr);
+  return -1;
+}
+
+DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
+{
+  struct sockaddr *sockaddr;
+  if (to_host_sockaddr(guest_to_host(addr), &sockaddr, addrlen) < 0) {
     return -1;
   }
 
-  int fd = connect(sockfd, sockaddr, host_addrlen);
+  int fd = connect(sockfd, sockaddr, sockaddr->sa_len);
   free(sockaddr);
   return fd;
 }
@@ -133,7 +165,7 @@ to_host_sockopt_name(int name)
   }
 }
 
-DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, int, opt_len)
+DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, uint, opt_len)
 {
   // Darwin's optval is compatible with that of Linux
   return setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len);
@@ -148,4 +180,24 @@ DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, g
 DEFINE_SYSCALL(shutdown, int, socket, int, how)
 {
   return shutdown(socket, how);
+}
+
+DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
+{
+  return sendto(socket, guest_to_host(buf), length, flags, NULL, 0);
+}
+
+DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, address, gaddr_t, addrdress_len)
+{
+  struct l_sockaddr *l_sockaddr = guest_to_host(address);
+  socklen_t *sockaddr_len = guest_to_host(addrdress_len);
+
+  int ret = recvfrom(socket, guest_to_host(buf), length, flags, (struct sockaddr*)l_sockaddr, sockaddr_len);
+
+  if (ret >= 0 && l_sockaddr != NULL) {
+    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
+    l_sockaddr->sa_family = family;
+  }
+
+  return ret;
 }
