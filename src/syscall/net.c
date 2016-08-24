@@ -7,11 +7,11 @@
 #include <stdio.h>
 #include <errno.h>
 
-DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 #include "linux/common.h"
 #include "linux/socket.h"
 #include "linux/misc.h"
 
+DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
   int nfamily;
   switch (family) {
