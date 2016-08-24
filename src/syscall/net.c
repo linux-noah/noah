@@ -2,10 +2,14 @@
 #include "common.h"
 
 #include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stddef.h>
+#include <assert.h>
 
 #include "linux/common.h"
 #include "linux/socket.h"
@@ -37,16 +41,42 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 
 DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
 {
-  char buf[addrlen];
-  struct sockaddr *naddr = (void *) &buf;
+  int host_addrlen;
+  struct sockaddr *sockaddr = malloc(addrlen);
+  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
 
-  memcpy(buf, guest_to_host(addr), addrlen);
+  memcpy((char*)sockaddr, l_sockaddr, addrlen);
+  assert(offsetof(struct sockaddr, sa_data) == offsetof(struct l_sockaddr, sa_data));
+  sockaddr->sa_family = l_sockaddr->sa_family;
 
-  naddr->sa_family = to_host_sa_family(naddr->sa_family);
+  switch (sockaddr->sa_family) {
+  case AF_UNIX: {
+    int slen;
+    struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)sockaddr;
+    if (sockaddr_un->sun_path[0] == '\0') {
+      // Linux abstract namespace starts with NULL, which we do not support yet
+      PRINTF("Abstract namespace: %20s\n", sockaddr_un->sun_path[1]);
+      slen = strnlen(&sockaddr_un->sun_path[1], addrlen - offsetof(struct sockaddr_un, sun_path) - 1);
+    } else {
+      slen = strnlen(sockaddr_un->sun_path, addrlen - offsetof(struct sockaddr_un, sun_path));
+    }
+    host_addrlen = sizeof(struct sockaddr_un);
+    if (host_addrlen < offsetof(struct sockaddr_un, sun_path) + slen) {
+      // Name too long
+      return -1;
+    }
+    break;
+  }
+  case AF_INET:
+    host_addrlen = sizeof(struct sockaddr_in);
+    break;
+  default:
+    fprintf(stderr, "Unimplemented sa_family");
+    return -1;
+  }
 
-  errno = 0;
-  int fd = connect(sockfd, naddr, addrlen);
-  perror("hoge");
+  int fd = connect(sockfd, sockaddr, host_addrlen);
+  free(sockaddr);
   return fd;
 }
 
