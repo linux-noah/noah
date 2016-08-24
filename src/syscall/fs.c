@@ -247,7 +247,7 @@ DEFINE_SYSCALL(rename, gaddr_t, oldpath, gaddr_t, newpath)
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
-  printf("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  PRINTF("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
   return -1;
 }
 
