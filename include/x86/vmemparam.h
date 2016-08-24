@@ -1,4 +1,2 @@
-#define KERN_BASE                        0xffff800000000000ULL
-
-#define CANONICAL_LOWER_END              0x00007fffffffffffULL
-
+#define STACK_SIZE (1 << 21)
+#define STACK_TOP  0x0000007fc0000000ULL
