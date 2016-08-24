@@ -46,6 +46,7 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <sys/select.h>
+#include <sys/poll.h>
 #include <dirent.h>
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
@@ -291,4 +292,9 @@ DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, 
   fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
 
   return select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout);
+}
+
+DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
+{
+  return poll(guest_to_host(fds), nfds, timeout);
 }

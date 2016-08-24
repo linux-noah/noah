@@ -8,7 +8,7 @@
   SYSCALL(4, stat)                              \
   SYSCALL(5, fstat)                             \
   SYSCALL(6, lstat)                             \
-  SYSCALL(7, unimplemented)                     \
+  SYSCALL(7, poll)                              \
   SYSCALL(8, unimplemented)                     \
   SYSCALL(9, mmap)                              \
   SYSCALL(10, mprotect)                         \
