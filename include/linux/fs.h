@@ -155,10 +155,6 @@ struct l_dirent64 {
 /*
  * stat family of syscalls
  */
-struct l_timespec {
-  l_time_t	tv_sec;
-  l_long	tv_nsec;
-};
 
 struct l_newstat {
   l_dev_t		st_dev;

@@ -31,6 +31,7 @@
 #include "noah.h"
 
 #include "linux/common.h"
+#include "linux/time.h"
 #include "linux/fs.h"
 #include "linux/misc.h"
 

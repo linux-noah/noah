@@ -236,7 +236,7 @@
   SYSCALL(232, unimplemented)                   \
   SYSCALL(233, unimplemented)                   \
   SYSCALL(234, unimplemented)                   \
-  SYSCALL(235, unimplemented)                   \
+  SYSCALL(235, utimes)                          \
   SYSCALL(236, unimplemented)                   \
   SYSCALL(237, unimplemented)                   \
   SYSCALL(238, unimplemented)                   \
@@ -281,7 +281,7 @@
   SYSCALL(277, unimplemented)                   \
   SYSCALL(278, unimplemented)                   \
   SYSCALL(279, unimplemented)                   \
-  SYSCALL(280, unimplemented)                   \
+  SYSCALL(280, utimensat)                       \
   SYSCALL(281, unimplemented)                   \
   SYSCALL(282, unimplemented)                   \
   SYSCALL(283, unimplemented)                   \
