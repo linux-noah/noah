@@ -279,9 +279,19 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
   return writev(fd, dst, iovcnt);
 }
 
+DEFINE_SYSCALL(symlink, gaddr_t, path1, gaddr_t, path2)
+{
+  return symlink(guest_to_host(path1), guest_to_host(path2));
+}
+
 DEFINE_SYSCALL(readlink, gaddr_t, pathname, gaddr_t, buf, int, bufsize)
 {
-  return -1;
+  return readlink(guest_to_host(pathname), guest_to_host(buf), bufsize);
+}
+
+DEFINE_SYSCALL(unlink, gaddr_t, pathname)
+{
+  return unlink(guest_to_host(pathname));
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)

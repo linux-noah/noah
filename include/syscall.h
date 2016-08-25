@@ -88,8 +88,8 @@
   SYSCALL(84, rmdir)                            \
   SYSCALL(85, unimplemented)                    \
   SYSCALL(86, unimplemented)                    \
-  SYSCALL(87, unimplemented)                    \
-  SYSCALL(88, unimplemented)                    \
+  SYSCALL(87, unlink)                           \
+  SYSCALL(88, symlink)                          \
   SYSCALL(89, readlink)                         \
   SYSCALL(90, chmod)                            \
   SYSCALL(91, fchmod)                           \
