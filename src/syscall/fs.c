@@ -343,3 +343,13 @@ DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
 {
   return lseek(fildes, offset, whence);
 }
+
+DEFINE_SYSCALL(mkdir, gaddr_t, path, int, mode)
+{
+  return mkdir(guest_to_host(path), mode);
+}
+
+DEFINE_SYSCALL(rmdir, gaddr_t, path)
+{
+  return rmdir(guest_to_host(path));
+}

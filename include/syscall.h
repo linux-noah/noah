@@ -84,8 +84,8 @@
   SYSCALL(80, chdir)                            \
   SYSCALL(81, fchdir)                           \
   SYSCALL(82, rename)                           \
-  SYSCALL(83, unimplemented)                    \
-  SYSCALL(84, unimplemented)                    \
+  SYSCALL(83, mkdir)                            \
+  SYSCALL(84, rmdir)                            \
   SYSCALL(85, unimplemented)                    \
   SYSCALL(86, unimplemented)                    \
   SYSCALL(87, unimplemented)                    \
