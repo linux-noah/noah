@@ -36,10 +36,6 @@
 #define	_AMD64_LINUX_H_
 
 typedef struct {
-  l_int		val[2];
-} l_fsid_t;
-
-typedef struct {
   l_time_t	tv_sec;
   l_suseconds_t	tv_usec;
 } l_timeval;

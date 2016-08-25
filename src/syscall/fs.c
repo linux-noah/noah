@@ -48,6 +48,8 @@
 #include <sys/syscall.h>
 #include <sys/select.h>
 #include <sys/poll.h>
+#include <sys/mount.h>
+#include <sys/syslimits.h>
 #include <dirent.h>
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
@@ -368,4 +370,35 @@ DEFINE_SYSCALL(rmdir, gaddr_t, path)
 DEFINE_SYSCALL(umask, int, mask)
 {
   return umask(mask);
+}
+
+void
+statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs)
+{
+#define HFS_SUPER_MAGIC 0x4244
+  if (!statfs && !l_statfs) {
+    return;
+  }
+
+  l_statfs->f_type = HFS_SUPER_MAGIC;
+  l_statfs->f_bsize = statfs->f_bsize;
+  l_statfs->f_type = statfs->f_type;
+  l_statfs->f_bsize = statfs->f_bsize;
+  l_statfs->f_blocks = statfs->f_blocks;
+  l_statfs->f_bfree = statfs->f_bfree;
+  l_statfs->f_bavail = statfs->f_bavail;
+  l_statfs->f_files = statfs->f_files;
+  l_statfs->f_ffree = statfs->f_ffree;
+  l_statfs->f_fsid.val[0] = statfs->f_fsid.val[0];
+  l_statfs->f_fsid.val[1] = statfs->f_fsid.val[1];
+  l_statfs->f_namelen = NAME_MAX;
+}
+
+DEFINE_SYSCALL(statfs, gaddr_t, path, gaddr_t, buf)
+{
+  struct statfs h_buf;
+  int ret = statfs(guest_to_host(path), &h_buf);
+  statfs_darwin_to_linux(&h_buf, guest_to_host(buf));
+
+  return ret;
 }

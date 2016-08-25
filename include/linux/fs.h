@@ -176,4 +176,21 @@ struct l_newstat {
   l_long		__unused3;
 };
 
+typedef struct {
+  l_int		val[2];
+} l_fsid_t;
+
+struct l_statfs {
+  l_long	f_type;
+  l_long	f_bsize;
+  l_long	f_blocks;
+  l_long	f_bfree;
+  l_long	f_bavail;
+  l_long	f_files;
+  l_long	f_ffree;
+  l_fsid_t	f_fsid;
+  l_long	f_namelen;
+  l_long	f_spare[6];
+};
+
 #endif	/* !_LINUX_FILE_H_ */
