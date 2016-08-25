@@ -9,7 +9,7 @@
   SYSCALL(5, fstat)                             \
   SYSCALL(6, lstat)                             \
   SYSCALL(7, poll)                              \
-  SYSCALL(8, unimplemented)                     \
+  SYSCALL(8, lseek)                             \
   SYSCALL(9, mmap)                              \
   SYSCALL(10, mprotect)                         \
   SYSCALL(11, munmap)                           \

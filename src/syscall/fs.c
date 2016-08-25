@@ -338,3 +338,8 @@ DEFINE_SYSCALL(lchown, gaddr_t, path, int, uid, int, gid)
 {
   return lchown(guest_to_host(path), uid, gid);
 }
+
+DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
+{
+  return lseek(fildes, offset, whence);
+}
