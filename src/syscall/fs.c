@@ -303,3 +303,23 @@ DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
 {
   return poll(guest_to_host(fds), nfds, timeout);
 }
+
+DEFINE_SYSCALL(chdir, gaddr_t, path)
+{
+  return chdir(guest_to_host(path));
+}
+
+DEFINE_SYSCALL(fchdir, int, fd)
+{
+  return fchdir(fd);
+}
+
+DEFINE_SYSCALL(chmod, gaddr_t, path, int, mode)
+{
+  return chmod(guest_to_host(path), mode);
+}
+
+DEFINE_SYSCALL(fchmod, int, fd, int, mode)
+{
+  return fchmod(fd, mode);
+}

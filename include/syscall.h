@@ -81,8 +81,8 @@
   SYSCALL(77, unimplemented)                    \
   SYSCALL(78, getdents)                         \
   SYSCALL(79, getcwd)                           \
-  SYSCALL(80, unimplemented)                    \
-  SYSCALL(81, unimplemented)                    \
+  SYSCALL(80, chdir)                            \
+  SYSCALL(81, fchdir)                           \
   SYSCALL(82, rename)                           \
   SYSCALL(83, unimplemented)                    \
   SYSCALL(84, unimplemented)                    \
@@ -91,8 +91,8 @@
   SYSCALL(87, unimplemented)                    \
   SYSCALL(88, unimplemented)                    \
   SYSCALL(89, readlink)                         \
-  SYSCALL(90, unimplemented)                    \
-  SYSCALL(91, unimplemented)                    \
+  SYSCALL(90, chmod)                            \
+  SYSCALL(91, fchmod)                           \
   SYSCALL(92, unimplemented)                    \
   SYSCALL(93, unimplemented)                    \
   SYSCALL(94, unimplemented)                    \
