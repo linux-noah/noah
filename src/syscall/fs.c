@@ -230,6 +230,11 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
   return pipe(guest_to_host(fildes_ptr));
 }
 
+DEFINE_SYSCALL(dup, unsigned int, fd)
+{
+  return dup(fd);
+}
+
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 {
   return dup2(fd1, fd2);

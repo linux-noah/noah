@@ -33,7 +33,7 @@
   SYSCALL(29, unimplemented)                    \
   SYSCALL(30, unimplemented)                    \
   SYSCALL(31, unimplemented)                    \
-  SYSCALL(32, unimplemented)                    \
+  SYSCALL(32, dup)                              \
   SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, nanosleep)                        \
