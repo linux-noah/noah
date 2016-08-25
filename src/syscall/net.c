@@ -55,7 +55,7 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 }
 
 int
-to_host_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr **sockaddr, size_t l_sockaddr_len)
+to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size_t l_sockaddr_len)
 {
   if (l_sockaddr == NULL) {
     return -1;
@@ -100,10 +100,25 @@ err:
   return -1;
 }
 
+void
+to_linux_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr *sockaddr, socklen_t *l_sockaddr_len)
+{
+  if (sockaddr == NULL || l_sockaddr == NULL || *l_sockaddr_len < sizeof(struct sockaddr)) {
+    return;
+  }
+
+  if ((void*)l_sockaddr != (void*)sockaddr) {
+    memmove(l_sockaddr, sockaddr, MIN(*l_sockaddr_len, sockaddr->sa_len));
+  }
+
+  int family = sockaddr->sa_family;
+  l_sockaddr->sa_family = to_linux_sa_family(family);
+}
+
 DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
 {
   struct sockaddr *sockaddr;
-  if (to_host_sockaddr(guest_to_host(addr), &sockaddr, addrlen) < 0) {
+  if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
     return -1;
   }
 
@@ -187,17 +202,14 @@ DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr
   return sendto(socket, guest_to_host(buf), length, flags, NULL, 0);
 }
 
-DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, address, gaddr_t, addrdress_len)
+DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, addr, gaddr_t, addrlen)
 {
-  struct l_sockaddr *l_sockaddr = guest_to_host(address);
-  socklen_t *sockaddr_len = guest_to_host(addrdress_len);
+  int ret;
+  socklen_t *socklen = guest_to_host(addrlen);
+  struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  int ret = recvfrom(socket, guest_to_host(buf), length, flags, (struct sockaddr*)l_sockaddr, sockaddr_len);
-
-  if (ret >= 0 && l_sockaddr != NULL) {
-    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = to_linux_sa_family(family);
-  }
+  ret = recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen);
+  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
 }
@@ -209,59 +221,50 @@ DEFINE_SYSCALL(listen, int, socket, int, backlog)
 
 DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 {
-  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
-  socklen_t *sockaddrlen = guest_to_host(addrlen);
+  int ret;
+  socklen_t *socklen = guest_to_host(addrlen);
+  struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  int ret = accept(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
-
-  if (ret >= 0 && l_sockaddr != NULL) {
-    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = to_linux_sa_family(family);
-  }
+  ret = accept(sockfd, (void*)sockaddr, socklen);
+  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
 }
 
 DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
 {
-  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
+  int ret;
+  struct sockaddr *sockaddr;
 
-  int ret = bind(sockfd, (struct sockaddr*)l_sockaddr, addrlen);
-
-  if (ret >= 0 && l_sockaddr != NULL) {
-    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = to_linux_sa_family(family);
+  if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
+    return -1;
   }
+  ret = bind(sockfd, sockaddr, addrlen);
 
+  free(sockaddr);
   return ret;
 }
 
 DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 {
-  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
-  socklen_t *sockaddrlen = guest_to_host(addrlen);
+  int ret;
+  socklen_t *socklen = guest_to_host(addrlen);
+  struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  int ret = getsockname(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
-
-  if (ret >= 0 && l_sockaddr != NULL) {
-    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = to_linux_sa_family(family);
-  }
+  ret = getsockname(sockfd, (void*)sockaddr, socklen);
+  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
 }
 
 DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 {
-  struct l_sockaddr *l_sockaddr = guest_to_host(addr);
-  socklen_t *sockaddrlen = guest_to_host(addrlen);
+  int ret;
+  socklen_t *socklen = guest_to_host(addrlen);
+  struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  int ret = getpeername(sockfd, (struct sockaddr*)l_sockaddr, sockaddrlen);
-
-  if (ret >= 0 && l_sockaddr != NULL) {
-    int family = ((struct sockaddr*)l_sockaddr)->sa_family;
-    l_sockaddr->sa_family = to_linux_sa_family(family);
-  }
+  ret = getpeername(sockfd, (void*)sockaddr, socklen);
+  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
 }
