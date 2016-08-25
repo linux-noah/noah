@@ -12,8 +12,6 @@
 int
 do_futex_wake(gaddr_t uaddr, int count)
 {
-  assert(count == INT_MAX);
-
   return 0;
 }
 
