@@ -364,3 +364,8 @@ DEFINE_SYSCALL(rmdir, gaddr_t, path)
 {
   return rmdir(guest_to_host(path));
 }
+
+DEFINE_SYSCALL(umask, int, mask)
+{
+  return umask(mask);
+}

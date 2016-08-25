@@ -96,7 +96,7 @@
   SYSCALL(92, chown)                            \
   SYSCALL(93, fchown)                           \
   SYSCALL(94, lchown)                           \
-  SYSCALL(95, unimplemented)                    \
+  SYSCALL(95, umask)                            \
   SYSCALL(96, gettimeofday)                     \
   SYSCALL(97, getrlimit)                        \
   SYSCALL(98, unimplemented)                    \
