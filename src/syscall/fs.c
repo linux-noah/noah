@@ -323,3 +323,18 @@ DEFINE_SYSCALL(fchmod, int, fd, int, mode)
 {
   return fchmod(fd, mode);
 }
+
+DEFINE_SYSCALL(fchown, int, fildes, int, uid, int, gid)
+{
+  return fchown(fildes, uid, gid);
+}
+
+DEFINE_SYSCALL(chown, gaddr_t, path, int, uid, int, gid)
+{
+  return chown(guest_to_host(path), uid, gid);
+}
+
+DEFINE_SYSCALL(lchown, gaddr_t, path, int, uid, int, gid)
+{
+  return lchown(guest_to_host(path), uid, gid);
+}

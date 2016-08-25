@@ -93,9 +93,9 @@
   SYSCALL(89, readlink)                         \
   SYSCALL(90, chmod)                            \
   SYSCALL(91, fchmod)                           \
-  SYSCALL(92, unimplemented)                    \
-  SYSCALL(93, unimplemented)                    \
-  SYSCALL(94, unimplemented)                    \
+  SYSCALL(92, chown)                            \
+  SYSCALL(93, fchown)                           \
+  SYSCALL(94, lchown)                           \
   SYSCALL(95, unimplemented)                    \
   SYSCALL(96, gettimeofday)                     \
   SYSCALL(97, getrlimit)                        \
