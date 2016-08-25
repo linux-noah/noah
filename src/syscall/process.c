@@ -95,11 +95,17 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
 
 DEFINE_SYSCALL(exit, int, reason)
 {
+  if (task.clear_child_tid) {
+    do_futex_wake(task.clear_child_tid, 1);
+  }
   _exit(reason);
 }
 
 DEFINE_SYSCALL(exit_group, int, reason)
 {
+  if (task.clear_child_tid) {
+    do_futex_wake(task.clear_child_tid, 1);
+  }
   _exit(reason);
 }
 

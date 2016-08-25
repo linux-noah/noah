@@ -37,9 +37,6 @@
 #ifndef _LINUX_FUTEX_H
 #define _LINUX_FUTEX_H
 
-extern LIST_HEAD(futex_list, futex) futex_list;
-extern struct mtx futex_mtx;
-
 #define LINUX_FUTEX_WAIT		 0
 #define LINUX_FUTEX_WAKE		 1
 #define LINUX_FUTEX_FD			 2	/* unused */
@@ -56,6 +53,8 @@ extern struct mtx futex_mtx;
 
 #define LINUX_FUTEX_PRIVATE_FLAG	128
 #define LINUX_FUTEX_CLOCK_REALTIME	256
+
+#define LINUX_FUTEX_CMD_MASK (128 - 1)
 
 #define FUTEX_OP_SET            0	/* *(int *)UADDR2 = OPARG; */
 #define FUTEX_OP_ADD            1	/* *(int *)UADDR2 += OPARG; */

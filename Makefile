@@ -14,7 +14,8 @@ SRCS := \
 	src/syscall/signal.c\
 	src/syscall/time.c\
 	src/syscall/sys.c\
-	src/syscall/net.c
+	src/syscall/net.c\
+	src/syscall/futex.c
 
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib test_fork)\

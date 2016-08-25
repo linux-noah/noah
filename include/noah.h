@@ -54,6 +54,7 @@ extern struct task task;
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
 int do_open(const char *path, int flags, int mode);
+int do_futex_wake(gaddr_t uaddr, int count);
 
 
 #define LINUX_RELEASE "4.6.4"
