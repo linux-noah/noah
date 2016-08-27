@@ -93,6 +93,11 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   return getrlimit(resource, l_rl);
 }
 
+DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
+{
+  return 0;
+}
+
 DEFINE_SYSCALL(exit, int, reason)
 {
   if (task.clear_child_tid) {
