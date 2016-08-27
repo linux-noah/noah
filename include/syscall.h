@@ -59,7 +59,7 @@
   SYSCALL(55, getsockopt)                       \
   SYSCALL(56, clone)                            \
   SYSCALL(57, fork)                             \
-  SYSCALL(58, unimplemented)                    \
+  SYSCALL(58, vfork)                            \
   SYSCALL(59, execve)                           \
   SYSCALL(60, exit)                             \
   SYSCALL(61, wait4)                            \

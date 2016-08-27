@@ -68,3 +68,8 @@ DEFINE_SYSCALL(fork)
 {
   return do_fork(LINUX_SIGCHLD, 0, 0, 0);
 }
+
+DEFINE_SYSCALL(vfork)
+{
+  return do_fork(LINUX_SIGCHLD, 0, 0, 0); /* FIXME */
+}
