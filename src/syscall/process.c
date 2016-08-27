@@ -163,7 +163,7 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
     }
     return 0;
   default:
-    return -1;
+    return -LINUX_EPERM;
   }
 }
 

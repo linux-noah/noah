@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include "linux/errno.h"
 
 DEFINE_SYSCALL(unimplemented)
 {
@@ -32,4 +33,17 @@ char *sc_name_table[NR_SYSCALLS] = {
 #define SYSCALL(n, name) [n] = #name,
   SYSCALLS
 #undef SYSCALL
+};
+
+
+int to_linux_errno(int errno) {
+#define COMMON(errno_name, val) if (errno == val) return errno_name;
+#define DARWIN(errno_name, val) if (errno == errno_name) return val;
+#define LINUX(errno, val) 
+  LINUX_ERRNOS
+  DARWIN_ADDITION
+#undef COMMON
+#undef LINUX
+#undef DARWIN
+  return EAGAIN; // Never happen
 };

@@ -1,139 +1,164 @@
 #ifndef NOAH_LINUX_ERRNO_H
 #define NOAH_LINUX_ERRNO_H
 
-#define LINUX_EPERM           1
-#define LINUX_ENOENT          2
-#define LINUX_ESRCH           3
-#define LINUX_EINTR           4
-#define LINUX_EIO             5
-#define LINUX_ENXIO           6
-#define LINUX_E2BIG           7
-#define LINUX_ENOEXEC         8
-#define LINUX_EBADF           9
-#define LINUX_ECHILD          10
-#define LINUX_EAGAIN          11
-#define LINUX_ENOMEM          12
-#define LINUX_EACCES          13
-#define LINUX_EFAULT          14
-#define LINUX_ENOTBLK         15
-#define LINUX_EBUSY           16
-#define LINUX_EEXIST          17
-#define LINUX_EXDEV           18
-#define LINUX_ENODEV          19
-#define LINUX_ENOTDIR         20
-#define LINUX_EISDIR          21
-#define LINUX_EINVAL          22
-#define LINUX_ENFILE          23
-#define LINUX_EMFILE          24
-#define LINUX_ENOTTY          25
-#define LINUX_ETXTBSY         26
-#define LINUX_EFBIG           27
-#define LINUX_ENOSPC          28
-#define LINUX_ESPIPE          29
-#define LINUX_EROFS           30
-#define LINUX_EMLINK          31
-#define LINUX_EPIPE           32
-#define LINUX_EDOM            33
-#define LINUX_ERANGE          34
-#define LINUX_EDEADLK         35
-#define LINUX_ENAMETOOLONG    36
-#define LINUX_ENOLCK          37
-#define LINUX_ENOSYS          38
-#define LINUX_ENOTEMPTY       39
-#define LINUX_ELOOP           40
-#define LINUX_EWOULDBLOCK     LINUX_EAGAIN
-#define LINUX_ENOMSG          42
-#define LINUX_EIDRM           43
-#define LINUX_ECHRNG          44
-#define LINUX_EL2NSYNC        45
-#define LINUX_EL3HLT          46
-#define LINUX_EL3RST          47
-#define LINUX_ELNRNG          48
-#define LINUX_EUNATCH         49
-#define LINUX_ENOCSI          50
-#define LINUX_EL2HLT          51
-#define LINUX_EBADE           52
-#define LINUX_EBADR           53
-#define LINUX_EXFULL          54
-#define LINUX_ENOANO          55
-#define LINUX_EBADRQC         56
-#define LINUX_EBADSLT         57
-#define LINUX_EDEADLOCK       LINUX_EDEADLK
-#define LINUX_EBFONT          59
-#define LINUX_ENOSTR          60
-#define LINUX_ENODATA         61
-#define LINUX_ETIME           62
-#define LINUX_ENOSR           63
-#define LINUX_ENONET          64
-#define LINUX_ENOPKG          65
-#define LINUX_EREMOTE         66
-#define LINUX_ENOLINK         67
-#define LINUX_EADV            68
-#define LINUX_ESRMNT          69
-#define LINUX_ECOMM           70
-#define LINUX_EPROTO          71
-#define LINUX_EMULTIHOP       72
-#define LINUX_EDOTDOT         73
-#define LINUX_EBADMSG         74
-#define LINUX_EOVERFLOW       75
-#define LINUX_ENOTUNIQ        76
-#define LINUX_EBADFD          77
-#define LINUX_EREMCHG         78
-#define LINUX_ELIBACC         79
-#define LINUX_ELIBBAD         80
-#define LINUX_ELIBSCN         81
-#define LINUX_ELIBMAX         82
-#define LINUX_ELIBEXEC        83
-#define LINUX_EILSEQ          84
-#define LINUX_ERESTART        85
-#define LINUX_ESTRPIPE        86
-#define LINUX_EUSERS          87
-#define LINUX_ENOTSOCK        88
-#define LINUX_EDESTADDRREQ    89
-#define LINUX_EMSGSIZE        90
-#define LINUX_EPROTOTYPE      91
-#define LINUX_ENOPROTOOPT     92
-#define LINUX_EPROTONOSUPPORT 93
-#define LINUX_ESOCKTNOSUPPORT 94
-#define LINUX_EOPNOTSUPP      95
-#define LINUX_ENOTSUP         LINUX_EOPNOTSUPP
-#define LINUX_EPFNOSUPPORT    96
-#define LINUX_EAFNOSUPPORT    97
-#define LINUX_EADDRINUSE      98
-#define LINUX_EADDRNOTAVAIL   99
-#define LINUX_ENETDOWN        100
-#define LINUX_ENETUNREACH     101
-#define LINUX_ENETRESET       102
-#define LINUX_ECONNABORTED    103
-#define LINUX_ECONNRESET      104
-#define LINUX_ENOBUFS         105
-#define LINUX_EISCONN         106
-#define LINUX_ENOTCONN        107
-#define LINUX_ESHUTDOWN       108
-#define LINUX_ETOOMANYREFS    109
-#define LINUX_ETIMEDOUT       110
-#define LINUX_ECONNREFUSED    111
-#define LINUX_EHOSTDOWN       112
-#define LINUX_EHOSTUNREACH    113
-#define LINUX_EALREADY        114
-#define LINUX_EINPROGRESS     115
-#define LINUX_ESTALE          116
-#define LINUX_EUCLEAN         117
-#define LINUX_ENOTNAM         118
-#define LINUX_ENAVAIL         119
-#define LINUX_EISNAM          120
-#define LINUX_EREMOTEIO       121
-#define LINUX_EDQUOT          122
-#define LINUX_ENOMEDIUM       123
-#define LINUX_EMEDIUMTYPE     124
-#define LINUX_ECANCELED       125
-#define LINUX_ENOKEY          126
-#define LINUX_EKEYEXPIRED     127
-#define LINUX_EKEYREVOKED     128
-#define LINUX_EKEYREJECTED    129
-#define LINUX_EOWNERDEAD      130
-#define LINUX_ENOTRECOVERABLE 131
-#define LINUX_ERFKILL         132
-#define LINUX_EHWPOISON       133
+#include <errno.h>
+
+#define LINUX_ERRNOS \
+  COMMON( EPERM,		1)			\
+  COMMON( ENOENT,		2)			\
+  COMMON( ESRCH,		3)			\
+  COMMON( EINTR,		4)			\
+  COMMON( EIO,			5)			\
+  COMMON( ENXIO,		6)			\
+  COMMON( E2BIG,		7)			\
+  COMMON( ENOEXEC,		8)			\
+  COMMON( EBADF,		9)			\
+  COMMON( ECHILD,		10)			\
+  COMMON( EAGAIN,		11)			\
+  COMMON( ENOMEM,		12)			\
+  COMMON( EACCES,		13)			\
+  COMMON( EFAULT,		14)			\
+  COMMON( ENOTBLK,		15)			\
+  COMMON( EBUSY,		16)			\
+  COMMON( EEXIST,		17)			\
+  COMMON( EXDEV,		18)			\
+  COMMON( ENODEV,		19)			\
+  COMMON( ENOTDIR,		20)			\
+  COMMON( EISDIR,		21)			\
+  COMMON( EINVAL,		22)			\
+  COMMON( ENFILE,		23)			\
+  COMMON( EMFILE,		24)			\
+  COMMON( ENOTTY,		25)			\
+  COMMON( ETXTBSY,		26)			\
+  COMMON( EFBIG,		27)			\
+  COMMON( ENOSPC,		28)			\
+  COMMON( ESPIPE,		29)			\
+  COMMON( EROFS,		30)			\
+  COMMON( EMLINK,		31)			\
+  COMMON( EPIPE,		32)			\
+  COMMON( EDOM,			33)			\
+  COMMON( ERANGE,		34)			\
+  COMMON( EDEADLK,		35)			\
+  COMMON( ENAMETOOLONG,		36)			\
+  COMMON( ENOLCK,		37)			\
+  COMMON( ENOSYS,		38)			\
+  COMMON( ENOTEMPTY,		39)			\
+  COMMON( ELOOP,		40)			\
+  COMMON( EWOULDBLOCK,    	LINUX_EAGAIN)		\
+  COMMON( ENOMSG,		42)			\
+  COMMON( EIDRM,		43)			\
+  LINUX ( ECHRNG,		44)			\
+  LINUX ( EL2NSYNC,		45)			\
+  LINUX ( EL3HLT,		46)			\
+  LINUX ( EL3RST,		47)			\
+  LINUX ( ELNRNG,		48)			\
+  LINUX ( EUNATCH,		49)			\
+  LINUX ( ENOCSI,		50)			\
+  LINUX ( EL2HLT,		51)			\
+  LINUX ( EBADE,		52)			\
+  LINUX ( EBADR,		53)			\
+  LINUX ( EXFULL,		54)			\
+  LINUX ( ENOANO,		55)			\
+  LINUX ( EBADRQC,		56)			\
+  LINUX ( EBADSLT,		57)			\
+  LINUX ( EDEADLOCK,		LINUX_EDEADLK)		\
+  LINUX ( EBFONT,		59)			\
+  COMMON( ENOSTR,		60)			\
+  COMMON( ENODATA,		61)			\
+  COMMON( ETIME,		62)			\
+  COMMON( ENOSR,		63)			\
+  LINUX ( ENONET,		64)			\
+  LINUX ( ENOPKG,		65)			\
+  COMMON( EREMOTE,		66)			\
+  COMMON( ENOLINK,		67)			\
+  LINUX ( EADV,			68)			\
+  LINUX ( ESRMNT,		69)			\
+  LINUX ( ECOMM,		70)			\
+  COMMON( EPROTO,		71)			\
+  COMMON( EMULTIHOP,		72)			\
+  LINUX ( EDOTDOT,		73)			\
+  COMMON( EBADMSG,		74)			\
+  COMMON( EOVERFLOW,		75)			\
+  LINUX ( ENOTUNIQ,		76)			\
+  LINUX ( EBADFD,		77)			\
+  LINUX ( EREMCHG,		78)			\
+  LINUX ( ELIBACC,		79)			\
+  LINUX ( ELIBBAD,		80)			\
+  LINUX ( ELIBSCN,		81)			\
+  LINUX ( ELIBMAX,		82)			\
+  LINUX ( ELIBEXEC,		83)			\
+  COMMON( EILSEQ,		84)			\
+  LINUX ( ERESTART,		85)			\
+  LINUX ( ESTRPIPE,		86)			\
+  COMMON( EUSERS,		87)			\
+  COMMON( ENOTSOCK,		88)			\
+  COMMON( EDESTADDRREQ,		89)			\
+  COMMON( EMSGSIZE,		90)			\
+  COMMON( EPROTOTYPE,		91)			\
+  COMMON( ENOPROTOOPT,		92)			\
+  COMMON( EPROTONOSUPPORT,	93)			\
+  COMMON( ESOCKTNOSUPPORT,	94)			\
+  COMMON( EOPNOTSUPP,		95)			\
+  COMMON( ENOTSUP,		LINUX_EOPNOTSUPP)	\
+  COMMON( EPFNOSUPPORT,		96)			\
+  COMMON( EAFNOSUPPORT,		97)			\
+  COMMON( EADDRINUSE,		98)			\
+  COMMON( EADDRNOTAVAIL,	99)			\
+  COMMON( ENETDOWN,		100)			\
+  COMMON( ENETUNREACH,		101)			\
+  COMMON( ENETRESET,		102)			\
+  COMMON( ECONNABORTED,		103)			\
+  COMMON( ECONNRESET,		104)			\
+  COMMON( ENOBUFS,		105)			\
+  COMMON( EISCONN,		106)			\
+  COMMON( ENOTCONN,		107)			\
+  COMMON( ESHUTDOWN,		108)			\
+  COMMON( ETOOMANYREFS,		109)			\
+  COMMON( ETIMEDOUT,		110)			\
+  COMMON( ECONNREFUSED,		111)			\
+  COMMON( EHOSTDOWN,		112)			\
+  COMMON( EHOSTUNREACH,		113)			\
+  COMMON( EALREADY,		114)			\
+  COMMON( EINPROGRESS,		115)			\
+  COMMON( ESTALE,		116)			\
+  LINUX ( EUCLEAN,		117)			\
+  LINUX ( ENOTNAM,		118)			\
+  LINUX ( ENAVAIL,		119)			\
+  LINUX ( EISNAM,		120)			\
+  LINUX ( EREMOTEIO,		121)			\
+  COMMON( EDQUOT,		122)			\
+  LINUX ( ENOMEDIUM,		123)			\
+  LINUX ( EMEDIUMTYPE,		124)			\
+  COMMON( ECANCELED,		125)			\
+  LINUX ( ENOKEY,		126)			\
+  LINUX ( EKEYEXPIRED,		127)			\
+  LINUX ( EKEYREVOKED,		128)			\
+  LINUX ( EKEYREJECTED,		129)			\
+  COMMON( EOWNERDEAD,		130)			\
+  COMMON( ENOTRECOVERABLE,	131)			\
+  LINUX ( ERFKILL,		132)			\
+  LINUX ( EHWPOISON,		133)			\
+
+#define DARWIN_ADDITION \
+  DARWIN( EFTYPE,	LINUX_EPERM)			\
+  DARWIN( EAUTH,	LINUX_EPERM)			\
+  DARWIN( ENEEDAUTH,	LINUX_EPERM)			\
+  DARWIN( EBADEXEC,	LINUX_ENOEXEC)			\
+  DARWIN( EBADARCH,	LINUX_ENOEXEC)			\
+  DARWIN( EBADMACHO,	LINUX_ENOEXEC)			\
+  DARWIN( ENOATTR,	LINUX_ENODATA)			\
+  DARWIN( ENOPOLICY,	LINUX_EPERM)			\
+  DARWIN( EBADRPC,	LINUX_EPERM)			\
+
+
+#define COMMON(errno_name, val) LINUX_ ## errno_name = (val),
+#define LINUX(errno_name, val) COMMON(errno_name, val)
+enum l_errno {
+  LINUX_ERRNOS
+};
+#undef COMMON
+#undef LINUX
+
+int darwin_to_linux_errno(int eval);
 
 #endif
