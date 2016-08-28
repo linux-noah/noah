@@ -446,6 +446,19 @@ print_regs()
   PRINTF("\trbp = 0x%llx\n", value);
 }
 
+void
+dump_instr()
+{
+  uint64_t instlen, rip;
+  hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+  hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
+  PRINTF("len: %d, instruction: ", instlen);
+  for (int i = 0; i < instlen; i ++) {
+    PRINTF("%02x ", *((uchar*)guest_to_host(rip) + i));
+  }
+  PRINTF("\n");
+}
+
 struct vm_snapshot {
   uint64_t vcpu_reg[NR_X86_REG_LIST];
   uint64_t vmcs[NR_VMCS_FIELD];

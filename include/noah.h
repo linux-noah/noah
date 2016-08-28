@@ -2,6 +2,7 @@
 #define NOAH_H
 
 #include <stdint.h>
+#include <unistd.h>
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
@@ -87,13 +88,14 @@ int do_futex_wake(gaddr_t uaddr, int count);
 /* debug */
 
 #if DEBUG_MODE
-#define PUTS(...) puts(__VA_ARGS__)
-#define PRINTF(...) printf(__VA_ARGS__)
+#define PUTS(...) do {puts(__VA_ARGS__);fflush(stdout);} while(0)
+#define PRINTF(...) do {printf(__VA_ARGS__);fflush(stdout);} while(0)
 #else
 #define PUTS(...) 0
 #define PRINTF(...) 0
 #endif
 
 void print_regs(void);
+void dump_instr(void);
 
 #endif

@@ -18,12 +18,7 @@ main_loop()
       return;
     }
 
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_RIP, &value);
-    PRINTF("\tguest-rip = 0x%llx\n", value);
-
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &value);
-    PRINTF("\tinstr length = 0x%llx\n", value);
-
+    dump_instr();
     print_regs();
 
     uint64_t exit_reason;
@@ -38,24 +33,30 @@ main_loop()
       break;
 
     case VMX_REASON_EXC_NMI: {
+      uint64_t instlen, rip, idtvec, idterr, intstatus, exit_qual;
       uint64_t retval;
 
       PUTS("reason: exc or nmi");
       PUTS("");
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &value);
-      PRINTF("idt info = %lld\n", value);
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &value);
-      PRINTF("idt error = %lld\n", value);
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &value);
-      PRINTF("guest int status = %lld\n", value);
-      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &value);
-      PRINTF("exit qualification = 0x%llx\n", value);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+      PRINTF("instr length = 0x%llx\n", instlen);
+      hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
+      PRINTF("rip = 0x%llx\n", rip);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &idtvec);
+      PRINTF("idt info = %lld\n", idtvec);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &idterr);
+      PRINTF("idt error = %lld\n", idterr);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &intstatus);
+      PRINTF("guest int status = %lld\n", intstatus);
+      hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &exit_qual);
+      PRINTF("exit qualification = 0x%llx\n", exit_qual);
+
       PUTS("!!MAYBE A SYSENTER!!");
 
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
 
       if (rax >= NR_SYSCALLS) {
-        printf("unknown system call: %llu\n", rax);
+        printf("unknown system call: %lld\n", rax);
         exit(1);
       }
 
@@ -66,9 +67,9 @@ main_loop()
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
 
-      PRINTF(">>>start syscall handling...: %s (%llu)\n", sc_name_table[rax], rax);
+      PRINTF(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
       retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      PRINTF("<<<done: %llu\n", retval);
+      PRINTF("<<<syscall done: %lld\n", retval);
 
       hv_vcpu_write_register(vcpuid, HV_X86_RAX, retval);
 
@@ -119,7 +120,7 @@ main_loop()
     }
 
     default:
-      PRINTF("reason: %lld\n", exit_reason);
+      PRINTF("other reason: %llu\n", exit_reason);
     }
 
 #if DEBUG_MODE
