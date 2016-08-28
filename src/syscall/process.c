@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <pthread.h>
 
 #include "common.h"
@@ -179,4 +180,39 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage
   struct rusage *rusage = (struct rusage*)guest_to_host(grusage);
 
   return wait4(pid, status, options, rusage);
+}
+
+static void
+darwin_to_linux_rusage(struct rusage *ru, struct l_rusage *lru)
+{
+  lru->ru_utime.tv_sec = ru->ru_utime.tv_sec;
+  lru->ru_utime.tv_usec = ru->ru_utime.tv_usec;
+  lru->ru_stime.tv_sec = ru->ru_stime.tv_sec;
+  lru->ru_stime.tv_usec = ru->ru_stime.tv_usec;
+  lru->ru_maxrss = ru->ru_maxrss;
+  lru->ru_ixrss = ru->ru_ixrss;
+  lru->ru_idrss = ru->ru_idrss;
+  lru->ru_isrss = ru->ru_isrss;
+  lru->ru_minflt = ru->ru_minflt;
+  lru->ru_majflt = ru->ru_majflt;
+  lru->ru_nswap = ru->ru_nswap;
+  lru->ru_inblock = ru->ru_inblock;
+  lru->ru_oublock = ru->ru_oublock;
+  lru->ru_msgsnd = ru->ru_msgsnd;
+  lru->ru_msgrcv = ru->ru_msgrcv;
+  lru->ru_nsignals = ru->ru_nsignals;
+  lru->ru_nvcsw = ru->ru_nvcsw;
+  lru->ru_nivcsw = ru->ru_nivcsw;
+}
+
+DEFINE_SYSCALL(getrusage, int, who, gaddr_t, rusage)
+{
+  struct rusage h_rusage;
+  if (getrusage(who, &h_rusage) < 0) {
+    return darwin_to_linux_errno(errno);
+  }
+
+  darwin_to_linux_rusage(&h_rusage, guest_to_host(rusage));
+
+  return 0;
 }

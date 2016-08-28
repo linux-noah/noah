@@ -84,6 +84,25 @@ struct l_rlimit {
   l_ulong		rlim_max;
 };
 
+struct l_rusage {
+  l_timeval	ru_utime;
+  l_timeval	ru_stime;
+  l_long	ru_maxrss;
+  l_long	ru_ixrss;
+  l_long	ru_idrss;
+  l_long	ru_isrss;
+  l_long	ru_minflt;
+  l_long	ru_majflt;
+  l_long	ru_nswap;
+  l_long	ru_inblock;
+  l_long	ru_oublock;
+  l_long	ru_msgsnd;
+  l_long	ru_msgrcv;
+  l_long	ru_nsignals;
+  l_long	ru_nvcsw;
+  l_long	ru_nivcsw;
+} __attribute__ ((packed));
+
 /*
  * poll()
  */

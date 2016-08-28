@@ -99,7 +99,7 @@
   SYSCALL(95, umask)                            \
   SYSCALL(96, gettimeofday)                     \
   SYSCALL(97, getrlimit)                        \
-  SYSCALL(98, unimplemented)                    \
+  SYSCALL(98, getrusage)                        \
   SYSCALL(99, sysinfo)                          \
   SYSCALL(100, unimplemented)                   \
   SYSCALL(101, unimplemented)                   \
