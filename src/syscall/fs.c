@@ -91,11 +91,7 @@ char*
 to_host_path(const char *path)
 {
   if (path[0] == '/') {
-    char *mnt_path = cat_linux_mnt(path);
-    if (access(mnt_path, F_OK) == 0) {
-      return mnt_path;
-    }
-    free(mnt_path);
+    return cat_linux_mnt(path);
   }
   return strdup(path);
 }
