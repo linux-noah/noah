@@ -6,6 +6,7 @@
 #include "noah.h"
 #include "syscall.h"
 
+
 void
 main_loop()
 {
@@ -51,6 +52,22 @@ main_loop()
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &exit_qual);
       PRINTF("exit qualification = 0x%llx\n", exit_qual);
 
+      // FIXME
+      // Exception
+      const ushort syscall_op = 0x0f05;
+      if (instlen != 2 && (*(ushort*)guest_to_host(rip)) != syscall_op) {
+        if (exit_qual != 0) { // Page Fault
+          fprintf(stderr, "page fault: %llx\n", exit_qual);
+          exit(1);
+        }
+
+        // Exception such as #P
+        PRINTF("!!MAYBE AN Ignorable Exception!!\n");
+        hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, instlen + rip);
+        continue;
+      }
+
+      // Syscall
       PUTS("!!MAYBE A SYSENTER!!");
 
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
