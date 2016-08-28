@@ -1,11 +1,14 @@
 typedef unsigned uint;
 
 struct gate_desc {
-  uint offset_low : 8;
-  uint selector : 8;
-  uint zero0 : 4;
-  uint type : 4;
-  uint offset_middle : 8;
-  uint offset_high : 16;
-  uint zero1 : 16;
-};
+  uint64_t offset_low:16;
+  uint64_t selector:16;
+  uint64_t ist:3;
+  uint64_t zero0:5;
+  uint64_t type:4;
+  uint64_t zero1:3;
+  uint64_t dpl:2;
+  uint64_t p:1;
+  uint64_t offset_high:48;
+  uint64_t zero2:32;
+} __attribute__ ((packed));
