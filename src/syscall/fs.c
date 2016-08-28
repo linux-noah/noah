@@ -455,7 +455,10 @@ DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
 
 DEFINE_SYSCALL(mkdir, gaddr_t, path, int, mode)
 {
-  return mkdir(guest_to_host(path), mode);
+  char *host_path = to_host_path(guest_to_host(path));
+  int ret = mkdir(host_path, mode);
+  free(host_path);
+  return ret;
 }
 
 DEFINE_SYSCALL(rmdir, gaddr_t, path)
