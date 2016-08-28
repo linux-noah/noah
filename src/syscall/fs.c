@@ -34,6 +34,7 @@
 #include "linux/time.h"
 #include "linux/fs.h"
 #include "linux/misc.h"
+#include "linux/errno.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -116,7 +117,11 @@ do_open(const char *path, int l_flags, int mode)
 
 DEFINE_SYSCALL(open, gaddr_t, path, int, flags, int, mode)
 {
-  return do_open(guest_to_host(path), flags, mode);
+  int ret = do_open(guest_to_host(path), flags, mode);
+  if (ret < 0) {
+    ret = -darwin_to_linux_errno(errno);
+  }
+  return ret;
 }
 
 DEFINE_SYSCALL(close, int, fd)
@@ -152,8 +157,10 @@ DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
   struct stat d_st;
 
   int ret = stat(l_path, &d_st);
-  if (ret < 0)
+  if (ret < 0) {
+    ret = -darwin_to_linux_errno(errno);
     return ret;
+  }
 
   stat_darwin_to_linux(&d_st, l_st);
 
@@ -181,8 +188,10 @@ DEFINE_SYSCALL(lstat, gaddr_t, path, gaddr_t, st)
   struct stat d_st;
 
   int ret = lstat(l_path, &d_st);
-  if (ret < 0)
+  if (ret < 0) {
+    ret = -darwin_to_linux_errno(errno);
     return ret;
+  }
 
   stat_darwin_to_linux(&d_st, l_st);
 
@@ -191,7 +200,11 @@ DEFINE_SYSCALL(lstat, gaddr_t, path, gaddr_t, st)
 
 DEFINE_SYSCALL(access, gaddr_t, path, int, mode)
 {
-  return access(guest_to_host(path), mode);
+  int ret = access(guest_to_host(path), mode);
+  if (ret < 0) {
+    ret = -darwin_to_linux_errno(errno);
+  }
+  return ret;
 }
 
 DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
@@ -400,5 +413,8 @@ DEFINE_SYSCALL(statfs, gaddr_t, path, gaddr_t, buf)
   int ret = statfs(guest_to_host(path), &h_buf);
   statfs_darwin_to_linux(&h_buf, guest_to_host(buf));
 
+  if (ret < 0) {
+    ret = -darwin_to_linux_errno(errno);
+  }
   return ret;
 }
