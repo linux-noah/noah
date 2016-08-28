@@ -35,6 +35,10 @@
   DEFINE_SCFUNCT(name, __VA_ARGS__)
 
 
+/*
+ *  Constant conversion macros.
+ */
+
 #define _CMAP_BIDR_darwin_to_linux(linux, darwin) case darwin: return (linux);
 #define _CMAP_BIDR_linux_to_darwin(linux, darwin) case linux: return (darwin);
 #define _CMAP_LTOR_darwin_to_linux(linux, darwin) 
@@ -42,11 +46,11 @@
 #define _CMAP_RTOL_darwin_to_linux(linux, darwin) case darwin: return (linux);
 #define _CMAP_RTOL_linux_to_darwin(linux, darwin) 
 
-#define CONST_MAP_BIDR(direction, linux, darwin) _CMAP_BIDR_ ## direction (linux, darwin)
-#define CONST_MAP_LTOR(direction, linux, darwin) _CMAP_LTOR_ ## direction (linux, darwin)
-#define CONST_MAP_RTOL(direction, linux, darwin) _CMAP_RTOL_ ## direction (linux, darwin)
+#define CMAP_BIDR(direction, linux, darwin) _CMAP_BIDR_ ## direction (linux, darwin)
+#define CMAP_LTOD(direction, linux, darwin) _CMAP_LTOR_ ## direction (linux, darwin)
+#define CMAP_DTOL(direction, linux, darwin) _CMAP_RTOL_ ## direction (linux, darwin)
 
-#define DECLARE_MAP_FUNC(direction, const_id, const_list)  \
+#define DECLARE_CMAP_FUNC(direction, const_id, const_list)  \
   static inline int direction ## _ ## const_id (int val) {  \
     switch (val) {                                         \
       const_list(direction)                                \
