@@ -454,6 +454,9 @@ DEFINE_SYSCALL(mkdir, gaddr_t, path, int, mode)
   char *host_path = to_host_path(guest_to_host(path));
   int ret = mkdir(host_path, mode);
   free(host_path);
+  if (ret < 0) {
+    return -darwin_to_linux_errno(errno);
+  }
   return ret;
 }
 
