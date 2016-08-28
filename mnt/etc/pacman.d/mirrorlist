@@ -1,0 +1,6 @@
+Server = http://ftp.tsukuba.wide.ad.jp/Linux/archlinux/$repo/os/$arch
+Server = http://ftp.jaist.ac.jp/pub/Linux/ArchLinux/$repo/os/$arch
+Server = http://mirror.premi.st/archlinux/$repo/os/$arch
+Server = http://shadow.ind.ntou.edu.tw/archlinux/$repo/os/$arch
+Server = http://archlinux.cs.nctu.edu.tw/$repo/os/$arch
+Server = http://arch-mirror.wtako.net/$repo/os/$arch
