@@ -174,6 +174,11 @@ DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
   return 0;
 }
 
+DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
+{
+  return 0;
+}
+
 DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage)
 {
   int *status = (int*)guest_to_host(gstatus);

@@ -274,7 +274,7 @@
   SYSCALL(270, unimplemented)                   \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
-  SYSCALL(273, unimplemented)                   \
+  SYSCALL(273, set_robust_list)                 \
   SYSCALL(274, unimplemented)                   \
   SYSCALL(275, unimplemented)                   \
   SYSCALL(276, unimplemented)                   \
