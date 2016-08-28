@@ -15,43 +15,13 @@
 #include "linux/socket.h"
 #include "linux/misc.h"
 
-int
-to_host_sa_family(int family)
-{
-  switch (family) {
-  case LINUX_AF_UNIX:
-    return AF_UNIX;
-  case LINUX_AF_INET:
-    return AF_INET;
-  case LINUX_AF_INET6:
-    return AF_INET6;
-  default:
-    return -1;
-  }
-}
-
-int
-to_linux_sa_family(int family)
-{
-  switch (family) {
-  case AF_UNIX:
-    return LINUX_AF_UNIX;
-  case AF_INET:
-    return LINUX_AF_INET;
-  case AF_INET6:
-    return LINUX_AF_INET6;
-  default:
-    return -1;
-  }
-}
-
 DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
   /* FIXME */
   type &= ~LINUX_SOCK_NONBLOCK;
   type &= ~LINUX_SOCK_CLOEXEC;
 
-  return socket(to_host_sa_family(family), type, protocol);
+  return socket(linux_to_darwin_sa_family(family), type, protocol);
 }
 
 int
@@ -67,7 +37,7 @@ to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size
   assert(offsetof(struct sockaddr, sa_data) == offsetof(struct l_sockaddr, sa_data));
   (*sockaddr)->sa_family = l_sockaddr->sa_family;
 
-  switch (to_host_sa_family(l_sockaddr->sa_family)) {
+  switch (linux_to_darwin_sa_family(l_sockaddr->sa_family)) {
   case AF_UNIX: {
     int slen;
     struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)*sockaddr;
@@ -112,7 +82,7 @@ to_linux_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr *sockaddr, sock
   }
 
   int family = sockaddr->sa_family;
-  l_sockaddr->sa_family = to_linux_sa_family(family);
+  l_sockaddr->sa_family = darwin_to_linux_sa_family(family);
 }
 
 DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)

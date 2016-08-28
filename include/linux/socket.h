@@ -214,6 +214,18 @@ struct l_cmsghdr {
 #define	LINUX_AF_APPLETALK	5
 #define	LINUX_AF_INET6		10
 
+#define AF_MAP(_) \
+  CONST_MAP_BIDR(_, LINUX_AF_UNSPEC,       AF_UNSPEC)     \
+  CONST_MAP_BIDR(_, LINUX_AF_UNIX,         AF_UNIX)       \
+  CONST_MAP_BIDR(_, LINUX_AF_INET,         AF_INET)       \
+  CONST_MAP_BIDR(_, LINUX_AF_IPX,          AF_IPX)        \
+  CONST_MAP_BIDR(_, LINUX_AF_APPLETALK,    AF_APPLETALK)  \
+  CONST_MAP_BIDR(_, LINUX_AF_INET6,        AF_INET6)      \
+
+DECLARE_MAP_FUNC(darwin_to_linux, sa_family, AF_MAP);
+DECLARE_MAP_FUNC(linux_to_darwin, sa_family, AF_MAP);
+
+
 /* Supported socket types */
 
 #define	LINUX_SOCK_STREAM	1
