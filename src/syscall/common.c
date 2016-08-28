@@ -34,16 +34,3 @@ char *sc_name_table[NR_SYSCALLS] = {
   SYSCALLS
 #undef SYSCALL
 };
-
-
-int darwin_to_linux_errno(int darwin_errno) {
-#define COMMON(errno_name, val) if (darwin_errno == errno_name) return LINUX_ ## errno_name;
-#define DARWIN(errno_name, val) if (darwin_errno == errno_name) return val;
-#define LINUX(errno_name, val) 
-  LINUX_ERRNOS
-  DARWIN_ADDITION
-#undef COMMON
-#undef LINUX
-#undef DARWIN
-  return -1; // Never happen
-};
