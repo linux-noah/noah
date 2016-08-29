@@ -13,6 +13,8 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <mach/clock.h>
+#include <mach/mach.h>
 
 DEFINE_SYSCALL(time, gaddr_t, tloc_ptr)
 {
@@ -48,4 +50,21 @@ DEFINE_SYSCALL(utimensat, gaddr_t, filename, gaddr_t, timevals)
   *l_times[1]= (struct l_timespec){times[1].tv_sec, 0};
 
   return ret;
+}
+
+DEFINE_SYSCALL(clock_gettime, l_clockid_t, id, gaddr_t, spec)
+{
+  struct timespec *l_ts = guest_to_host(spec);
+
+  assert(id == LINUX_CLOCK_MONOTONIC);
+
+  clock_serv_t cclock;
+  mach_timespec_t mts;
+  host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+  clock_get_time(cclock, &mts);
+  mach_port_deallocate(mach_task_self(), cclock);
+  l_ts->tv_sec = mts.tv_sec;
+  l_ts->tv_nsec = mts.tv_nsec;
+
+  return 0;
 }

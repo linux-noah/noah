@@ -35,4 +35,13 @@ struct l_timespec {
   l_long	tv_nsec;
 };
 
+typedef uint32_t l_clockid_t;
+
+#define	LINUX_CLOCK_REALTIME		0
+#define	LINUX_CLOCK_MONOTONIC		1
+#define	LINUX_CLOCK_PROCESS_CPUTIME_ID	2
+#define	LINUX_CLOCK_THREAD_CPUTIME_ID	3
+#define	LINUX_CLOCK_REALTIME_HR		4
+#define	LINUX_CLOCK_MONOTONIC_HR	5
+
 #endif
