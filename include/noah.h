@@ -37,6 +37,7 @@ void vmm_reentry(void);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;
+typedef gaddr_t  gstr_t;
 
 gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
@@ -97,5 +98,7 @@ int do_futex_wake(gaddr_t uaddr, int count);
 
 void print_regs(void);
 void dump_instr(void);
+
+void noah_strace(char *syscall_name, u_int64_t ret, ...);
 
 #endif

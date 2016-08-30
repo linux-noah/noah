@@ -58,12 +58,12 @@
 #include <mach-o/dyld.h>
 
 
-DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
+DEFINE_SYSCALL(write, int, fd, gstr_t, buf, size_t, size)
 {
   return write(fd, guest_to_host(buf), size);
 }
 
-DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
+DEFINE_SYSCALL(read, int, fd, gstr_t, buf, size_t, size)
 {
   return read(fd, guest_to_host(buf), size);
 }
@@ -146,7 +146,7 @@ do_open(const char *path, int l_flags, int mode)
   return ret;
 }
 
-DEFINE_SYSCALL(open, gaddr_t, path, int, flags, int, mode)
+DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
 {
   int ret = do_open(guest_to_host(path), flags, mode);
   if (ret < 0) {
@@ -181,7 +181,7 @@ stat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
   lstat->st_blocks = stat->st_blocks;
 }
 
-DEFINE_SYSCALL(stat, gaddr_t, path, gaddr_t, st)
+DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
 {
   char *host_path = to_host_path(guest_to_host(path));
   struct l_newstat *l_st = guest_to_host(st);
@@ -213,7 +213,7 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
   return 0;
 }
 
-DEFINE_SYSCALL(lstat, gaddr_t, path, gaddr_t, st)
+DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
 {
   char *host_path = to_host_path(guest_to_host(path));
   struct l_newstat *l_st = guest_to_host(st);
@@ -231,7 +231,7 @@ DEFINE_SYSCALL(lstat, gaddr_t, path, gaddr_t, st)
   return 0;
 }
 
-DEFINE_SYSCALL(access, gaddr_t, path, int, mode)
+DEFINE_SYSCALL(access, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
 
@@ -299,7 +299,7 @@ DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
   return 0;
 }
 
-DEFINE_SYSCALL(rename, gaddr_t, oldpath, gaddr_t, newpath)
+DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
 {
   char *host_oldpath, *host_newpath;
 
@@ -345,7 +345,7 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
   return writev(fd, dst, iovcnt);
 }
 
-DEFINE_SYSCALL(symlink, gaddr_t, path1, gaddr_t, path2)
+DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
 {
   char *host_path1, *host_path2;
   
@@ -363,7 +363,7 @@ DEFINE_SYSCALL(symlink, gaddr_t, path1, gaddr_t, path2)
   return ret;
 }
 
-DEFINE_SYSCALL(readlink, gaddr_t, path, gaddr_t, buf, int, bufsize)
+DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = readlink(host_path, guest_to_host(buf), bufsize);
@@ -372,7 +372,7 @@ DEFINE_SYSCALL(readlink, gaddr_t, path, gaddr_t, buf, int, bufsize)
   return ret;
 }
 
-DEFINE_SYSCALL(unlink, gaddr_t, path)
+DEFINE_SYSCALL(unlink, gstr_t, path)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = unlink(host_path);
@@ -401,7 +401,7 @@ DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
   return poll(guest_to_host(fds), nfds, timeout);
 }
 
-DEFINE_SYSCALL(chdir, gaddr_t, path)
+DEFINE_SYSCALL(chdir, gstr_t, path)
 {
   return chdir(guest_to_host(path));
 }
@@ -411,7 +411,7 @@ DEFINE_SYSCALL(fchdir, int, fd)
   return fchdir(fd);
 }
 
-DEFINE_SYSCALL(chmod, gaddr_t, path, int, mode)
+DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = chmod(guest_to_host(path), mode);
@@ -430,7 +430,7 @@ DEFINE_SYSCALL(fchown, int, fildes, int, uid, int, gid)
   return fchown(fildes, uid, gid);
 }
 
-DEFINE_SYSCALL(chown, gaddr_t, path, int, uid, int, gid)
+DEFINE_SYSCALL(chown, gstr_t, path, int, uid, int, gid)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = chown(guest_to_host(path), uid, gid);
@@ -439,7 +439,7 @@ DEFINE_SYSCALL(chown, gaddr_t, path, int, uid, int, gid)
   return ret;
 }
 
-DEFINE_SYSCALL(lchown, gaddr_t, path, int, uid, int, gid)
+DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = lchown(guest_to_host(path), uid, gid);
@@ -453,7 +453,7 @@ DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
   return lseek(fildes, offset, whence);
 }
 
-DEFINE_SYSCALL(mkdir, gaddr_t, path, int, mode)
+DEFINE_SYSCALL(mkdir, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = mkdir(host_path, mode);
@@ -464,7 +464,7 @@ DEFINE_SYSCALL(mkdir, gaddr_t, path, int, mode)
   return ret;
 }
 
-DEFINE_SYSCALL(rmdir, gaddr_t, path)
+DEFINE_SYSCALL(rmdir, gstr_t, path)
 {
   char *host_path = to_host_path(guest_to_host(path));
   int ret = rmdir(host_path);
@@ -500,7 +500,7 @@ statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs)
   l_statfs->f_namelen = NAME_MAX;
 }
 
-DEFINE_SYSCALL(statfs, gaddr_t, path, gaddr_t, buf)
+DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
 {
   struct statfs h_buf;
   char *host_path = to_host_path(guest_to_host(path));
