@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #include "noah.h"
 
@@ -32,7 +33,20 @@ noah_strace(char *syscall_name, uint64_t ret, ...)
     }
     fprintf(stderr, "%s: ", arg_name);
     if (strcmp(type_name, "gstr_t") == 0) {
-      fprintf(stderr, "\"%.100s\"", guest_to_host(val));
+      fprintf(stderr, "\"");
+      for (int i = 0; i < 100; i++) {
+        char c = *((char*)guest_to_host(val) + i);
+        if (c == '\0') {
+          break;
+        } else if (c == '\n') {
+          fprintf(stderr, "\\n");
+        } else if (!isprint(c)) {
+          fprintf(stderr, "\\x%02x", c);
+        } else {
+          fprintf(stderr, "%c", c);
+        }
+      }
+      fprintf(stderr, "\"");
     } else if (strcmp(type_name, "gaddr_t") == 0) {
       fprintf(stderr, "0x%016llx [host: 0x%016llx]", val, (uint64_t)guest_to_host(val));
     } else if (strcmp(type_name, "int") == 0) {
