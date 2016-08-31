@@ -21,7 +21,7 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
   type &= ~LINUX_SOCK_NONBLOCK;
   type &= ~LINUX_SOCK_CLOEXEC;
 
-  return socket(linux_to_darwin_sa_family(family), type, protocol);
+  return or_errno(socket(linux_to_darwin_sa_family(family), type, protocol));
 }
 
 int
@@ -153,23 +153,23 @@ to_host_sockopt_name(int name)
 DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, uint, opt_len)
 {
   // Darwin's optval is compatible with that of Linux
-  return setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len);
+  return or_errno(setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len));
 }
 
 DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, gaddr_t, opt_len)
 {
   // Darwin's optval is compatible with that of Linux
-  return getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len));
+  return or_errno(getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len)));
 }
 
 DEFINE_SYSCALL(shutdown, int, socket, int, how)
 {
-  return shutdown(socket, how);
+  return or_errno(shutdown(socket, how));
 }
 
 DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
 {
-  return sendto(socket, guest_to_host(buf), length, flags, NULL, 0);
+  return or_errno(sendto(socket, guest_to_host(buf), length, flags, NULL, 0));
 }
 
 DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, addr, gaddr_t, addrlen)
@@ -178,7 +178,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen);
+  ret = or_errno(recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -186,7 +186,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
 
 DEFINE_SYSCALL(listen, int, socket, int, backlog)
 {
-  return listen(socket, backlog);
+  return or_errno(listen(socket, backlog));
 }
 
 DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
@@ -195,7 +195,7 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = accept(sockfd, (void*)sockaddr, socklen);
+  ret = or_errno(accept(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -207,9 +207,9 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
   struct sockaddr *sockaddr;
 
   if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
-    return -1;
+    return -EINVAL;
   }
-  ret = bind(sockfd, sockaddr, addrlen);
+  ret = or_errno(bind(sockfd, sockaddr, addrlen));
 
   free(sockaddr);
   return ret;
@@ -221,7 +221,7 @@ DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = getsockname(sockfd, (void*)sockaddr, socklen);
+  ret = or_errno(getsockname(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -233,7 +233,7 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = getpeername(sockfd, (void*)sockaddr, socklen);
+  ret = or_errno(getpeername(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;

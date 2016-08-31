@@ -35,7 +35,7 @@ do_fork(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gadd
 
   int ret;
   if (pid < 0) {
-    ret = -1;
+    ret = -errno;
   } else {
     ret = pid;
   }

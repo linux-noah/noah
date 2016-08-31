@@ -31,6 +31,6 @@ DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_p
   case LINUX_FUTEX_WAKE: return do_futex_wake(uaddr, val);
   default:
     fprintf(stderr, "unsupported futex command: %d\n", op);
-    return -1;
+    return -ENOSYS;
   }
 }

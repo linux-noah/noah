@@ -18,52 +18,52 @@ struct task task;
 
 DEFINE_SYSCALL(getpid)
 {
-  return getpid();
+  return or_errno(getpid());
 }
 
 DEFINE_SYSCALL(getuid)
 {
-  return getuid();
+  return or_errno(getuid());
 }
 
 DEFINE_SYSCALL(getgid)
 {
-  return getgid();
+  return or_errno(getgid());
 }
 
 DEFINE_SYSCALL(setuid, l_uid_t, uid)
 {
-  return setuid(uid);
+  return or_errno(setuid(uid));
 }
 
 DEFINE_SYSCALL(setgid, l_gid_t, gid)
 {
-  return setgid(gid);
+  return or_errno(setgid(gid));
 }
 
 DEFINE_SYSCALL(geteuid)
 {
-  return geteuid();
+  return or_errno(geteuid());
 }
 
 DEFINE_SYSCALL(getegid)
 {
-  return getegid();
+  return or_errno(getegid());
 }
 
 DEFINE_SYSCALL(setpgid, pid_t, pid, pid_t, pgid)
 {
-  return setpgid(pid, pgid);
+  return or_errno(setpgid(pid, pgid));
 }
 
 DEFINE_SYSCALL(getppid)
 {
-  return getppid();
+  return or_errno(getppid());
 }
 
 DEFINE_SYSCALL(getpgrp)
 {
-  return getpgrp();
+  return or_errno(getpgrp());
 }
 
 DEFINE_SYSCALL(gettid)
@@ -91,7 +91,7 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   case LINUX_RLIMIT_AS: resource = RLIMIT_AS; break;
   }
 
-  return getrlimit(resource, l_rl);
+  return or_errno(getrlimit(resource, l_rl));
 }
 
 DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
@@ -140,37 +140,26 @@ DEFINE_SYSCALL(uname, gaddr_t, buf)
   strncpy(_buf->machine, "x86_64", sizeof _buf->machine - 1);
   strncpy(_buf->domainname, "GNU/Linux", sizeof _buf->domainname - 1);
 
-  if (gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0) {
-    return -1;
-  }
-  return 0;
+  return or_errno(gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0);
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   switch (code) {
   case LINUX_ARCH_SET_GS:
-    if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr) != HV_SUCCESS) {
-      return -1;
-    }
+    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr);
     return 0;
   case LINUX_ARCH_SET_FS:
-    if (hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr) != HV_SUCCESS) {
-      return -1;
-    }
+    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr);
     return 0;
   case LINUX_ARCH_GET_FS:
-    if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
-      return -1;
-    }
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr));
     return 0;
   case LINUX_ARCH_GET_GS:
-    if (hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr)) != HV_SUCCESS) {
-      return -1;
-    }
+    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr));
     return 0;
   default:
-    return -LINUX_EPERM;
+    return -EINVAL;
   }
 }
 
@@ -190,7 +179,7 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage
   int *status = (int*)guest_to_host(gstatus);
   struct rusage *rusage = (struct rusage*)guest_to_host(grusage);
 
-  return wait4(pid, status, options, rusage);
+  return or_errno(wait4(pid, status, options, rusage));
 }
 
 static void
@@ -220,7 +209,7 @@ DEFINE_SYSCALL(getrusage, int, who, gaddr_t, rusage)
 {
   struct rusage h_rusage;
   if (getrusage(who, &h_rusage) < 0) {
-    return darwin_to_linux_errno(errno);
+    return -errno;
   }
 
   darwin_to_linux_rusage(&h_rusage, guest_to_host(rusage));

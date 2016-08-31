@@ -44,10 +44,12 @@ load_elf_interp(const char *path, ulong load_addr)
 
   assert(IS_ELF(*h));
 
-  if (! (h->e_type == ET_EXEC || h->e_type == ET_DYN))
-    return -1;
-  if (h->e_machine != EM_X86_64)
-    return -1;
+  if (! (h->e_type == ET_EXEC || h->e_type == ET_DYN)) {
+    return -ENOEXEC;
+  }
+  if (h->e_machine != EM_X86_64) {
+    return -ENOEXEC;
+  }
 
   Elf64_Phdr *p = (Elf64_Phdr *)(data + h->e_phoff);
 
@@ -92,11 +94,11 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
   if (ehdr->e_type != ET_EXEC) {
     fprintf(stderr, "not an executable file");
-    return -1;
+    return -ENOEXEC;
   }
   if (ehdr->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
-    return -1;
+    return -ENOEXEC;
   }
 
   Elf64_Phdr *p = (Elf64_Phdr *)((char *)ehdr + ehdr->e_phoff);
@@ -186,7 +188,7 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
       goto parse_end;
     }
     if (n > LINUX_PATH_MAX - 1) {
-      return -1;
+      return -ENAMETOOLONG;
     }
     strncpy(sb_argv[sb_argc], script, n);
     sb_argv[sb_argc][n] = 0;
@@ -196,7 +198,7 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
 
  parse_end:
   if (sb_argc == 0) {
-    return -1;
+    return -EFAULT;
   }
 
   int newargc = sb_argc + argc;
@@ -338,7 +340,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
       return -1;
   }
   else {
-    return -1;                  /* unsupported file type */
+    return -ENOEXEC;                  /* unsupported file type */
   }
 
   munmap(data, st.st_size);
@@ -382,5 +384,5 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 
   vmm_destroy();
 
-  return execve(noah_path, argv, envp);
+  return or_errno(execve(noah_path, argv, envp));
 }

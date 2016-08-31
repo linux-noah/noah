@@ -18,22 +18,22 @@
 
 DEFINE_SYSCALL(time, gaddr_t, tloc_ptr)
 {
-  return time(guest_to_host(tloc_ptr));
+  return or_errno(time(guest_to_host(tloc_ptr)));
 }
 
 DEFINE_SYSCALL(gettimeofday, gaddr_t, tp, gaddr_t, tzp)
 {
-  return gettimeofday(guest_to_host(tp), guest_to_host(tzp));
+  return or_errno(gettimeofday(guest_to_host(tp), guest_to_host(tzp)));
 }
 
 DEFINE_SYSCALL(nanosleep, gaddr_t, rqtp, gaddr_t, rmtp)
 {
-  return nanosleep(guest_to_host(rqtp), guest_to_host(rmtp));
+  return or_errno(nanosleep(guest_to_host(rqtp), guest_to_host(rmtp)));
 }
 
 DEFINE_SYSCALL(utimes, gaddr_t, filename, gaddr_t, timevals)
 {
-  return utimes(guest_to_host(filename), guest_to_host(timevals));
+  return or_errno(utimes(guest_to_host(filename), guest_to_host(timevals)));
 }
 
 DEFINE_SYSCALL(utimensat, gaddr_t, filename, gaddr_t, timevals)
@@ -42,7 +42,7 @@ DEFINE_SYSCALL(utimensat, gaddr_t, filename, gaddr_t, timevals)
   struct timeval times[2];
   int ret = utimes(guest_to_host(filename), times);
   if (ret < 0) {
-    return ret;
+    return -errno;
   }
 
   struct l_timespec (*l_times)[2] = guest_to_host(timevals);
