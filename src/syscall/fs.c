@@ -58,12 +58,12 @@
 #include <mach-o/dyld.h>
 
 
-DEFINE_SYSCALL(write, int, fd, gstr_t, buf, size_t, size)
+DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
 {
   return write(fd, guest_to_host(buf), size);
 }
 
-DEFINE_SYSCALL(read, int, fd, gstr_t, buf, size_t, size)
+DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
 {
   return read(fd, guest_to_host(buf), size);
 }
