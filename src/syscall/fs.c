@@ -325,6 +325,12 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
   return ret;
 }
 
+DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, size_t, size)
+{
+  printk("getxattr is unimplemented\n");
+  return -LINUX_ENOTSUP;
+}
+
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
   printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);

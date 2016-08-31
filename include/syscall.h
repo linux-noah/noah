@@ -126,7 +126,7 @@
   SYSCALL(122, unimplemented)                   \
   SYSCALL(123, unimplemented)                   \
   SYSCALL(124, unimplemented)                   \
-  SYSCALL(125, unimplemented)                   \
+  SYSCALL(125, capget)                          \
   SYSCALL(126, unimplemented)                   \
   SYSCALL(127, unimplemented)                   \
   SYSCALL(128, unimplemented)                   \
@@ -192,7 +192,7 @@
   SYSCALL(188, unimplemented)                   \
   SYSCALL(189, unimplemented)                   \
   SYSCALL(190, unimplemented)                   \
-  SYSCALL(191, unimplemented)                   \
+  SYSCALL(191, getxattr)                        \
   SYSCALL(192, unimplemented)                   \
   SYSCALL(193, unimplemented)                   \
   SYSCALL(194, unimplemented)                   \

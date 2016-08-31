@@ -115,6 +115,12 @@ DEFINE_SYSCALL(exit_group, int, reason)
   _exit(reason);
 }
 
+DEFINE_SYSCALL(capget, gaddr_t, header_ptr, gaddr_t, data_ptr)
+{
+  printk("capget is unimplemented\n");
+  return 0;
+}
+
 struct utsname {
   char sysname[65];
   char nodename[65];
