@@ -88,17 +88,6 @@ int do_futex_wake(gaddr_t uaddr, int count);
 
 /* debug */
 
-#if DEBUG_MODE
-#define PUTS(...) do {puts(__VA_ARGS__);fflush(stdout);} while(0)
-#define PRINTF(...) do {printf(__VA_ARGS__);fflush(stdout);} while(0)
-#else
-#define PUTS(...) 0
-#define PRINTF(...) 0
-#endif
-
-void print_regs(void);
-void dump_instr(void);
-
-void noah_strace(char *syscall_name, u_int64_t ret, ...);
+#include "debug.h"
 
 #endif

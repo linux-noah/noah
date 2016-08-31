@@ -319,7 +319,7 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
-  PRINTF("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
   return -1;
 }
 

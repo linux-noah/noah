@@ -365,7 +365,7 @@ init_msr()
   if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
       hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
       hv_vcpu_enable_native_msr(vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
-    PRINTF("MSR initialization failed.\n");
+    printk("MSR initialization failed.\n");
   }
 }
 
@@ -376,19 +376,19 @@ vmm_create()
 
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
-    PRINTF("could not create the vm: error code %x", ret);
+    printk("could not create the vm: error code %x", ret);
     return;
   }
 
-  PUTS("successfully created the vm");
+  printk("successfully created the vm\n");
 
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
-    PRINTF("could not create a vcpu: error code %x", ret);
+    printk("could not create a vcpu: error code %x", ret);
     return;
   }
 
-  PUTS("successfully created a vcpu");
+  printk("successfully created a vcpu\n");
 
   INIT_LIST_HEAD(&vmm_vm_regions);
 
@@ -408,19 +408,19 @@ vmm_destroy()
 
   ret = hv_vcpu_destroy(vcpuid);
   if (ret != HV_SUCCESS) {
-    PRINTF("could not destroy the vcpu: error code %x", ret);
+    printk("could not destroy the vcpu: error code %x", ret);
     return;
   }
 
-  PUTS("successfully destroyed the vcpu");
+  printk("successfully destroyed the vcpu\n");
 
   ret = hv_vm_destroy();
   if (ret != HV_SUCCESS) {
-    PRINTF("could not destroy the vm: error code %x", ret);
+    printk("could not destroy the vm: error code %x", ret);
     return;
   }
 
-  PUTS("successfully destroyed the vm");
+  printk("successfully destroyed the vm\n");
 }
 
 void
@@ -429,21 +429,21 @@ print_regs()
   uint64_t value;
 
   hv_vcpu_read_register(vcpuid, HV_X86_RIP, &value);
-  PRINTF("\trip = 0x%llx\n", value);
+  printk("\trip = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RAX, &value);
-  PRINTF("\trax = 0x%llx\n", value);
+  printk("\trax = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBX, &value);
-  PRINTF("\trbx = 0x%llx\n", value);
+  printk("\trbx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RCX, &value);
-  PRINTF("\trcx = 0x%llx\n", value);
+  printk("\trcx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDX, &value);
-  PRINTF("\trdx = 0x%llx\n", value);
+  printk("\trdx = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RDI, &value);
-  PRINTF("\trdi = 0x%llx\n", value);
+  printk("\trdi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RSI, &value);
-  PRINTF("\trsi = 0x%llx\n", value);
+  printk("\trsi = 0x%llx\n", value);
   hv_vcpu_read_register(vcpuid, HV_X86_RBP, &value);
-  PRINTF("\trbp = 0x%llx\n", value);
+  printk("\trbp = 0x%llx\n", value);
 }
 
 void
@@ -452,11 +452,11 @@ dump_instr()
   uint64_t instlen, rip;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
   hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
-  PRINTF("len: %lld, instruction: ", instlen);
+  printk("len: %lld, instruction: ", instlen);
   for (int i = 0; i < instlen; i ++) {
-    PRINTF("%02x ", *((uchar*)guest_to_host(rip) + i));
+    printk("%02x ", *((uchar*)guest_to_host(rip) + i));
   }
-  PRINTF("\n");
+  printk("\n");
 }
 
 struct vm_snapshot {
@@ -470,7 +470,7 @@ vmm_snapshot()
   /* snapshot registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
     if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &_vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
-      PRINTF("store_regs failed\n");
+      printk("store_regs failed\n");
       return;
     }
   }
@@ -478,7 +478,7 @@ vmm_snapshot()
   for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
     uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &_vmm_snapshot.vmcs[i]);
     if (success != HV_SUCCESS) {
-      PRINTF("store_vmcs failed\n");
+      printk("store_vmcs failed\n");
       return;
     }
   }
@@ -489,7 +489,7 @@ reg_restore()
 {
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
     if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], _vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
-      PRINTF("restore regs failed\n");
+      printk("restore regs failed\n");
       return;
     }
   }
@@ -547,7 +547,7 @@ vmcs_restore()
     }
     uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], _vmm_snapshot.vmcs[i]);
     if (success != HV_SUCCESS) {
-      PRINTF("restore vmcs failed, %s\n", vmcs_field_str[i]);
+      printk("restore vmcs failed, %s\n", vmcs_field_str[i]);
       return false;
     }
     cont: ;
@@ -573,25 +573,25 @@ vmm_reentry()
 {
   hv_return_t ret;
 
-  PUTS("vmm_restore");
+  printk("vmm_restore\n");
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
-    PRINTF("could not create the vm: error code %x", ret);
+    printk("could not create the vm: error code %x", ret);
     return;
   }
 
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
-    PRINTF("could not create a vcpu: error code %x", ret);
+    printk("could not create a vcpu: error code %x", ret);
     return;
   }
 
   init_msr();
 
   vmcs_restore();
-  PUTS("vmcs_restore done");
+  printk("vmcs_restore done\n");
   restore_ept();
-  PUTS("ept_restore done");
+  printk("ept_restore done\n");
   reg_restore();
-  PUTS("reg_restore done");
+  printk("reg_restore done\n");
 }

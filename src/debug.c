@@ -2,6 +2,38 @@
 #include <stdio.h>
 #include <Hypervisor/hv.h>
 #include <Hypervisor/hv_vmx.h>
+#include <stdarg.h>
+#include <time.h>
+
+#include "noah.h"
+
+static FILE *printk_sink;
+
+void
+init_debug(const char *fn)
+{
+  if (! fn) {
+    fn = "/dev/null";
+  }
+  printk_sink = fopen(fn, "a");
+
+  char buf[1000];
+  time_t now = time(0);
+  struct tm tm = *gmtime(&now);
+  strftime(buf, sizeof buf, "%a, %d %b %Y %H:%M:%S %Z", &tm);
+  printk("\n//==================\n");
+  printk("noah started: [%s]\n", buf);
+}
+
+void
+printk(const char *fmt, ...)
+{
+  va_list ap;
+
+  va_start(ap, fmt);
+  vfprintf(printk_sink, fmt, ap);
+  va_end(ap);
+}
 
 char *vmcs_field_to_str(uint32_t vmcs_field) {
   switch(vmcs_field) {

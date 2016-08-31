@@ -43,7 +43,7 @@ to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size
     struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)*sockaddr;
     if (sockaddr_un->sun_path[0] == '\0') {
       // Linux abstract namespace starts with NULL, which we do not support yet
-      PRINTF("Abstract namespace: %20s\n", &sockaddr_un->sun_path[1]);
+      printk("Abstract namespace: %20s\n", &sockaddr_un->sun_path[1]);
       slen = strnlen(&sockaddr_un->sun_path[1], l_sockaddr_len - offsetof(struct sockaddr_un, sun_path) - 1);
     } else {
       slen = strnlen(sockaddr_un->sun_path, l_sockaddr_len - offsetof(struct sockaddr_un, sun_path));
@@ -145,7 +145,7 @@ to_host_sockopt_name(int name)
   case LINUX_SO_ACCEPTCONN:
     return SO_ACCEPTCONN;
   default:
-    PRINTF("Unsupported sockopt name: 0x%x\n", name);
+    printk("Unsupported sockopt name: 0x%x\n", name);
     return -1;
   }
 }

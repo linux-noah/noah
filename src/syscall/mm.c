@@ -78,7 +78,7 @@ DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd,
 
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
-  PRINTF("mprotect: addr = 0x%llx, len = 0x%zx, prot = %d\n", addr, len, prot);
+  printk("mprotect: addr = 0x%llx, len = 0x%zx, prot = %d\n", addr, len, prot);
   return 0;
 }
 

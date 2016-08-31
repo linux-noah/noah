@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <cpuid.h>
+#include <getopt.h>
 
 #include "noah.h"
 #include "syscall.h"
@@ -15,7 +16,7 @@ main_loop()
 
   while (true) {
     if ((ret = hv_vcpu_run(vcpuid)) != HV_SUCCESS) {
-      PUTS("oops, hv_vcpu_run fails");
+      printk("oops, hv_vcpu_run fails\n");
       return;
     }
 
@@ -29,7 +30,7 @@ main_loop()
       uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
 
     case VMX_REASON_VMCALL:
-      PUTS("reason: vmcall");
+      printk("reason: vmcall\n");
       assert(false);
       break;
 
@@ -37,20 +38,20 @@ main_loop()
       uint64_t instlen, rip, idtvec, idterr, intstatus, exit_qual;
       uint64_t retval;
 
-      PUTS("reason: exc or nmi");
-      PUTS("");
+      printk("reason: exc or nmi\n");
+      printk("\n");
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
-      PRINTF("instr length = 0x%llx\n", instlen);
+      printk("instr length = 0x%llx\n", instlen);
       hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
-      PRINTF("rip = 0x%llx\n", rip);
+      printk("rip = 0x%llx\n", rip);
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_INFO, &idtvec);
-      PRINTF("idt info = %lld\n", idtvec);
+      printk("idt info = %lld\n", idtvec);
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &idterr);
-      PRINTF("idt error = %lld\n", idterr);
+      printk("idt error = %lld\n", idterr);
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_INT_STATUS, &intstatus);
-      PRINTF("guest int status = %lld\n", intstatus);
+      printk("guest int status = %lld\n", intstatus);
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &exit_qual);
-      PRINTF("exit qualification = 0x%llx\n", exit_qual);
+      printk("exit qualification = 0x%llx\n", exit_qual);
 
       // FIXME
       // Exception
@@ -62,13 +63,13 @@ main_loop()
         }
 
         // Exception such as #P
-        PRINTF("!!MAYBE AN Ignorable Exception!!\n");
+        printk("!!MAYBE AN Ignorable Exception!!\n");
         hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_RIP, instlen + rip);
         continue;
       }
 
       // Syscall
-      PUTS("!!MAYBE A SYSENTER!!");
+      printk("!!MAYBE A SYSENTER!!\n");
 
       hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
 
@@ -84,9 +85,9 @@ main_loop()
       hv_vcpu_read_register(vcpuid, HV_X86_R8, &r8);
       hv_vcpu_read_register(vcpuid, HV_X86_R9, &r9);
 
-      PRINTF(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
+      printk(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
       retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      PRINTF("<<<syscall done: %lld\n", retval);
+      printk("<<<syscall done: %lld\n", retval);
 
       hv_vcpu_write_register(vcpuid, HV_X86_RAX, retval);
 
@@ -97,25 +98,25 @@ main_loop()
     }
 
     case VMX_REASON_EPT_VIOLATION:
-      PRINTF("reason: ept_violation\n");
+      printk("reason: ept_violation\n");
 
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-      PRINTF("guest-physical address = 0x%llx\n", value);
+      printk("guest-physical address = 0x%llx\n", value);
 
       uint64_t qual;
 
       hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_EXIT_QUALIFIC, &qual);
-      PRINTF("exit qualification = 0x%llx\n", qual);
+      printk("exit qualification = 0x%llx\n", qual);
 
-      if (qual & (1 << 0)) PUTS("cause: data read");
-      if (qual & (1 << 1)) PUTS("cause: data write");
-      if (qual & (1 << 2)) PUTS("cause: inst fetch");
+      if (qual & (1 << 0)) printk("cause: data read\n");
+      if (qual & (1 << 1)) printk("cause: data write\n");
+      if (qual & (1 << 2)) printk("cause: inst fetch\n");
 
       if (qual & (1 << 7)) {
         hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_GUEST_LIN_ADDR, &value);
-        PRINTF("guest linear address = 0x%llx\n", value);
+        printk("guest linear address = 0x%llx\n", value);
       } else {
-        PUTS("guest linear address = (unavailable)");
+        printk("guest linear address = (unavailable)\n");
       }
 
       break;
@@ -137,31 +138,61 @@ main_loop()
     }
 
     default:
-      PRINTF("other reason: %llu\n", exit_reason);
+      printk("other reason: %llu\n", exit_reason);
     }
 
 #if DEBUG_MODE
-    PUTS("[press <enter> to step or C-D to continue...]");
+    printk("[press <enter> to step or C-D to continue...]\n");
     getchar();
 #endif
 
-    PUTS("");
+    printk("\n");
   }
 
-  PUTS("exit...");
+  printk("exit...\n");
+}
+
+void
+__attribute__((noreturn)) usage()
+{
+  fprintf(stderr, "usage: noah elf_file ...\n");
+  exit(1);
 }
 
 int
 main(int argc, char *argv[], char **envp)
 {
-  if (argc == 1) {
-    fprintf(stderr, "usage: %s elf_file ...\n", argv[0]);
-    exit(1);
+  static struct option long_options[] = {
+    { "help", no_argument, NULL, 'h' },
+    { "output", required_argument, NULL, 'o' },
+    { 0, 0, 0, 0 }
+  };
+  int c, option_index = 0;
+
+  char *outfile = NULL;
+
+  while ((c = getopt_long(argc, argv, "+ho:", long_options, &option_index)) != -1) {
+    switch (c) {
+    default:
+      usage();
+    case 'o':
+      outfile = optarg;
+      break;
+    }
   }
+
+  argc -= optind;
+  argv += optind;
+
+  if (argc == 0) {
+    usage();
+  }
+
+  init_debug(outfile);
 
   vmm_create();
 
-  if (do_exec(argv[1], argc - 1, argv + 1, envp) < 0) {
+  if (do_exec(argv[0], argc, argv, envp) < 0) {
     exit(1);
   };
 
