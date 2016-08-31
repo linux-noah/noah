@@ -2,8 +2,33 @@
 #include "noah.h"
 
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include "linux/errno.h"
+
+size_t
+copy_from_user(void *to, gaddr_t src_ptr, size_t n)
+{
+  const void *src = guest_to_host(src_ptr);
+  memcpy(to, src, n);
+  return 0;
+}
+
+ssize_t
+strncpy_from_user(void *to, gaddr_t src_ptr, size_t n)
+{
+  const void *src = guest_to_host(src_ptr);
+  char *end = strncpy(to, src, n);
+  return end - (char *) to;
+}
+
+size_t
+copy_to_user(gaddr_t to_ptr, const void *src, size_t n)
+{
+  void *to = guest_to_host(to_ptr);
+  memcpy(to, src, n);
+  return 0;
+}
 
 DEFINE_SYSCALL(unimplemented)
 {

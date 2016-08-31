@@ -53,6 +53,10 @@ struct task {
 
 extern struct task task;
 
+size_t copy_from_user(void *haddr, gaddr_t gaddr, size_t n); /* returns 0 on success */
+ssize_t strncpy_from_user(void *haddr, gaddr_t gaddr, size_t n);
+size_t copy_to_user(gaddr_t gaddr, const void *haddr, size_t n);
+
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset);
 int do_open(const char *path, int flags, int mode);
