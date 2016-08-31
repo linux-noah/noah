@@ -348,7 +348,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
 #include <mach-o/dyld.h>
 
-DEFINE_SYSCALL(execve, gaddr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
+DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int argc = 0, envc = 0;
   while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
