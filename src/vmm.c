@@ -452,7 +452,7 @@ dump_instr()
   uint64_t instlen, rip;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
   hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
-  PRINTF("len: %d, instruction: ", instlen);
+  PRINTF("len: %lld, instruction: ", instlen);
   for (int i = 0; i < instlen; i ++) {
     PRINTF("%02x ", *((uchar*)guest_to_host(rip) + i));
   }
