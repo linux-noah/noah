@@ -153,9 +153,16 @@ main_loop()
 }
 
 void
+__attribute__((noreturn)) version()
+{
+  fprintf(stderr, "noah %s\n", NOAH_VERSION);
+  exit(1);
+}
+
+void
 __attribute__((noreturn)) usage()
 {
-  fprintf(stderr, "usage: noah elf_file ...\n");
+  fprintf(stderr, "usage: noah [OPTION] elf_file ...\n");
   exit(1);
 }
 
@@ -164,6 +171,7 @@ main(int argc, char *argv[], char **envp)
 {
   static struct option long_options[] = {
     { "help", no_argument, NULL, 'h' },
+    { "version", no_argument, NULL, 'v' },
     { "output", required_argument, NULL, 'o' },
     { 0, 0, 0, 0 }
   };
@@ -171,10 +179,12 @@ main(int argc, char *argv[], char **envp)
 
   char *outfile = NULL;
 
-  while ((c = getopt_long(argc, argv, "+ho:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+hvo:", long_options, &option_index)) != -1) {
     switch (c) {
     default:
       usage();
+    case 'v':
+      version();
     case 'o':
       outfile = optarg;
       break;
