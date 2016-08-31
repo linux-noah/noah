@@ -18,7 +18,7 @@ ssize_t
 strncpy_from_user(void *to, gaddr_t src_ptr, size_t n)
 {
   const void *src = guest_to_host(src_ptr);
-  char *end = strncpy(to, src, n);
+  char *end = stpncpy(to, src, n);
   return end - (char *) to;
 }
 
