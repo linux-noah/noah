@@ -58,14 +58,22 @@
 #include <mach-o/dyld.h>
 
 
-DEFINE_SYSCALL(write, int, fd, gaddr_t, buf, size_t, size)
+DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
-  return write(fd, guest_to_host(buf), size);
+  char buf[size];
+  copy_from_user(buf, buf_ptr, size);
+  return write(fd, buf, size);
 }
 
-DEFINE_SYSCALL(read, int, fd, gaddr_t, buf, size_t, size)
+DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
-  return read(fd, guest_to_host(buf), size);
+  char buf[size];
+  int n = read(fd, buf, size);
+  if (n < 0) {
+    return -darwin_to_linux_errno(errno);
+  }
+  copy_to_user(buf_ptr, buf, n);
+  return n;
 }
 
 char*
