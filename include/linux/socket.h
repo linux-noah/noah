@@ -32,6 +32,8 @@
 #ifndef _LINUX_SOCKET_H_
 #define _LINUX_SOCKET_H_
 
+#include "linux/const.h"
+
 /*
  * Socket defines
  */

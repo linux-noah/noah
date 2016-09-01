@@ -62,7 +62,7 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
   copy_from_user(buf, buf_ptr, size);
-  return or_errno(write(fd, buf, size));
+  return syswrap(write(fd, buf, size));
 }
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
@@ -148,7 +148,7 @@ do_open(const char *path, int l_flags, int mode)
     flags |= O_DIRECTORY;
 
   char *host_path = to_host_path(path);
-  int ret = or_errno(open(host_path, flags, mode));
+  int ret = syswrap(open(host_path, flags, mode));
 
   free(host_path);
   return ret;
@@ -161,7 +161,7 @@ DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
 
 DEFINE_SYSCALL(close, int, fd)
 {
-  return or_errno(close(fd));
+  return syswrap(close(fd));
 }
 
 static void
@@ -191,7 +191,7 @@ DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
 
-  int ret = or_errno(stat(host_path, &d_st));
+  int ret = syswrap(stat(host_path, &d_st));
   free(host_path);
   if (ret < 0) {
     return ret;
@@ -207,7 +207,7 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
 
-  int ret = or_errno(fstat(fd, &d_st));
+  int ret = syswrap(fstat(fd, &d_st));
   if (ret < 0)
     return ret;
 
@@ -237,7 +237,7 @@ DEFINE_SYSCALL(access, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
 
-  int ret = or_errno(access(host_path, mode));
+  int ret = syswrap(access(host_path, mode));
 
   free(host_path);
   return ret;
@@ -279,17 +279,17 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
 
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
-  return or_errno(pipe(guest_to_host(fildes_ptr)));
+  return syswrap(pipe(guest_to_host(fildes_ptr)));
 }
 
 DEFINE_SYSCALL(dup, unsigned int, fd)
 {
-  return or_errno(dup(fd));
+  return syswrap(dup(fd));
 }
 
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 {
-  return or_errno(dup2(fd1, fd2));
+  return syswrap(dup2(fd1, fd2));
 }
 
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
@@ -309,7 +309,7 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
     host_newpath = strdup(guest_to_host(newpath));
   }
 
-  int ret = or_errno(rename(host_oldpath, host_newpath));
+  int ret = syswrap(rename(host_oldpath, host_newpath));
   
   free(host_oldpath);
   free(host_newpath);
@@ -330,7 +330,7 @@ DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 
 DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 {
-  return or_errno(fcntl(fd, cmd, arg));
+  return syswrap(fcntl(fd, cmd, arg));
 }
 
 struct l_iovec {
@@ -347,7 +347,7 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
     dst[i].iov_base = guest_to_host(src[i].iov_base);
     dst[i].iov_len = src[i].iov_len;
   }
-  return or_errno(writev(fd, dst, iovcnt));
+  return syswrap(writev(fd, dst, iovcnt));
 }
 
 DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
@@ -361,7 +361,7 @@ DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
     host_path2 = strdup(guest_to_host(path2));
   }
 
-  int ret = or_errno(symlink(host_path1, host_path2));
+  int ret = syswrap(symlink(host_path1, host_path2));
 
   free(host_path1);
   free(host_path2);
@@ -371,7 +371,7 @@ DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
 DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(readlink(host_path, guest_to_host(buf), bufsize));
+  int ret = syswrap(readlink(host_path, guest_to_host(buf), bufsize));
 
   free(host_path);
   return ret;
@@ -380,7 +380,7 @@ DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
 DEFINE_SYSCALL(unlink, gstr_t, path)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(unlink(host_path));
+  int ret = syswrap(unlink(host_path));
 
   free(host_path);
   return ret;
@@ -398,28 +398,28 @@ DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, 
   // Darwin's fd_set is compatible with that of Linux
   fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
 
-  return or_errno(select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout));
+  return syswrap(select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout));
 }
 
 DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
 {
-  return or_errno(poll(guest_to_host(fds), nfds, timeout));
+  return syswrap(poll(guest_to_host(fds), nfds, timeout));
 }
 
 DEFINE_SYSCALL(chdir, gstr_t, path)
 {
-  return or_errno(chdir(guest_to_host(path)));
+  return syswrap(chdir(guest_to_host(path)));
 }
 
 DEFINE_SYSCALL(fchdir, int, fd)
 {
-  return or_errno(fchdir(fd));
+  return syswrap(fchdir(fd));
 }
 
 DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(chmod(guest_to_host(path), mode));
+  int ret = syswrap(chmod(guest_to_host(path), mode));
 
   free(host_path);
   return ret;
@@ -427,18 +427,18 @@ DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 
 DEFINE_SYSCALL(fchmod, int, fd, int, mode)
 {
-  return or_errno(fchmod(fd, mode));
+  return syswrap(fchmod(fd, mode));
 }
 
 DEFINE_SYSCALL(fchown, int, fildes, int, uid, int, gid)
 {
-  return or_errno(fchown(fildes, uid, gid));
+  return syswrap(fchown(fildes, uid, gid));
 }
 
 DEFINE_SYSCALL(chown, gstr_t, path, int, uid, int, gid)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(chown(guest_to_host(path), uid, gid));
+  int ret = syswrap(chown(guest_to_host(path), uid, gid));
 
   free(host_path);
   return ret;
@@ -447,7 +447,7 @@ DEFINE_SYSCALL(chown, gstr_t, path, int, uid, int, gid)
 DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(lchown(guest_to_host(path), uid, gid));
+  int ret = syswrap(lchown(guest_to_host(path), uid, gid));
 
   free(host_path);
   return ret;
@@ -469,7 +469,7 @@ DEFINE_SYSCALL(mkdir, gstr_t, path, int, mode)
 DEFINE_SYSCALL(rmdir, gstr_t, path)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = or_errno(rmdir(host_path));
+  int ret = syswrap(rmdir(host_path));
 
   free(host_path);
   return ret;

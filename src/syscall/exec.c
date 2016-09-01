@@ -384,5 +384,5 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 
   vmm_destroy();
 
-  return or_errno(execve(noah_path, argv, envp));
+  return syswrap(execve(noah_path, argv, envp));
 }

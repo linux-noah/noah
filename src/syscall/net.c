@@ -21,7 +21,7 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
   type &= ~LINUX_SOCK_NONBLOCK;
   type &= ~LINUX_SOCK_CLOEXEC;
 
-  return or_errno(socket(linux_to_darwin_sa_family(family), type, protocol));
+  return syswrap(socket(linux_to_darwin_sa_family(family), type, protocol));
 }
 
 int
@@ -153,23 +153,23 @@ to_host_sockopt_name(int name)
 DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, uint, opt_len)
 {
   // Darwin's optval is compatible with that of Linux
-  return or_errno(setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len));
+  return syswrap(setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len));
 }
 
 DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, gaddr_t, opt_len)
 {
   // Darwin's optval is compatible with that of Linux
-  return or_errno(getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len)));
+  return syswrap(getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len)));
 }
 
 DEFINE_SYSCALL(shutdown, int, socket, int, how)
 {
-  return or_errno(shutdown(socket, how));
+  return syswrap(shutdown(socket, how));
 }
 
 DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
 {
-  return or_errno(sendto(socket, guest_to_host(buf), length, flags, NULL, 0));
+  return syswrap(sendto(socket, guest_to_host(buf), length, flags, NULL, 0));
 }
 
 DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, addr, gaddr_t, addrlen)
@@ -178,7 +178,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = or_errno(recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen));
+  ret = syswrap(recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -186,7 +186,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
 
 DEFINE_SYSCALL(listen, int, socket, int, backlog)
 {
-  return or_errno(listen(socket, backlog));
+  return syswrap(listen(socket, backlog));
 }
 
 DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
@@ -195,7 +195,7 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = or_errno(accept(sockfd, (void*)sockaddr, socklen));
+  ret = syswrap(accept(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -209,7 +209,7 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
   if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
     return -LINUX_EINVAL;
   }
-  ret = or_errno(bind(sockfd, sockaddr, addrlen));
+  ret = syswrap(bind(sockfd, sockaddr, addrlen));
 
   free(sockaddr);
   return ret;
@@ -221,7 +221,7 @@ DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = or_errno(getsockname(sockfd, (void*)sockaddr, socklen));
+  ret = syswrap(getsockname(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
@@ -233,7 +233,7 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
   socklen_t *socklen = guest_to_host(addrlen);
   struct l_sockaddr *sockaddr = guest_to_host(addr);
 
-  ret = or_errno(getpeername(sockfd, (void*)sockaddr, socklen));
+  ret = syswrap(getpeername(sockfd, (void*)sockaddr, socklen));
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;

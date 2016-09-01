@@ -18,22 +18,22 @@
 
 DEFINE_SYSCALL(time, gaddr_t, tloc_ptr)
 {
-  return or_errno(time(guest_to_host(tloc_ptr)));
+  return syswrap(time(guest_to_host(tloc_ptr)));
 }
 
 DEFINE_SYSCALL(gettimeofday, gaddr_t, tp, gaddr_t, tzp)
 {
-  return or_errno(gettimeofday(guest_to_host(tp), guest_to_host(tzp)));
+  return syswrap(gettimeofday(guest_to_host(tp), guest_to_host(tzp)));
 }
 
 DEFINE_SYSCALL(nanosleep, gaddr_t, rqtp, gaddr_t, rmtp)
 {
-  return or_errno(nanosleep(guest_to_host(rqtp), guest_to_host(rmtp)));
+  return syswrap(nanosleep(guest_to_host(rqtp), guest_to_host(rmtp)));
 }
 
 DEFINE_SYSCALL(utimes, gaddr_t, filename, gaddr_t, timevals)
 {
-  return or_errno(utimes(guest_to_host(filename), guest_to_host(timevals)));
+  return syswrap(utimes(guest_to_host(filename), guest_to_host(timevals)));
 }
 
 DEFINE_SYSCALL(utimensat, gaddr_t, filename, gaddr_t, timevals)

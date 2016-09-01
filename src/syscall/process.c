@@ -18,52 +18,52 @@ struct task task;
 
 DEFINE_SYSCALL(getpid)
 {
-  return or_errno(getpid());
+  return syswrap(getpid());
 }
 
 DEFINE_SYSCALL(getuid)
 {
-  return or_errno(getuid());
+  return syswrap(getuid());
 }
 
 DEFINE_SYSCALL(getgid)
 {
-  return or_errno(getgid());
+  return syswrap(getgid());
 }
 
 DEFINE_SYSCALL(setuid, l_uid_t, uid)
 {
-  return or_errno(setuid(uid));
+  return syswrap(setuid(uid));
 }
 
 DEFINE_SYSCALL(setgid, l_gid_t, gid)
 {
-  return or_errno(setgid(gid));
+  return syswrap(setgid(gid));
 }
 
 DEFINE_SYSCALL(geteuid)
 {
-  return or_errno(geteuid());
+  return syswrap(geteuid());
 }
 
 DEFINE_SYSCALL(getegid)
 {
-  return or_errno(getegid());
+  return syswrap(getegid());
 }
 
 DEFINE_SYSCALL(setpgid, pid_t, pid, pid_t, pgid)
 {
-  return or_errno(setpgid(pid, pgid));
+  return syswrap(setpgid(pid, pgid));
 }
 
 DEFINE_SYSCALL(getppid)
 {
-  return or_errno(getppid());
+  return syswrap(getppid());
 }
 
 DEFINE_SYSCALL(getpgrp)
 {
-  return or_errno(getpgrp());
+  return syswrap(getpgrp());
 }
 
 DEFINE_SYSCALL(gettid)
@@ -91,7 +91,7 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   case LINUX_RLIMIT_AS: resource = RLIMIT_AS; break;
   }
 
-  return or_errno(getrlimit(resource, l_rl));
+  return syswrap(getrlimit(resource, l_rl));
 }
 
 DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
@@ -140,7 +140,7 @@ DEFINE_SYSCALL(uname, gaddr_t, buf)
   strncpy(_buf->machine, "x86_64", sizeof _buf->machine - 1);
   strncpy(_buf->domainname, "GNU/Linux", sizeof _buf->domainname - 1);
 
-  return or_errno(gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0);
+  return syswrap(gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0);
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
@@ -179,7 +179,7 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage
   int *status = (int*)guest_to_host(gstatus);
   struct rusage *rusage = (struct rusage*)guest_to_host(grusage);
 
-  return or_errno(wait4(pid, status, options, rusage));
+  return syswrap(wait4(pid, status, options, rusage));
 }
 
 static void
