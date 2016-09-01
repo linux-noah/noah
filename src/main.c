@@ -140,12 +140,6 @@ main_loop()
     default:
       printk("other reason: %llu\n", exit_reason);
     }
-
-#if DEBUG_MODE
-    printk("[press <enter> to step or C-D to continue...]\n");
-    getchar();
-#endif
-
     printk("\n");
   }
 
