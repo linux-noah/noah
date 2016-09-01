@@ -31,6 +31,7 @@ printk(const char *fmt, ...)
   va_list ap;
 
   va_start(ap, fmt);
+  fprintf(printk_sink, "[%d] ", getpid());
   vfprintf(printk_sink, fmt, ap);
   va_end(ap);
 }

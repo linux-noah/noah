@@ -452,11 +452,12 @@ dump_instr()
   uint64_t instlen, rip;
   hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
   hv_vcpu_read_register(vcpuid, HV_X86_RIP, &rip);
-  printk("len: %lld, instruction: ", instlen);
+  char inst_str[instlen * 3 + 1];
   for (int i = 0; i < instlen; i ++) {
-    printk("%02x ", *((uchar*)guest_to_host(rip) + i));
+    sprintf(inst_str + 3 * i, "%02x ", *((uchar*)guest_to_host(rip) + i));
   }
-  printk("\n");
+  inst_str[instlen * 3] = '\0';
+  printk("len: %lld, instruction: %s\n", instlen, inst_str);
 }
 
 struct vm_snapshot {
