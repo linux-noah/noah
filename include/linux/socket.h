@@ -204,31 +204,25 @@ struct l_cmsghdr {
 #define L_CMSG_HDRSZ		LINUX_CMSG_LEN(0)
 
 /* Supported address families */
+#define LINUX_AF(_)\
+  DECL_LINUX(_,AF_UNSPEC,       0)\
+  DECL_LINUX(_,AF_UNIX,         1)\
+  DECL_ALIAS(_,AF_FILE,         AF_UNIX)\
+  DECL_LINUX(_,AF_INET,         2)\
+  DECL_LINUX(_,AF_AX25,         3,\
+                                LINUX_SPECIFIC)\
+  DECL_LINUX(_,AF_IPX,          4)\
+  DECL_LINUX(_,AF_APPLETALK,    5)\
+  DECL_LINUX(_,AF_INET6,        10)\
 
-#define	LINUX_AF_UNSPEC		0
-#define	LINUX_AF_UNIX		1
-#define LINUX_AF_FILE		1
-#define	LINUX_AF_INET		2
-#define	LINUX_AF_AX25		3
-#define	LINUX_AF_IPX		4
-#define	LINUX_AF_APPLETALK	5
-#define	LINUX_AF_INET6		10
-
-#define AF_MAP(_) \
-  CMAP_BIDR(_, LINUX_AF_UNSPEC,       AF_UNSPEC)     \
-  CMAP_BIDR(_, LINUX_AF_UNIX,         AF_UNIX)       \
-  CMAP_BIDR(_, LINUX_AF_INET,         AF_INET)       \
-  CMAP_BIDR(_, LINUX_AF_IPX,          AF_IPX)        \
-  CMAP_BIDR(_, LINUX_AF_APPLETALK,    AF_APPLETALK)  \
-  CMAP_BIDR(_, LINUX_AF_INET6,        AF_INET6)      \
-
-DECLARE_CMAP_FUNC(darwin_to_linux, sa_family, AF_MAP);
-DECLARE_CMAP_FUNC(linux_to_darwin, sa_family, AF_MAP);
+DECLARE_CENUM(sa_family, LINUX_AF);
+DECLARE_CMAP_FUNC(darwin_to_linux, sa_family, LINUX_AF);
+DECLARE_CMAP_FUNC(linux_to_darwin, sa_family, LINUX_AF);
 
 
 /* Supported socket types */
 
-#define	LINUX_SOCK_STREAM	1
+#define	sLINUX_SOCK_STREAM	1
 #define	LINUX_SOCK_DGRAM	2
 #define	LINUX_SOCK_RAW		3
 #define	LINUX_SOCK_RDM		4
