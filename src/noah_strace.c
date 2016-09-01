@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ctype.h>
 
+#include "syscall/common.h"
 #include "noah.h"
 
 
@@ -55,7 +56,11 @@ noah_strace(char *syscall_name, uint64_t ret, ...)
       fprintf(stderr, "0x%llx", val);
     }
   }
-  fprintf(stderr, "): ret = 0x%llx\n", ret);
+  fprintf(stderr, "): ret = 0x%llx", ret);
+  if ((int64_t)ret < 0) {
+    fprintf(stderr, "[%s]", linux_errno_str(-ret));
+  }
+  fprintf(stderr, "\n");
 
   va_end(ap);
 }
