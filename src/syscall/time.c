@@ -40,9 +40,9 @@ DEFINE_SYSCALL(utimensat, gaddr_t, filename, gaddr_t, timevals)
 {
   // HFS+ suppots only second precision timestamp
   struct timeval times[2];
-  int ret = utimes(guest_to_host(filename), times);
+  int ret = syswrap(utimes(guest_to_host(filename), times));
   if (ret < 0) {
-    return -errno;
+    return ret;
   }
 
   struct l_timespec (*l_times)[2] = guest_to_host(timevals);

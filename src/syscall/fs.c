@@ -222,7 +222,7 @@ DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
 
-  int ret = lstat(host_path, &d_st);
+  int ret = syswrap(lstat(host_path, &d_st));
   free(host_path);
   if (ret < 0) {
     return ret;
@@ -455,13 +455,13 @@ DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
 
 DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
 {
-  return lseek(fildes, offset, whence);
+  return syswrap(lseek(fildes, offset, whence));
 }
 
 DEFINE_SYSCALL(mkdir, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = mkdir(host_path, mode);
+  int ret = syswrap(mkdir(host_path, mode));
   free(host_path);
   return ret;
 }
@@ -477,7 +477,7 @@ DEFINE_SYSCALL(rmdir, gstr_t, path)
 
 DEFINE_SYSCALL(umask, int, mask)
 {
-  return umask(mask);
+  return syswrap(umask(mask));
 }
 
 void
@@ -507,7 +507,7 @@ DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
   struct statfs h_buf;
   char *host_path = to_host_path(guest_to_host(path));
 
-  int ret = statfs(host_path, &h_buf);
+  int ret = syswrap(statfs(host_path, &h_buf));
   statfs_darwin_to_linux(&h_buf, guest_to_host(buf));
 
   free(host_path);
