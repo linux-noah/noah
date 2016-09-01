@@ -207,7 +207,7 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
   struct sockaddr *sockaddr;
 
   if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
-    return -EINVAL;
+    return -LINUX_EINVAL;
   }
   ret = or_errno(bind(sockfd, sockaddr, addrlen));
 

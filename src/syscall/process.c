@@ -159,7 +159,7 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
     hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr));
     return 0;
   default:
-    return -EINVAL;
+    return -LINUX_EINVAL;
   }
 }
 

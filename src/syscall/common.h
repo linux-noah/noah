@@ -25,15 +25,6 @@
 #define DEFINE_SCWRAPPER(name, ...)                                     \
   uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                      \
     uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));              \
-    if ((int64_t)ret < 0) {                                                 \
-      int64_t derrno = -ret;                                                \
-      if (derrno < ELAST) {                                             \
-        ret = -darwin_to_linux_errno(derrno);                           \
-      } else {                                                          \
-      /* errno bigger than ELAST indicates raw Linux errno */           \
-        ret = -(derrno - ELAST);                                        \
-      }                                                                 \
-    }                                                                   \
     _noah_strace(#name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0)); \
     return ret;                                                         \
   }

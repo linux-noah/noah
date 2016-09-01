@@ -325,7 +325,7 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
   printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
-  return -EPERM;
+  return -LINUX_EPERM;
 }
 
 DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)

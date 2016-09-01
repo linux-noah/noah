@@ -153,7 +153,7 @@ DECLARE_CSTR_FUNC(errno, LINUX_ERRNO);
 DECLARE_CMAP_FUNC(darwin_to_linux, errno, LINUX_ERRNO);
 
 static inline int or_errno(int sys_ret) {
-  return (sys_ret < 0 && errno != 0) ? -errno : sys_ret ;
+  return (sys_ret < 0 && errno != 0) ? -darwin_to_linux_errno(errno) : sys_ret ;
 }
 
 #endif
