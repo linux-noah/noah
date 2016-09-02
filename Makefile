@@ -21,7 +21,7 @@ SRCS := \
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib test_fork)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
-	$(addprefix test/test_shell/build/, mv env)
+	$(addprefix test/test_shell/build/, mv env gcc)
 
 LINUX_BUILD_SERV := idylls.jp
 
