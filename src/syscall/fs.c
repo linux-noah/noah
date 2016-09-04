@@ -202,6 +202,23 @@ DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
   return 0;
 }
 
+DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
+{
+  char *host_path = to_host_path(guest_to_host(path));
+  struct l_newstat *l_st = guest_to_host(st);
+  struct stat d_st;
+
+  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at(flags)));
+  free(host_path);
+  if (ret < 0) {
+    return ret;
+  }
+
+  stat_darwin_to_linux(&d_st, l_st);
+
+  return 0;
+}
+
 DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
 {
   struct l_newstat *l_st = guest_to_host(st);

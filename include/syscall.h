@@ -263,7 +263,7 @@
   SYSCALL(259, unimplemented)                   \
   SYSCALL(260, unimplemented)                   \
   SYSCALL(261, unimplemented)                   \
-  SYSCALL(262, unimplemented)                   \
+  SYSCALL(262, newfstatat)                      \
   SYSCALL(263, unimplemented)                   \
   SYSCALL(264, unimplemented)                   \
   SYSCALL(265, unimplemented)                   \
