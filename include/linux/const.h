@@ -6,8 +6,8 @@
  */
 
 #define DECL_LINUX_linux_to_darwin(linux, val, darwin, ...) case linux: return (darwin);
-#define DECL_ALIAS_linux_to_darwin(linux, darwin) 
-#define FROM_DARWN_linux_to_darwin(linux, darwin)           case linux: return (dawrin);
+#define DECL_ALIAS_linux_to_darwin(linux, darwin)
+#define FROM_DARWN_linux_to_darwin(linux, darwin)
 
 #define DECL_LINUX_darwin_to_linux(linux, val, darwin, ...) case darwin: return (linux);
 #define DECL_ALIAS_darwin_to_linux(linux, darwin) 
