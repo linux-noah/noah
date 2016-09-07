@@ -34,7 +34,7 @@ DEFINE_SYSCALL(unimplemented)
 {
   uint64_t rax;
 
-  hv_vcpu_read_register(vcpuid, HV_X86_RAX, &rax);
+  hv_vcpu_read_register(task->vcpuid, HV_X86_RAX, &rax);
 
   fprintf(stderr, "unimplemented syscall: %lld\n", rax);
   exit(1);

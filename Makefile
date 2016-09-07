@@ -1,4 +1,4 @@
-CFLAGS += -g -Iinclude
+CFLAGS += -g -Iinclude -std=gnu11
 LDFLAGS += -framework Hypervisor
 
 SRCS := \

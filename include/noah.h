@@ -33,9 +33,8 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
+#include "util/list.h"
 #include "x86/page.h"
-
-extern hv_vcpuid_t vcpuid;
 
 void vmm_create(void);
 void vmm_snapshot(void);
@@ -53,11 +52,32 @@ void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 
 /* linux emulation */
 
-struct task {
-  gaddr_t set_child_tid, clear_child_tid;
+struct mm_region {
+  void *haddr;
+  gaddr_t gaddr;
+  size_t size;
+  int prot;
+  struct list_head list;
 };
 
-extern struct task task;
+struct mm {
+  struct list_head mm_regions;
+  uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
+};
+
+struct task {
+  hv_vcpuid_t vcpuid;
+  gaddr_t set_child_tid, clear_child_tid;
+  struct list_head tasks; // Tasks in the current proc
+};
+
+struct proc {
+  struct list_head tasks;
+  struct mm *mm;
+};
+
+extern struct proc proc;
+_Thread_local extern struct task *task;
 
 size_t copy_from_user(void *haddr, gaddr_t gaddr, size_t n); /* returns 0 on success */
 ssize_t strncpy_from_user(void *haddr, gaddr_t gaddr, size_t n);

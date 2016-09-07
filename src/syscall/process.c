@@ -14,7 +14,8 @@
 #include "linux/misc.h"
 #include "linux/errno.h"
 
-struct task task;
+struct proc proc;
+_Thread_local struct task *task;
 
 DEFINE_SYSCALL(getpid)
 {
@@ -101,16 +102,16 @@ DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 
 DEFINE_SYSCALL(exit, int, reason)
 {
-  if (task.clear_child_tid) {
-    do_futex_wake(task.clear_child_tid, 1);
+  if (task->clear_child_tid) {
+    do_futex_wake(task->clear_child_tid, 1);
   }
   _exit(reason);
 }
 
 DEFINE_SYSCALL(exit_group, int, reason)
 {
-  if (task.clear_child_tid) {
-    do_futex_wake(task.clear_child_tid, 1);
+  if (task->clear_child_tid) {
+    do_futex_wake(task->clear_child_tid, 1);
   }
   _exit(reason);
 }
@@ -147,16 +148,16 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   switch (code) {
   case LINUX_ARCH_SET_GS:
-    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_GS_BASE, addr);
+    hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS_BASE, addr);
     return 0;
   case LINUX_ARCH_SET_FS:
-    hv_vmx_vcpu_write_vmcs(vcpuid, VMCS_GUEST_FS_BASE, addr);
+    hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, addr);
     return 0;
   case LINUX_ARCH_GET_FS:
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr));
+    hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr));
     return 0;
   case LINUX_ARCH_GET_GS:
-    hv_vmx_vcpu_read_vmcs(vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr));
+    hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr));
     return 0;
   default:
     return -LINUX_EINVAL;
@@ -165,7 +166,7 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 
 DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 {
-  task.clear_child_tid = tidptr;
+  task->clear_child_tid = tidptr;
   return 0;
 }
 

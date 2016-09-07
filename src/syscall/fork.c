@@ -43,16 +43,16 @@ do_fork(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gadd
   vmm_reentry();
 
   if (pid == 0) {
-    task.set_child_tid = task.clear_child_tid = 0;
+    task->set_child_tid = task->clear_child_tid = 0;
     if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
-      task.set_child_tid = child_tid;
+      task->set_child_tid = child_tid;
     }
     if (clone_flags & LINUX_CLONE_CHILD_CLEARTID) {
-      task.clear_child_tid = child_tid;
+      task->clear_child_tid = child_tid;
     }
 
-    if (task.set_child_tid != 0) {
-      *(int *) guest_to_host(task.set_child_tid) = getpid();
+    if (task->set_child_tid != 0) {
+      *(int *) guest_to_host(task->set_child_tid) = getpid();
     }
   }
 
