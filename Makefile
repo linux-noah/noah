@@ -1,5 +1,5 @@
 CFLAGS += -g -Iinclude -std=gnu11
-LDFLAGS += -framework Hypervisor
+LDFLAGS += -framework Hypervisor -lpthread
 
 SRCS := \
 	src/main.c\

@@ -1,3 +1,6 @@
+#ifndef NOAH_X86_VMX_H
+#define NOAH_X86_VMX_H
+
 #define NR_VMCS_FIELD (sizeof(vmcs_field_list) / sizeof(uint32_t) - 1)
 
 #define VMCS_FIELD_ENTRIES                      \
@@ -232,3 +235,5 @@ static const char *x86_reg_str[] = {
   X86_REG_ENTRIES
 #undef X86_REG
 };
+
+#endif

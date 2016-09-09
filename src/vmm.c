@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <pthread.h>
 
 #include "noah.h"
 #include "util/list.h"
@@ -346,11 +347,11 @@ init_regs()
 }
 
 void
-init_msr()
+init_msr(hv_vcpuid_t vcpuid)
 {
-  if (hv_vcpu_enable_native_msr(task->vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(task->vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(task->vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
+  if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
+      hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
+      hv_vcpu_enable_native_msr(vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
     printk("MSR initialization failed.\n");
   }
 }
@@ -379,12 +380,13 @@ vmm_create()
   printk("successfully created a vcpu\n");
 
   proc.mm = malloc(sizeof(struct mm));
+  pthread_rwlock_init(&proc.alloc_lock, NULL);
   INIT_LIST_HEAD(&proc.mm->mm_regions);
   INIT_LIST_HEAD(&proc.tasks);
   list_add(&task->tasks, &proc.tasks);
 
   init_vmcs();
-  init_msr();
+  init_msr(task->vcpuid);
   init_page();
   init_special_regs();
   init_segment();
@@ -454,24 +456,19 @@ dump_instr()
   printk("len: %lld, instruction: %s\n", instlen, inst_str);
 }
 
-_Thread_local struct vm_snapshot {
-  uint64_t vcpu_reg[NR_X86_REG_LIST];
-  uint64_t vmcs[NR_VMCS_FIELD];
-} _vmm_snapshot;
-
 void
-vmm_snapshot()
+vcpu_snapshot(struct vcpu_snapshot *snapshot, hv_vcpuid_t vcpuid)
 {
   /* snapshot registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_read_register(task->vcpuid, x86_reg_list[i], &_vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
+    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &snapshot->vcpu_reg[i]) != HV_SUCCESS) {
       printk("store_regs failed\n");
       return;
     }
   }
   /* snapshot vmcs */
   for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
-    uint64_t success = hv_vmx_vcpu_read_vmcs(task->vcpuid, vmcs_field_list[i], &_vmm_snapshot.vmcs[i]);
+    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &snapshot->vmcs[i]);
     if (success != HV_SUCCESS) {
       printk("store_vmcs failed\n");
       return;
@@ -480,19 +477,28 @@ vmm_snapshot()
 }
 
 void
-reg_restore()
+vmm_snapshot(struct vm_snapshot *snapshot)
 {
-  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_write_register(task->vcpuid, x86_reg_list[i], _vmm_snapshot.vcpu_reg[i]) != HV_SUCCESS) {
-      printk("restore regs failed\n");
-      return;
-    }
+  printk("vmm_snapshot\n");
+  INIT_LIST_HEAD(&snapshot->vcpu_snapshots);
+
+  pthread_rwlock_rdlock(&proc.alloc_lock);
+
+  /* snapshot processors */
+  struct task* t;
+  list_for_each_entry(t, &proc.tasks, tasks) {
+    struct vcpu_snapshot *cpusnap = malloc(sizeof(struct vcpu_snapshot));
+    vcpu_snapshot(cpusnap, t->vcpuid);
+    list_add_tail(&cpusnap->vcpu_snapshots, &snapshot->vcpu_snapshots);
   }
+
+  pthread_rwlock_unlock(&proc.alloc_lock);
 }
 
-bool
-vmcs_restore()
+void
+vcpu_restore(struct vcpu_snapshot *snapshot, hv_vcpuid_t vcpuid)
 {
+  /* restore vmcs */
   static const uint32_t restore_mask[] = {
     VMCS_VPID,
     VMCS_HOST_ES,
@@ -540,14 +546,20 @@ vmcs_restore()
         goto cont;
       }
     }
-    uint64_t success = hv_vmx_vcpu_write_vmcs(task->vcpuid, vmcs_field_list[i], _vmm_snapshot.vmcs[i]);
+    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], snapshot->vmcs[i]);
     if (success != HV_SUCCESS) {
       printk("restore vmcs failed, %s\n", vmcs_field_str[i]);
-      return false;
     }
-    cont: ;
+cont: ;
   }
-  return true;
+
+  /* restore registers */
+  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
+    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], snapshot->vcpu_reg[i]) != HV_SUCCESS) {
+      printk("restore regs failed\n");
+      return;
+    }
+  }
 }
 
 bool
@@ -564,7 +576,7 @@ restore_ept()
 }
 
 void
-vmm_reentry()
+vmm_reentry(struct vm_snapshot *snapshot)
 {
   hv_return_t ret;
 
@@ -574,19 +586,29 @@ vmm_reentry()
     printk("could not create the vm: error code %x", ret);
     return;
   }
+  printk("successfully created vm\n");
 
-  ret = hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
-  if (ret != HV_SUCCESS) {
-    printk("could not create a vcpu: error code %x", ret);
-    return;
+  pthread_rwlock_rdlock(&proc.alloc_lock);
+  struct list_head *s = snapshot->vcpu_snapshots.next;
+  struct list_head *t = proc.tasks.next;
+  while (s != &snapshot->vcpu_snapshots) {
+    struct task *task = list_entry(t, struct task, tasks);
+
+    ret = hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
+    if (ret != HV_SUCCESS) {
+      printk("could not create a vcpu: error code %x", ret);
+      return;
+    }
+    init_msr(task->vcpuid);
+
+    vcpu_restore(list_entry(s, struct vcpu_snapshot, vcpu_snapshots), task->vcpuid);
+
+    s = s->next; t = t->next;
   }
+  pthread_rwlock_unlock(&proc.alloc_lock);
+  printk("vcpu_restore done\n");
 
-  init_msr();
-
-  vmcs_restore();
-  printk("vmcs_restore done\n");
   restore_ept();
   printk("ept_restore done\n");
-  reg_restore();
-  printk("reg_restore done\n");
+
 }

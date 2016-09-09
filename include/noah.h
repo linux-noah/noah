@@ -2,6 +2,7 @@
 #define NOAH_H
 
 #include <stdint.h>
+#include <stdint.h>
 #include <unistd.h>
 
 typedef unsigned char uchar;
@@ -35,10 +36,23 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 
 #include "util/list.h"
 #include "x86/page.h"
+#include "x86/vmx.h"
+
+struct vm_snapshot {
+  struct list_head vcpu_snapshots;
+};
+
+struct vcpu_snapshot {
+  uint64_t vcpu_reg[NR_X86_REG_LIST];
+  uint64_t vmcs[NR_VMCS_FIELD];
+  struct list_head vcpu_snapshots;
+};
 
 void vmm_create(void);
-void vmm_snapshot(void);
-void vmm_reentry(void);
+void vcpu_snapshot(struct vcpu_snapshot*, hv_vcpuid_t);
+void vmm_snapshot(struct vm_snapshot*);
+void vmm_reentry(struct vm_snapshot*);
+void vcpu_restore(struct vcpu_snapshot *, hv_vcpuid_t);
 void vmm_destroy(void);
 
 typedef uint64_t gaddr_t;
@@ -73,6 +87,8 @@ struct task {
 
 struct proc {
   struct list_head tasks;
+  int nr_tasks;
+  pthread_rwlock_t alloc_lock; // Protection for tasks (and nr_tasks), mm
   struct mm *mm;
 };
 
@@ -88,6 +104,7 @@ gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t off
 int do_open(const char *path, int flags, int mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
+void main_loop();
 
 #define LINUX_RELEASE "4.6.4"
 #define LINUX_VERSION "#1 SMP PREEMPT Mon Jul 11 19:12:32 CEST 2016" /* FIXME */
