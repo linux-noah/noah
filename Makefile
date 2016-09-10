@@ -42,7 +42,7 @@ test/test_shell/build/%: test/test_shell/%.c test/include/*.h
 
 MAKE_TEST_UPROGS = ssh $(LINUX_BUILD_SERV) "rm /tmp/$(USER)/*";\
                    rsync $^ $(LINUX_BUILD_SERV):/tmp/$(USER)/;\
-                   ssh $(LINUX_BUILD_SERV) "musl-gcc -g -O0 /tmp/$(USER)/$*.c -o /tmp/$(USER)/$*";\
+                   ssh $(LINUX_BUILD_SERV) "gcc -g -O0 /tmp/$(USER)/$*.c -lpthread -o /tmp/$(USER)/$*";\
                    rsync $(LINUX_BUILD_SERV):/tmp/$(USER)/$* $@
 
 run: build/noah test/test_stdout/build/hello
