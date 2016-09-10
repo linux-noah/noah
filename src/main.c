@@ -9,7 +9,7 @@
 
 
 void
-main_loop()
+run_task()
 {
   hv_return_t ret;
   uint64_t value;
@@ -200,7 +200,7 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   };
 
-  main_loop();
+  run_task();
 
   vmm_destroy();
 

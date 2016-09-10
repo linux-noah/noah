@@ -94,7 +94,7 @@ clone_thread_entry(void *varg)
   free(arg->vcpu_snapshot);
   free(varg);
 
-  main_loop();
+  run_task();
 
   return NULL; // hv_vcpu_run failed for some reason
 }

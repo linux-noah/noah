@@ -106,7 +106,7 @@ gaddr_t do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t off
 int do_open(const char *path, int flags, int mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
-void main_loop();
+void run_task();
 
 #define LINUX_RELEASE "4.6.4"
 #define LINUX_VERSION "#1 SMP PREEMPT Mon Jul 11 19:12:32 CEST 2016" /* FIXME */
