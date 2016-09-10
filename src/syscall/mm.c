@@ -106,3 +106,9 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
 
   return current_brk = brk;
 }
+
+DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)
+{
+  printk("madvise is not implemented");
+  return 0;
+}

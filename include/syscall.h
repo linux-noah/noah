@@ -29,7 +29,7 @@
   SYSCALL(25, unimplemented)                    \
   SYSCALL(26, unimplemented)                    \
   SYSCALL(27, unimplemented)                    \
-  SYSCALL(28, unimplemented)                    \
+  SYSCALL(28, madvise)                          \
   SYSCALL(29, unimplemented)                    \
   SYSCALL(30, unimplemented)                    \
   SYSCALL(31, unimplemented)                    \
