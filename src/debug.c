@@ -4,10 +4,12 @@
 #include <Hypervisor/hv_vmx.h>
 #include <stdarg.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "noah.h"
 
 static FILE *printk_sink;
+pthread_mutex_t printk_sync = PTHREAD_MUTEX_INITIALIZER;
 
 void
 init_debug(const char *fn)
@@ -31,8 +33,16 @@ printk(const char *fmt, ...)
   va_list ap;
 
   va_start(ap, fmt);
-  fprintf(printk_sink, "[%d] ", getpid());
+
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+
+  pthread_mutex_lock(&printk_sync);
+  fprintf(printk_sink, "[%d:%lld] ", getpid(), tid);
   vfprintf(printk_sink, fmt, ap);
+  fflush(printk_sink);
+  pthread_mutex_unlock(&printk_sync);
+
   va_end(ap);
 }
 
