@@ -19,7 +19,7 @@ SRCS := \
 	src/syscall/futex.c
 
 TEST_UPROGS := \
-	$(addprefix test/test_assertion/build/, fib test_fork)\
+	$(addprefix test/test_assertion/build/, fib test_fork test_thread)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
 	$(addprefix test/test_shell/build/, mv env gcc)
 
