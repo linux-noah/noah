@@ -13,7 +13,7 @@
 #include "linux/signal.h"
 
 int
-post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid)
+post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
 {
   if (clone_ret < 0) {
     return clone_ret;
@@ -31,6 +31,11 @@ post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gadd
     if (task->set_child_tid != 0) {
       *(int *) guest_to_host(task->set_child_tid) = getpid();
     }
+
+    if (clone_flags & LINUX_CLONE_SETTLS) {
+      hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, tls);
+    }
+
   } else {
     if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
       *(int *) guest_to_host(parent_tid) = clone_ret;
@@ -41,7 +46,7 @@ post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gadd
 }
 
 int
-clone_proc(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid)
+clone_proc(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
 {
   // Because Apple Hypervisor Framwork won't let us use multiple VMs,
   // we destroy the current vm and restore it later
@@ -53,7 +58,7 @@ clone_proc(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, g
 
   vmm_reentry(&snapshot);
 
-  return post_clone(ret, clone_flags, newsp, parent_tid, child_tid);
+  return post_clone(ret, clone_flags, newsp, parent_tid, child_tid, tls);
 }
 
 struct clone_thread_arg {
@@ -61,6 +66,7 @@ struct clone_thread_arg {
   unsigned long newsp;
   gaddr_t parent_tid;
   gaddr_t child_tid;
+  gaddr_t tls;
   struct vcpu_snapshot *vcpu_snapshot;
 };
 
@@ -83,7 +89,7 @@ clone_thread_entry(void *varg)
   list_add_tail(&task->tasks, &proc.tasks);
   pthread_rwlock_unlock(&proc.alloc_lock);
 
-  int sys_ret = post_clone(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid);
+  int sys_ret = post_clone(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
 
   uint64_t rip;
   hv_vcpu_write_register(task->vcpuid, HV_X86_RAX, sys_ret);
@@ -100,7 +106,7 @@ clone_thread_entry(void *varg)
 }
 
 int
-clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid)
+clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
 {
   printk("clone_thread\n");
   uint64_t tid;
@@ -108,7 +114,7 @@ clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid,
 
   struct vcpu_snapshot *snapshot = malloc(sizeof(struct vcpu_snapshot));
   struct clone_thread_arg *arg = malloc(sizeof(struct clone_thread_arg));
-  *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, snapshot};
+  *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls, snapshot};
   vcpu_snapshot(snapshot, task->vcpuid);
   pthread_create(&threadid, NULL, clone_thread_entry, arg);
   pthread_threadid_np(threadid, &tid);
@@ -117,20 +123,17 @@ clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid,
 }
 
 int
-do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid)
+do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
 {
   int sigtype = clone_flags & 0xff;
   assert(sigtype == LINUX_SIGCHLD || sigtype == 0);
 
   clone_flags &= -0x100;
-  unsigned long implemented = LINUX_CLONE_THREAD | LINUX_CLONE_DETACHED | LINUX_CLONE_CHILD_SETTID | LINUX_CLONE_CHILD_CLEARTID | LINUX_CLONE_PARENT_SETTID;
+  unsigned long implemented = LINUX_CLONE_THREAD | LINUX_CLONE_DETACHED | LINUX_CLONE_SETTLS | LINUX_CLONE_CHILD_SETTID | LINUX_CLONE_CHILD_CLEARTID | LINUX_CLONE_PARENT_SETTID;
   unsigned long needed = 0;
   if (clone_flags & LINUX_CLONE_THREAD) {
     int needed = LINUX_CLONE_VM | LINUX_CLONE_FS | LINUX_CLONE_FILES | LINUX_CLONE_SIGHAND | LINUX_CLONE_SYSVSEM;
-    implemented |= needed | LINUX_CLONE_SETTLS;
-    if (clone_flags & LINUX_CLONE_SETTLS) {
-      printk("CLONE_SETTLS is not implemented yet, ignoring...\n");
-    }
+    implemented |= needed;
   }
   if ((clone_flags & ~implemented) || (clone_flags & needed) != needed) {
     fprintf(stderr, "unsupported clone_flags: %lx\n", clone_flags);
@@ -140,23 +143,23 @@ do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gad
 
 
   if (clone_flags & LINUX_CLONE_THREAD) {
-    return clone_thread(clone_flags, newsp, parent_tid, child_tid);
+    return clone_thread(clone_flags, newsp, parent_tid, child_tid, tls);
   } else {
-    return clone_proc(clone_flags, newsp, parent_tid, child_tid);
+    return clone_proc(clone_flags, newsp, parent_tid, child_tid, tls);
   }
 }
 
-DEFINE_SYSCALL(clone, unsigned long, clone_flags, unsigned long, newsp, gaddr_t, parent_tid, gaddr_t, child_tid)
+DEFINE_SYSCALL(clone, unsigned long, clone_flags, unsigned long, newsp, gaddr_t, parent_tid, gaddr_t, child_tid, gaddr_t, tls)
 {
-  return do_clone(clone_flags, newsp, parent_tid, child_tid);
+  return do_clone(clone_flags, newsp, parent_tid, child_tid, tls);
 }
 
 DEFINE_SYSCALL(fork)
 {
-  return do_clone(LINUX_SIGCHLD, 0, 0, 0);
+  return do_clone(LINUX_SIGCHLD, 0, 0, 0, 0);
 }
 
 DEFINE_SYSCALL(vfork)
 {
-  return do_clone(LINUX_SIGCHLD, 0, 0, 0);
+  return do_clone(LINUX_SIGCHLD, 0, 0, 0, 0);
 }

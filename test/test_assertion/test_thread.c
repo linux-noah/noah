@@ -5,6 +5,8 @@
 
 int count;
 
+__thread int tls_data = 0xbeef;
+
 void*
 thread_start(void *arg)
 {
@@ -21,7 +23,28 @@ test_thread_create()
   assert_true(count == 1);
 }
 
+void*
+thread_tls(void *arg)
+{
+  assert_true(tls_data == 0xbeef);
+  tls_data = 0xdead;
+  assert_true(tls_data == 0xdead);
+}
+
+void
+test_tls()
+{
+  assert_true(tls_data == 0xbeef);
+  tls_data = 0xface;
+  assert_true(tls_data == 0xface);
+  pthread_t thread;
+  pthread_create(&thread, NULL, thread_start, NULL);
+  usleep(5000); // FIXME: replace with pthread_join after implementing futex
+  assert_true(tls_data == 0xface);
+}
+
 int main()
 {
   test_thread_create();
+  test_tls();
 }
