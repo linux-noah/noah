@@ -3,18 +3,22 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <pthread.h>
 
 #include "syscall/common.h"
 #include "noah.h"
 
 
 void
-noah_strace(char *syscall_name, uint64_t ret, ...)
+noah_strace(char *syscall_name, ...)
 {
   va_list ap;
-  va_start(ap, ret);
+  va_start(ap, syscall_name);
 
-  fprintf(stderr, "[%d] strace: %s(", getpid(), syscall_name);
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+
+  fprintf(stderr, "[%d:%lld] strace: %s(", getpid(), tid, syscall_name);
   int first = 1;
   for (;;) {
     char *type_name, *arg_name;
@@ -56,11 +60,19 @@ noah_strace(char *syscall_name, uint64_t ret, ...)
       fprintf(stderr, "0x%llx", val);
     }
   }
-  fprintf(stderr, "): ret = 0x%llx", ret);
+  fprintf(stderr, ")");
+  fflush(stderr);
+
+  va_end(ap);
+}
+
+void
+noah_strace_ret(char *syscall_name, uint64_t ret)
+{
+  fprintf(stderr, ": ret = 0x%llx", ret);
   if ((int64_t)ret < 0) {
     fprintf(stderr, "[%s]", linux_errno_str(-ret));
   }
   fprintf(stderr, "\n");
-
-  va_end(ap);
+  fflush(stderr);
 }

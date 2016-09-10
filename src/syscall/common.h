@@ -24,8 +24,9 @@
 
 #define DEFINE_SCWRAPPER(name, ...)                                     \
   uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                      \
+    _noah_strace(#name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
     uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));              \
-    _noah_strace(#name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0)); \
+    _noah_strace_ret(#name, ret);                                       \
     return ret;                                                         \
   }
 
@@ -46,8 +47,10 @@
 
 #ifdef DEBUG_MODE
 #define _noah_strace noah_strace
+#define _noah_strace_ret noah_strace_ret
 #else
 #define _noah_strace(...) 
+#define _noah_strace_ret(...) 
 #endif
 
 
