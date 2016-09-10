@@ -103,14 +103,24 @@ DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 DEFINE_SYSCALL(exit, int, reason)
 {
   if (task->clear_child_tid) {
+    *(int*)guest_to_host(task->clear_child_tid) = 0;
     do_futex_wake(task->clear_child_tid, 1);
   }
-  _exit(reason);
+  pthread_rwlock_wrlock(&proc.alloc_lock);
+  if (proc.nr_tasks == 1) {
+    _exit(reason);
+  } else {
+    proc.nr_tasks--;
+    list_del(&proc.tasks);
+    pthread_rwlock_unlock(&proc.alloc_lock);
+    pthread_exit(&reason);
+  }
 }
 
 DEFINE_SYSCALL(exit_group, int, reason)
 {
   if (task->clear_child_tid) {
+    *(int*)guest_to_host(task->clear_child_tid) = 0;
     do_futex_wake(task->clear_child_tid, 1);
   }
   _exit(reason);

@@ -370,6 +370,7 @@ vmm_create()
   printk("successfully created the vm\n");
 
   task = malloc(sizeof(struct task));
+  bzero(task, sizeof(struct task));
 
   ret = hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
@@ -384,6 +385,7 @@ vmm_create()
   INIT_LIST_HEAD(&proc.mm->mm_regions);
   INIT_LIST_HEAD(&proc.tasks);
   list_add(&task->tasks, &proc.tasks);
+  proc.nr_tasks = 1;
 
   init_vmcs();
   init_msr(task->vcpuid);
