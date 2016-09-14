@@ -54,7 +54,7 @@ void vmm_reentry(struct vm_snapshot*);
 void vcpu_snapshot(struct vcpu_snapshot*);
 void vcpu_restore(struct vcpu_snapshot*);
 
-void init_msr(hv_vcpuid_t);
+void init_msr();
 
 typedef uint64_t gaddr_t;
 typedef gaddr_t  gstr_t;

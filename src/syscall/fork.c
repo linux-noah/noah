@@ -79,7 +79,6 @@ clone_thread_entry(void *varg)
   bzero(task, sizeof(struct task));
 
   hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
-  init_msr(task->vcpuid);
 
   vcpu_restore(arg->vcpu_snapshot);
   hv_vmx_vcpu_write_vmcs(task->vcpuid, HV_X86_RSP, arg->newsp);
