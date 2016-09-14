@@ -33,11 +33,14 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
   flags &= ~LINUX_MAP_DENYWRITE;
   flags &= ~LINUX_MAP_EXECUTABLE;
 
+  /* We ignore these currenlty */
+  flags &= ~LINUX_MAP_NORESERVE;
+
   /* the linux kernel does nothing for LINUX_MAP_STACK */
   flags &= ~LINUX_MAP_STACK;
 
   if ((flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
-    fprintf(stderr, "unsupported mmap flags: %x\n", flags);
+    fprintf(stderr, "unsupported mmap flags: 0x%x\n", flags);
     exit(1);
   }
   if (flags & LINUX_MAP_ANON) {
