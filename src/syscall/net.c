@@ -68,7 +68,7 @@ to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size
     break;
 
   default:
-    fprintf(stderr, "Unimplemented sa_family");
+    fprintf(stderr, "Unimplemented sa_family: 0x%x(%s)\n", linux_to_darwin_sa_family(l_sockaddr->sa_family), linux_sa_family_str(l_sockaddr->sa_family));
     goto err;
   }
 
