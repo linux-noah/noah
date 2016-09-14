@@ -161,6 +161,8 @@ __attribute__((noreturn)) usage()
   exit(1);
 }
 
+struct noah_run_info noah_run_info;
+
 int
 main(int argc, char *argv[], char **envp)
 {
@@ -189,6 +191,8 @@ main(int argc, char *argv[], char **envp)
       break;
     }
   }
+
+  noah_run_info = (struct noah_run_info) {.self_path = argv[0], .argc = argc, .argv = argv, .optind = optind};
 
   argc -= optind;
   argv += optind;

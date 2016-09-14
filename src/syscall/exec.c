@@ -359,22 +359,16 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
   while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
 
-  /* get this executable's path */
-  uint32_t bufsize;
-  _NSGetExecutablePath(NULL, &bufsize);
-  char noah_path[bufsize];
-  if (_NSGetExecutablePath(noah_path, &bufsize)) {
-    return -1;
-  }
-
   const char *elf_path = guest_to_host(gelf_path);
 
-  char *argv[argc + 2];
-  argv[0] = noah_path;
-  for (int i = 0; i < argc; i++) {
-    argv[i + 1] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  char *argv[argc + noah_run_info.optind + 1];
+  for (int i = 0; i < noah_run_info.optind; i++) {
+    argv[i] = noah_run_info.argv[i];
   }
-  argv[argc + 1] = NULL;
+  for (int i = 0; i < argc; i++) {
+    argv[i + noah_run_info.optind] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  }
+  argv[argc + noah_run_info.optind] = NULL;
 
   char *envp[envc + 1];
   for (int i = 0; i < envc; i++) {
@@ -383,9 +377,9 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   envp[envc] = NULL;
 
   /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
-  argv[1] = (char *) elf_path;
+  argv[noah_run_info.optind] = (char *) elf_path;
 
   vmm_destroy();
 
-  return syswrap(execve(noah_path, argv, envp));
+  return syswrap(execve(noah_run_info.self_path, argv, envp));
 }
