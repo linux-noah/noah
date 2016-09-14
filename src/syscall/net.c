@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <assert.h>
+#include <limits.h>
 
 #include "linux/common.h"
 #include "linux/socket.h"
@@ -172,6 +173,79 @@ DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr
   return syswrap(sendto(socket, guest_to_host(buf), length, flags, NULL, 0));
 }
 
+int
+linux_to_darwin_msg_flags(l_int flags)
+{
+  int ret = 0;
+  if (flags & LINUX_MSG_OOB) {
+    ret |= MSG_OOB;
+    flags &= ~LINUX_MSG_OOB;
+  }
+  if (flags & LINUX_MSG_PEEK) {
+    ret |= MSG_PEEK;
+    flags &= ~LINUX_MSG_PEEK;
+  }
+  if (flags & LINUX_MSG_DONTROUTE) {
+    ret |= MSG_DONTROUTE;
+    flags &= ~LINUX_MSG_DONTROUTE;
+  }
+  if (flags & LINUX_MSG_EOR) {
+    ret |= MSG_EOR;
+    flags &= ~LINUX_MSG_EOR;
+  }
+  if (flags & LINUX_MSG_TRUNC) {
+    ret |= MSG_TRUNC;
+    flags &= ~LINUX_MSG_TRUNC;
+  }
+  if (flags & LINUX_MSG_CTRUNC) {
+    ret |= MSG_CTRUNC;
+    flags &= ~LINUX_MSG_CTRUNC;
+  }
+  if (flags & LINUX_MSG_WAITALL) {
+    ret |= MSG_WAITALL;
+    flags &= ~LINUX_MSG_WAITALL;
+  }
+  if (flags & LINUX_MSG_DONTWAIT) {
+    ret |= MSG_DONTWAIT;
+    flags &= ~LINUX_MSG_DONTWAIT;
+  }
+
+  if (flags) {
+    printk("unsupported msg_flags: 0x%x", flags);
+    return -LINUX_EOPNOTSUPP;
+  }
+
+  return ret;
+}
+
+int
+linux_to_darwin_msghdr(const struct l_msghdr *lhdr, struct msghdr *dhdr)
+{
+  if (lhdr->msg_controllen > INT_MAX) {
+    return -LINUX_ENOBUFS;
+  }
+
+  dhdr->msg_name = (void*)lhdr->msg_name;
+  dhdr->msg_namelen = lhdr->msg_namelen;
+  dhdr->msg_iov = (void*)lhdr->msg_iov;
+  dhdr->msg_iovlen = lhdr->msg_iovlen;
+  dhdr->msg_control = (void*)lhdr->msg_control;
+  dhdr->msg_flags = linux_to_darwin_msg_flags(lhdr->msg_flags);
+
+  if (dhdr->msg_flags < 0) {
+    // unsupported flags found
+    return dhdr->msg_flags;
+  }
+
+  if (LINUX_CMSG_FIRSTHDR(lhdr) != NULL) {
+    printk("we do not support ancillary data yet\n");
+    return -LINUX_EINVAL;
+  }
+  dhdr->msg_controllen = 0;
+
+  return 0;
+}
+
 DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, addr, gaddr_t, addrlen)
 {
   int ret;
@@ -182,6 +256,19 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
   to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
 
   return ret;
+}
+
+DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg, int, flags)
+{
+  struct l_msghdr *lhdr = (struct l_msghdr*)msg;
+  struct msghdr dhdr;
+  
+  int err = linux_to_darwin_msghdr(lhdr, &dhdr);
+  if (err < 0) {
+    return err;
+  }
+
+  return syswrap(sendmsg(sockfd, &dhdr, flags));
 }
 
 DEFINE_SYSCALL(listen, int, socket, int, backlog)
