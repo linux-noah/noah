@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <pthread.h>
@@ -114,6 +115,8 @@ DEFINE_SYSCALL(exit, int, reason)
     proc.nr_tasks--;
     list_del(&task->tasks);
     pthread_rwlock_unlock(&proc.alloc_lock);
+    hv_vcpu_destroy(task->vcpuid);
+    free(task);
     pthread_exit(&reason);
   }
 }
