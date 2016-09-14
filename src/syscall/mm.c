@@ -1,7 +1,10 @@
 #include "common.h"
 
 #include "noah.h"
+#include "vmm.h"
 #include "x86/page.h"
+
+#include "linux/mman.h"
 
 #include <stdio.h>
 #include <stdlib.h>

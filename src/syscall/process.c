@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "noah.h"
+#include "vmm.h"
 
 #include "linux/common.h"
 #include "linux/misc.h"

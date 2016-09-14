@@ -4,6 +4,7 @@
 #include <cpuid.h>
 #include <getopt.h>
 
+#include "vmm.h"
 #include "noah.h"
 #include "syscall.h"
 

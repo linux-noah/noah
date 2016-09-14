@@ -12,9 +12,12 @@
 #include <sys/stat.h>
 
 #include "noah.h"
+#include "vmm.h"
 #include "x86/page.h"
 #include "x86/vmemparam.h"
 #include "elf.h"
+
+#include "linux/mman.h"
 
 extern uint64_t brk_min;
 
