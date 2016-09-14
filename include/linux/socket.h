@@ -215,6 +215,7 @@ struct l_cmsghdr {
   DECL_LINUX(_,AF_UNSPEC,       0)\
   DECL_LINUX(_,AF_UNIX,         1)\
   DECL_ALIAS(_,AF_FILE,         AF_UNIX)\
+  DECL_ALIAS(_,AF_LOCAL,        AF_UNIX)\
   DECL_LINUX(_,AF_INET,         2)\
   DECL_LINUX(_,AF_AX25,         3,\
                                 LINUX_SPECIFIC)\

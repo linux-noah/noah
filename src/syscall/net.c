@@ -42,6 +42,7 @@ to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size
   case AF_UNIX: {
     int slen;
     struct sockaddr_un *sockaddr_un = (struct sockaddr_un*)*sockaddr;
+
     if (sockaddr_un->sun_path[0] == '\0') {
       // Linux abstract namespace starts with NULL, which we do not support yet
       printk("Abstract namespace: %20s\n", &sockaddr_un->sun_path[1]);
@@ -56,9 +57,16 @@ to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size
     }
     break;
   }
+
   case AF_INET:
     (*sockaddr)->sa_len = sizeof(struct sockaddr_in);
     break;
+
+  case AF_INET6:
+    assert(l_sockaddr_len != sizeof(struct sockaddr_in6) - sizeof(uint32_t));
+    (*sockaddr)->sa_len = l_sockaddr_len;
+    break;
+
   default:
     fprintf(stderr, "Unimplemented sa_family");
     goto err;
