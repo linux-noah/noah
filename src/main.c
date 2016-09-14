@@ -167,20 +167,24 @@ main(int argc, char *argv[], char **envp)
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
     { "output", required_argument, NULL, 'o' },
+    { "strace", required_argument, NULL, 's' },
     { 0, 0, 0, 0 }
   };
   int c, option_index = 0;
 
   char *outfile = NULL;
 
-  while ((c = getopt_long(argc, argv, "+hvo:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+hvo:s:", long_options, &option_index)) != -1) {
     switch (c) {
     default:
       usage();
     case 'v':
       version();
     case 'o':
-      outfile = optarg;
+      init_printk(optarg);
+      break;
+    case 's':
+      init_meta_strace(optarg);
       break;
     }
   }
@@ -191,8 +195,6 @@ main(int argc, char *argv[], char **envp)
   if (argc == 0) {
     usage();
   }
-
-  init_printk(outfile);
 
   vmm_create();
 

@@ -12,11 +12,10 @@ static FILE *printk_sink;
 pthread_mutex_t printk_sync = PTHREAD_MUTEX_INITIALIZER;
 
 void
-init_debug_sink(const char *fn, FILE **sinkp, const char *name)
+init_sink(const char *fn, FILE **sinkp, const char *name)
 {
   if (! fn) {
-    //fn = "/dev/null";
-    fn = "log";
+    fn = "/dev/null";
   }
   *sinkp = fopen(fn, "a");
 
@@ -24,22 +23,26 @@ init_debug_sink(const char *fn, FILE **sinkp, const char *name)
   time_t now = time(0);
   struct tm tm = *gmtime(&now);
   strftime(buf, sizeof buf, "%a, %d %b %Y %H:%M:%S %Z", &tm);
-  printk("\n//==================\n");
-  printk("%s log started: [%s]\n", name, buf);
+  fprintf(*sinkp, "\n//==================\n");
+  fprintf(*sinkp, "%s log started: [%s]\n", name, buf);
 }
 
 void
 init_printk(const char *fn)
 {
-  init_debug_sink(fn, &printk_sink, "printk");
+  init_sink(fn, &printk_sink, "printk");
 }
 
 void
 printk(const char *fmt, ...)
 {
   va_list ap;
-
   va_start(ap, fmt);
+
+  if (!printk_sink) {
+    va_end(ap);
+    return;
+  }
 
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);

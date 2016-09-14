@@ -13,22 +13,27 @@ static FILE *strace_sink;
 pthread_mutex_t strace_sync = PTHREAD_MUTEX_INITIALIZER;
 
 void
-noah_strace(char *syscall_name, ...)
+init_meta_strace(const char *path)
 {
-  static int is_initialized = false;
-  if (!is_initialized) {
-    init_debug_sink("strace", &strace_sink, "strace");
-    is_initialized = true;
-  }
+  init_sink("strace", &strace_sink, "strace");
+}
 
+void
+meta_strace(char *syscall_name, ...)
+{
   va_list ap;
   va_start(ap, syscall_name);
+
+  if (!strace_sink) {
+    va_end(ap);
+    return;
+  }
 
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
 
   pthread_mutex_lock(&strace_sync);
-  fprintf(strace_sink, "[%d:%lld] strace: %s(", getpid(), tid, syscall_name);
+  fprintf(strace_sink, "[%d:%lld] %s(", getpid(), tid, syscall_name);
   int first = 1;
   for (;;) {
     char *type_name, *arg_name;
@@ -78,8 +83,12 @@ noah_strace(char *syscall_name, ...)
 }
 
 void
-noah_strace_ret(char *syscall_name, uint64_t ret)
+meta_strace_ret(char *syscall_name, uint64_t ret)
 {
+  if (!strace_sink) {
+    return;
+  }
+
   fprintf(strace_sink, ": ret = 0x%llx", ret);
   if ((int64_t)ret < 0) {
     fprintf(strace_sink, "[%s]", linux_errno_str(-ret));
