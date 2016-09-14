@@ -192,7 +192,7 @@ main(int argc, char *argv[], char **envp)
     usage();
   }
 
-  init_debug(outfile);
+  init_printk(outfile);
 
   vmm_create();
 

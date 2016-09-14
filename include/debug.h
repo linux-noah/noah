@@ -2,7 +2,8 @@
 #include <stdint.h>
 #include <Hypervisor/hv.h>
 
-void init_debug(const char *name);
+void init_debug_sink(const char *fn, FILE **sinkp, const char *name);
+void init_printk(const char *fn);
 
 void printk(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 void print_regs(void);
