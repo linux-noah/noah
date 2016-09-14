@@ -38,22 +38,21 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #include "x86/page.h"
 #include "x86/vmx.h"
 
-struct vm_snapshot {
-  struct list_head vcpu_snapshots;
-};
-
 struct vcpu_snapshot {
   uint64_t vcpu_reg[NR_X86_REG_LIST];
   uint64_t vmcs[NR_VMCS_FIELD];
-  struct list_head vcpu_snapshots;
+};
+
+struct vm_snapshot {
+  struct vcpu_snapshot first_vcpu_snapshot;
 };
 
 void vmm_create(void);
-void vcpu_snapshot(struct vcpu_snapshot*, hv_vcpuid_t);
+void vmm_destroy(void);
 void vmm_snapshot(struct vm_snapshot*);
 void vmm_reentry(struct vm_snapshot*);
-void vcpu_restore(struct vcpu_snapshot *, hv_vcpuid_t);
-void vmm_destroy(void);
+void vcpu_snapshot(struct vcpu_snapshot*);
+void vcpu_restore(struct vcpu_snapshot*);
 
 void init_msr(hv_vcpuid_t);
 

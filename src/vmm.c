@@ -459,18 +459,18 @@ dump_instr()
 }
 
 void
-vcpu_snapshot(struct vcpu_snapshot *snapshot, hv_vcpuid_t vcpuid)
+vcpu_snapshot(struct vcpu_snapshot *snapshot)
 {
   /* snapshot registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_read_register(vcpuid, x86_reg_list[i], &snapshot->vcpu_reg[i]) != HV_SUCCESS) {
+    if (hv_vcpu_read_register(task->vcpuid, x86_reg_list[i], &snapshot->vcpu_reg[i]) != HV_SUCCESS) {
       printk("store_regs failed\n");
       return;
     }
   }
   /* snapshot vmcs */
   for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
-    uint64_t success = hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field_list[i], &snapshot->vmcs[i]);
+    uint64_t success = hv_vmx_vcpu_read_vmcs(task->vcpuid, vmcs_field_list[i], &snapshot->vmcs[i]);
     if (success != HV_SUCCESS) {
       printk("store_vmcs failed\n");
       return;
@@ -482,23 +482,21 @@ void
 vmm_snapshot(struct vm_snapshot *snapshot)
 {
   printk("vmm_snapshot\n");
-  INIT_LIST_HEAD(&snapshot->vcpu_snapshots);
 
   pthread_rwlock_rdlock(&proc.alloc_lock);
 
-  /* snapshot processors */
-  struct task* t;
-  list_for_each_entry(t, &proc.tasks, tasks) {
-    struct vcpu_snapshot *cpusnap = malloc(sizeof(struct vcpu_snapshot));
-    vcpu_snapshot(cpusnap, t->vcpuid);
-    list_add_tail(&cpusnap->vcpu_snapshots, &snapshot->vcpu_snapshots);
+  if (proc.nr_tasks > 1) {
+    fprintf(stderr, "multi-threaded fork is not implemented yet.\n");
+    exit(1);
   }
+
+  vcpu_snapshot(&snapshot->first_vcpu_snapshot);
 
   pthread_rwlock_unlock(&proc.alloc_lock);
 }
 
 void
-vcpu_restore(struct vcpu_snapshot *snapshot, hv_vcpuid_t vcpuid)
+vcpu_restore(struct vcpu_snapshot *snapshot)
 {
   /* restore vmcs */
   static const uint32_t restore_mask[] = {
@@ -548,7 +546,7 @@ vcpu_restore(struct vcpu_snapshot *snapshot, hv_vcpuid_t vcpuid)
         goto cont;
       }
     }
-    uint64_t success = hv_vmx_vcpu_write_vmcs(vcpuid, vmcs_field_list[i], snapshot->vmcs[i]);
+    uint64_t success = hv_vmx_vcpu_write_vmcs(task->vcpuid, vmcs_field_list[i], snapshot->vmcs[i]);
     if (success != HV_SUCCESS) {
       printk("restore vmcs failed, %s\n", vmcs_field_str[i]);
     }
@@ -557,7 +555,7 @@ cont: ;
 
   /* restore registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_write_register(vcpuid, x86_reg_list[i], snapshot->vcpu_reg[i]) != HV_SUCCESS) {
+    if (hv_vcpu_write_register(task->vcpuid, x86_reg_list[i], snapshot->vcpu_reg[i]) != HV_SUCCESS) {
       printk("restore regs failed\n");
       return;
     }
@@ -591,22 +589,21 @@ vmm_reentry(struct vm_snapshot *snapshot)
   printk("successfully created vm\n");
 
   pthread_rwlock_rdlock(&proc.alloc_lock);
-  struct list_head *s = snapshot->vcpu_snapshots.next;
-  struct list_head *t = proc.tasks.next;
-  while (s != &snapshot->vcpu_snapshots) {
-    struct task *task = list_entry(t, struct task, tasks);
 
-    ret = hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
-    if (ret != HV_SUCCESS) {
-      printk("could not create a vcpu: error code %x", ret);
-      return;
-    }
-    init_msr(task->vcpuid);
-
-    vcpu_restore(list_entry(s, struct vcpu_snapshot, vcpu_snapshots), task->vcpuid);
-
-    s = s->next; t = t->next;
+  if (proc.nr_tasks > 1) {
+    fprintf(stderr, "multi-threaded fork is not implemented yet.\n");
+    exit(1);
   }
+
+  ret = hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
+  if (ret != HV_SUCCESS) {
+    printk("could not create a vcpu: error code %x", ret);
+    return;
+  }
+  init_msr(task->vcpuid);
+
+  vcpu_restore(&snapshot->first_vcpu_snapshot);
+
   pthread_rwlock_unlock(&proc.alloc_lock);
   printk("vcpu_restore done\n");
 
