@@ -8,6 +8,7 @@
 #include <pthread.h>
 
 #include "noah.h"
+#include "vmm.h"
 #include "util/list.h"
 
 #include <Hypervisor/hv.h>
