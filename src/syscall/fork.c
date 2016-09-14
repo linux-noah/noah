@@ -81,7 +81,7 @@ clone_thread_entry(void *varg)
   hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
   init_msr(task->vcpuid);
 
-  vcpu_restore(arg->vcpu_snapshot, task->vcpuid);
+  vcpu_restore(arg->vcpu_snapshot);
   hv_vmx_vcpu_write_vmcs(task->vcpuid, HV_X86_RSP, arg->newsp);
 
   pthread_rwlock_wrlock(&proc.alloc_lock);
@@ -115,7 +115,7 @@ clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid,
   struct vcpu_snapshot *snapshot = malloc(sizeof(struct vcpu_snapshot));
   struct clone_thread_arg *arg = malloc(sizeof(struct clone_thread_arg));
   *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls, snapshot};
-  vcpu_snapshot(snapshot, task->vcpuid);
+  vcpu_snapshot(snapshot);
   pthread_create(&threadid, NULL, clone_thread_entry, arg);
   pthread_threadid_np(threadid, &tid);
 
