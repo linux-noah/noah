@@ -15,7 +15,7 @@ pthread_mutex_t strace_sync = PTHREAD_MUTEX_INITIALIZER;
 void
 init_meta_strace(const char *path)
 {
-  init_sink("strace", &strace_sink, "strace");
+  init_sink(path, &strace_sink, "strace");
 }
 
 void
