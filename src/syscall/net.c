@@ -218,18 +218,26 @@ linux_to_darwin_msg_flags(l_int flags)
   return ret;
 }
 
+void
+linux_to_darwin_msg_iovec(struct l_iovec *liovec, struct iovec *diovec)
+{
+  diovec->iov_base = guest_to_host(liovec->iov_base);
+  diovec->iov_len = liovec->iov_len;
+}
+
 int
-linux_to_darwin_msghdr(const struct l_msghdr *lhdr, struct msghdr *dhdr)
+linux_to_darwin_msghdr(const struct l_msghdr *lhdr, struct iovec *diovec, struct msghdr *dhdr)
 {
   if (lhdr->msg_controllen > INT_MAX) {
     return -LINUX_ENOBUFS;
   }
 
-  dhdr->msg_name = (void*)lhdr->msg_name;
+  dhdr->msg_name = guest_to_host(lhdr->msg_name);
   dhdr->msg_namelen = lhdr->msg_namelen;
-  dhdr->msg_iov = (void*)lhdr->msg_iov;
+  linux_to_darwin_msg_iovec(guest_to_host(lhdr->msg_iov), diovec);
+  dhdr->msg_iov = diovec;
   dhdr->msg_iovlen = lhdr->msg_iovlen;
-  dhdr->msg_control = (void*)lhdr->msg_control;
+  dhdr->msg_control = guest_to_host(lhdr->msg_control);
   dhdr->msg_flags = linux_to_darwin_msg_flags(lhdr->msg_flags);
 
   if (dhdr->msg_flags < 0) {
@@ -258,17 +266,42 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gad
   return ret;
 }
 
-DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg, int, flags)
+int
+do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
 {
-  struct l_msghdr *lhdr = (struct l_msghdr*)msg;
   struct msghdr dhdr;
+  struct iovec diovec;
   
-  int err = linux_to_darwin_msghdr(lhdr, &dhdr);
+  int err = linux_to_darwin_msghdr(msg, &diovec, &dhdr);
   if (err < 0) {
     return err;
   }
 
   return syswrap(sendmsg(sockfd, &dhdr, flags));
+}
+
+DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg, int, flags)
+{
+  return do_sendmsg(sockfd, (struct l_msghdr*)msg, flags);
+}
+
+DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec, unsigned int, vlen, unsigned int, flags)
+{
+  struct l_mmsghdr *msg = guest_to_host(msgvec);
+  int i = 0;
+
+  while (i < vlen) {
+    int err = do_sendmsg(sockfd, &msg->msg_hdr, flags);
+    if (err < 0) {
+      return err;
+    }
+    msg->msg_len = err;
+
+    i++;
+    msg++;
+  }
+
+  return i;
 }
 
 DEFINE_SYSCALL(listen, int, socket, int, backlog)

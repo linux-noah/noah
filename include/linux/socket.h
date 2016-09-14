@@ -155,6 +155,11 @@ struct l_ifconf {
 #define LINUX_SCM_CREDENTIALS	0x02
 #define LINUX_SCM_TIMESTAMP	0x1D
 
+struct l_iovec {
+  l_uintptr_t iov_base;
+  l_size_t iov_len;
+};
+
 struct l_msghdr {
   l_uintptr_t	msg_name;
   l_int		msg_namelen;
