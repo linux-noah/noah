@@ -347,11 +347,11 @@ init_regs()
 }
 
 void
-init_msr(hv_vcpuid_t vcpuid)
+init_msr()
 {
-  if (hv_vcpu_enable_native_msr(vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
+  if (hv_vcpu_enable_native_msr(task->vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
+      hv_vcpu_enable_native_msr(task->vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
+      hv_vcpu_enable_native_msr(task->vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
     printk("MSR initialization failed.\n");
   }
 }
@@ -388,7 +388,7 @@ vmm_create()
   proc.nr_tasks = 1;
 
   init_vmcs();
-  init_msr(task->vcpuid);
+  init_msr();
   init_page();
   init_special_regs();
   init_segment();
@@ -560,6 +560,9 @@ cont: ;
       return;
     }
   }
+
+  /* restore MSRs. Initializing them is enough now */
+  init_msr();
 }
 
 bool
@@ -600,8 +603,6 @@ vmm_reentry(struct vm_snapshot *snapshot)
     printk("could not create a vcpu: error code %x", ret);
     return;
   }
-  init_msr(task->vcpuid);
-
   vcpu_restore(&snapshot->first_vcpu_snapshot);
 
   pthread_rwlock_unlock(&proc.alloc_lock);
