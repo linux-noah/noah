@@ -77,7 +77,7 @@ print_ret(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint
 }
 
 void
-do_meta_strace(int syscall_num, meta_strace_hook def, meta_strace_hook **hooks, uint64_t ret,  va_list ap)
+do_meta_strace(int syscall_num, char *syscall_name, meta_strace_hook def, meta_strace_hook **hooks, uint64_t ret,  va_list ap)
 {
   int argc = 0;
   char *argnames[6];
@@ -92,6 +92,12 @@ do_meta_strace(int syscall_num, meta_strace_hook def, meta_strace_hook **hooks, 
       break;
     }
     argc++;
+  }
+
+  if (strcmp(syscall_name, "unimplemented") == 0) {
+    fprintf(strace_sink, "<unimplemented systemcall>");
+    def(-1, argc, argnames, typenames, vals, ret);
+    return;
   }
 
   if (hooks[syscall_num]) {
@@ -123,7 +129,7 @@ meta_strace_pre(int syscall_num, char *syscall_name, ...)
   pthread_mutex_lock(&strace_sync);
   fprintf(strace_sink, "[%d:%lld] %s(", getpid(), tid, syscall_name);
 
-  do_meta_strace(syscall_num, print_args, strace_pre_hooks, 0, ap);
+  do_meta_strace(syscall_num, syscall_name, print_args, strace_pre_hooks, 0, ap);
 
   fflush(strace_sink);
   pthread_mutex_unlock(&strace_sync);
@@ -145,7 +151,7 @@ meta_strace_post(int syscall_num, char *syscall_name, uint64_t ret, ...)
 
   pthread_mutex_lock(&strace_sync);
 
-  do_meta_strace(syscall_num, print_ret, strace_post_hooks, ret, ap);
+  do_meta_strace(syscall_num, syscall_name, print_ret, strace_post_hooks, ret, ap);
 
   fflush(strace_sink);
   pthread_mutex_unlock(&strace_sync);
