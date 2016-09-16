@@ -20,14 +20,8 @@ init_meta_strace(const char *path)
 
 typedef void meta_strace_hook(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret);
 
-meta_strace_hook trace_read_pre, trace_read_post;
-
-meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
-  [NR_read] = trace_read_post,
-};
-meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
-  [NR_read] = trace_read_pre,
-};
+meta_strace_hook *strace_pre_hooks[NR_SYSCALLS];
+meta_strace_hook *strace_post_hooks[NR_SYSCALLS];
 
 void
 trace_arg(int syscall_num, int arg_idx, const char *arg_name, const char *type_name, uint64_t val)
@@ -64,20 +58,18 @@ trace_arg(int syscall_num, int arg_idx, const char *arg_name, const char *type_n
 void
 print_args(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  fprintf(strace_sink, "(");
   for (int i = 0; i < argc; i++) {
     if (i > 0) {
       fprintf(strace_sink, ", ");
     }
     trace_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
   }
-  fprintf(strace_sink, ")");
 }
 
 void
 print_ret(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  fprintf(strace_sink, ": ret = 0x%llx", ret);
+  fprintf(strace_sink, "): ret = 0x%llx", ret);
   if ((int64_t)ret < 0) {
     fprintf(strace_sink, "[%s]", linux_errno_str(-ret));
   }
@@ -129,7 +121,7 @@ meta_strace_pre(int syscall_num, char *syscall_name, ...)
   pthread_threadid_np(NULL, &tid);
 
   pthread_mutex_lock(&strace_sync);
-  fprintf(strace_sink, "[%d:%lld] %s", getpid(), tid, syscall_name);
+  fprintf(strace_sink, "[%d:%lld] %s(", getpid(), tid, syscall_name);
 
   do_meta_strace(syscall_num, print_args, strace_pre_hooks, 0, ap);
 
@@ -164,25 +156,57 @@ meta_strace_post(int syscall_num, char *syscall_name, uint64_t ret, ...)
 void
 trace_read_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  fprintf(strace_sink, "(");
-  trace_arg(syscall_num, 0, argnames[0], typenames[0], vals[0]);
+  // Print nothing
 }
 
+/* Print buf after syscall in order to show what stinrg is actually read */
 void
 trace_read_post(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  // Print buf after syscall in order to show what stinrg is actually read
-  for (int i = 1; i < argc; i++) {
-    fprintf(strace_sink, ", ");
-
-    // Print buf as string
-    char *type = typenames[i];
-    if (i == 1) {
-      type = "gstr_t";
-    }
-    trace_arg(syscall_num, i, argnames[i], type, vals[i]);
-  }
-  fprintf(strace_sink, ")");
+  typenames[1] = "gstr_t"; // Print buf as string
+  print_args(syscall_num, argc, argnames, typenames, vals, ret);
 
   print_ret(syscall_num, argc, argnames, typenames, vals, ret);
 }
+
+void
+trace_write_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  typenames[1] = "gstr_t"; // Print buf as string
+  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+}
+
+void
+trace_recvfrom_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  // Print nothing
+}
+
+/* Print buf after syscall in order to show what stinrg is actually recvfrom */
+void
+trace_recvfrom_post(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  typenames[1] = "gstr_t"; // Print buf as string
+  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+
+  print_ret(syscall_num, argc, argnames, typenames, vals, ret);
+}
+
+void
+trace_sendto_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  typenames[1] = "gstr_t"; // Print buf as string
+  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+}
+
+meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
+  [NR_read] = trace_read_pre,
+  [NR_recvfrom] = trace_recvfrom_pre,
+  [NR_write] = trace_write_pre,
+  [NR_sendto] = trace_sendto_pre,
+};
+meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
+  [NR_read] = trace_read_post,
+  [NR_recvfrom] = trace_recvfrom_post,
+};
+
