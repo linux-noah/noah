@@ -379,6 +379,13 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
   argv[noah_run_info.optind] = (char *) elf_path;
 
+  /* FIXME: Workaround. Return errors to illegal fiels */
+  int ret = do_open(elf_path, O_RDONLY, S_IXUSR);
+  if (ret < 0) {
+    return ret;
+  }
+  close(ret);
+
   vmm_destroy();
 
   return syswrap(execve(noah_run_info.self_path, argv, envp));
