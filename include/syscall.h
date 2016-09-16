@@ -150,8 +150,8 @@
   SYSCALL(146, unimplemented)                   \
   SYSCALL(147, unimplemented)                   \
   SYSCALL(148, unimplemented)                   \
-  SYSCALL(149, unimplemented)                   \
-  SYSCALL(150, unimplemented)                   \
+  SYSCALL(149, mlock)                           \
+  SYSCALL(150, munlock)                         \
   SYSCALL(151, unimplemented)                   \
   SYSCALL(152, unimplemented)                   \
   SYSCALL(153, unimplemented)                   \

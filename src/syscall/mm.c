@@ -117,4 +117,15 @@ DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)
 {
   printk("madvise is not implemented");
   return 0;
+
+}
+
+DEFINE_SYSCALL(mlock, gaddr_t, addr, size_t, length)
+{
+  return syswrap(mlock(guest_to_host(addr), length));
+}
+
+DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
+{
+  return syswrap(munlock(guest_to_host(addr), length));
 }
