@@ -202,13 +202,43 @@ DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
   return 0;
 }
 
+int
+linux_to_darwin_at_flags(int flags)
+{
+  int ret = 0;
+  if (flags & LINUX_AT_FDCWD) {
+    ret |= AT_FDCWD;
+    flags &= ~LINUX_AT_FDCWD;
+  }
+  if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
+    ret |= AT_SYMLINK_NOFOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_NOFOLLOW;
+  }
+  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
+  if (flags & LINUX_AT_EACCESS) {
+    ret |= AT_EACCESS;
+    flags &= ~LINUX_AT_EACCESS;
+  }
+  if (flags & LINUX_AT_SYMLINK_FOLLOW) {
+    ret |= AT_SYMLINK_FOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_FOLLOW;
+  }
+
+  if (flags) {
+    printk("unsupported at flags:0x%x\n", flags);
+    fprintf(stderr, "unsupported at flags:0x%x\n", flags);
+  }
+
+  return ret;
+}
+
 DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
 {
   char *host_path = to_host_path(guest_to_host(path));
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
 
-  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at(flags)));
+  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at_flags(flags)));
   free(host_path);
   if (ret < 0) {
     return ret;

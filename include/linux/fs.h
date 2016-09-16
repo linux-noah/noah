@@ -44,7 +44,6 @@
                                      LINUX_SPECIFIC)\
 
 DECLARE_CENUM(at, LINUX_AT);
-DECLARE_CMAP_FUNC(linux_to_darwin, at, LINUX_AT);
 
 /*
  * posix_fadvise advice
