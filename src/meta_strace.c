@@ -24,25 +24,31 @@ meta_strace_hook *strace_pre_hooks[NR_SYSCALLS];
 meta_strace_hook *strace_post_hooks[NR_SYSCALLS];
 
 void
-trace_arg(int syscall_num, int arg_idx, const char *arg_name, const char *type_name, uint64_t val)
+print_gstr(gstr_t str, int maxlen)
+{
+  fprintf(strace_sink, "\"");
+  for (int i = 0; i < maxlen; i++) {
+    char c = *((char*)guest_to_host(str) + i);
+    if (c == '\0') {
+      break;
+    } else if (c == '\n') {
+      fprintf(strace_sink, "\\n");
+    } else if (!isprint(c)) {
+      fprintf(strace_sink, "\\x%02x", c);
+    } else {
+      fprintf(strace_sink, "%c", c);
+    }
+  }
+  fprintf(strace_sink, "\"");
+}
+
+void
+print_arg(int syscall_num, int arg_idx, const char *arg_name, const char *type_name, uint64_t val)
 {
     fprintf(strace_sink, "%s: ", arg_name);
 
     if (strcmp(type_name, "gstr_t") == 0) {
-      fprintf(strace_sink, "\"");
-      for (int i = 0; i < 100; i++) {
-        char c = *((char*)guest_to_host(val) + i);
-        if (c == '\0') {
-          break;
-        } else if (c == '\n') {
-          fprintf(strace_sink, "\\n");
-        } else if (!isprint(c)) {
-          fprintf(strace_sink, "\\x%02x", c);
-        } else {
-          fprintf(strace_sink, "%c", c);
-        }
-      }
-      fprintf(strace_sink, "\"");
+      print_gstr(val, 100);
 
     } else if (strcmp(type_name, "gaddr_t") == 0) {
       fprintf(strace_sink, "0x%016llx [host: 0x%016llx]", val, (uint64_t)guest_to_host(val));
@@ -62,7 +68,7 @@ print_args(int syscall_num, int argc, char *argnames[6], char *typenames[6], uin
     if (i > 0) {
       fprintf(strace_sink, ", ");
     }
-    trace_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
   }
 }
 
@@ -169,8 +175,17 @@ trace_read_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6],
 void
 trace_read_post(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  typenames[1] = "gstr_t"; // Print buf as string
-  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fprintf(strace_sink, ", ");
+    }
+    if (i == 1) {
+      fprintf(strace_sink, "%s: ", argnames[1]);
+      print_gstr(vals[1], ret); // Print buf as string
+    } else {
+      print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    }
+  }
 
   print_ret(syscall_num, argc, argnames, typenames, vals, ret);
 }
@@ -178,8 +193,17 @@ trace_read_post(int syscall_num, int argc, char *argnames[6], char *typenames[6]
 void
 trace_write_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  typenames[1] = "gstr_t"; // Print buf as string
-  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fprintf(strace_sink, ", ");
+    }
+    if (i == 1) {
+      fprintf(strace_sink, "%s: ", argnames[1]);
+      print_gstr(vals[1], vals[2]); // Print buf as string
+    } else {
+      print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    }
+  }
 }
 
 void
@@ -192,8 +216,17 @@ trace_recvfrom_pre(int syscall_num, int argc, char *argnames[6], char *typenames
 void
 trace_recvfrom_post(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  typenames[1] = "gstr_t"; // Print buf as string
-  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fprintf(strace_sink, ", ");
+    }
+    if (i == 1) {
+      fprintf(strace_sink, "%s: ", argnames[1]);
+      print_gstr(vals[1], ret); // Print buf as string
+    } else {
+      print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    }
+  }
 
   print_ret(syscall_num, argc, argnames, typenames, vals, ret);
 }
@@ -201,8 +234,17 @@ trace_recvfrom_post(int syscall_num, int argc, char *argnames[6], char *typename
 void
 trace_sendto_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
-  typenames[1] = "gstr_t"; // Print buf as string
-  print_args(syscall_num, argc, argnames, typenames, vals, ret);
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fprintf(strace_sink, ", ");
+    }
+    if (i == 1) {
+      fprintf(strace_sink, "%s: ", argnames[1]);
+      print_gstr(vals[1], vals[2]); // Print buf as string
+    } else {
+      print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    }
+  }
 }
 
 void
@@ -217,14 +259,14 @@ trace_execve_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6
     dargv[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
   }
 
-  trace_arg(syscall_num, 0, argnames[0], typenames[0], vals[0]); // path
+  print_arg(syscall_num, 0, argnames[0], typenames[0], vals[0]); // path
   /* argc */
   fprintf(strace_sink, ", [");
   for (int i = 0; i < exec_argc; i++) {
     fprintf(strace_sink, "\"%s\", ", dargv[i]);
   }
   fprintf(strace_sink, "], ");
-  trace_arg(syscall_num, 2, argnames[2], typenames[2], vals[2]); // envp
+  print_arg(syscall_num, 2, argnames[2], typenames[2], vals[2]); // envp
 }
 
 meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
