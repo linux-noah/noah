@@ -162,7 +162,7 @@
   SYSCALL(158, arch_prctl)                      \
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, setrlimit)                       \
-  SYSCALL(161, unimplemented)                   \
+  SYSCALL(161, chroot)                          \
   SYSCALL(162, unimplemented)                   \
   SYSCALL(163, unimplemented)                   \
   SYSCALL(164, unimplemented)                   \

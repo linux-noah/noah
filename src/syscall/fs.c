@@ -560,3 +560,11 @@ DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
   free(host_path);
   return ret;
 }
+
+DEFINE_SYSCALL(chroot, gstr_t, path)
+{
+  fprintf(stderr, "chroot is not implemented yet, ignoring...\n");
+  printk("chroot is not implemented yet, ignoring...\n");
+
+  return -LINUX_ENOSYS;
+}
