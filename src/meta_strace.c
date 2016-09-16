@@ -199,11 +199,34 @@ trace_sendto_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6
   print_args(syscall_num, argc, argnames, typenames, vals, ret);
 }
 
+void
+trace_execve_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  int exec_argc = 0;
+  gaddr_t gargv = vals[1];
+
+  while (((gaddr_t*)guest_to_host(gargv))[exec_argc] != 0) exec_argc++;
+  char *dargv[exec_argc];
+  for (int i = 0; i < exec_argc; i++) {
+    dargv[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  }
+
+  trace_arg(syscall_num, 0, argnames[0], typenames[0], vals[0]); // path
+  /* argc */
+  fprintf(strace_sink, ", [");
+  for (int i = 0; i < exec_argc; i++) {
+    fprintf(strace_sink, "\"%s\", ", dargv[i]);
+  }
+  fprintf(strace_sink, "], ");
+  trace_arg(syscall_num, 2, argnames[2], typenames[2], vals[2]); // envp
+}
+
 meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
   [NR_read] = trace_read_pre,
   [NR_recvfrom] = trace_recvfrom_pre,
   [NR_write] = trace_write_pre,
   [NR_sendto] = trace_sendto_pre,
+  [NR_execve] = trace_execve_pre,
 };
 meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
   [NR_read] = trace_read_post,
