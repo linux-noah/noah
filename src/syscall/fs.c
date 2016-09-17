@@ -424,7 +424,11 @@ DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
 
 DEFINE_SYSCALL(chdir, gstr_t, path)
 {
-  return syswrap(chdir(guest_to_host(path)));
+  char *host_path = to_host_path(guest_to_host(path));
+  int ret = syswrap(chdir(host_path));
+
+  free(host_path);
+  return ret;
 }
 
 DEFINE_SYSCALL(fchdir, int, fd)
