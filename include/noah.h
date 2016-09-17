@@ -79,6 +79,7 @@ struct proc {
   int nr_tasks;
   pthread_rwlock_t alloc_lock; /* Protection for tasks (and nr_tasks), mm */
   struct mm *mm;
+  char *root; /* FS root */
 };
 
 extern struct proc proc;

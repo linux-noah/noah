@@ -53,10 +53,8 @@
 #include <sys/mount.h>
 #include <sys/syslimits.h>
 #include <dirent.h>
-#include <libgen.h>
 
 #include <mach-o/dyld.h>
-
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
@@ -77,29 +75,12 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 }
 
 char*
-cat_linux_mnt(const char *path)
-{
-  uint32_t noah_path_len = 0;
-  _NSGetExecutablePath(NULL, &noah_path_len);
-  char noah_path[noah_path_len];
-  _NSGetExecutablePath(noah_path, &noah_path_len);
-
-  char *dir_path = dirname(noah_path);
-  int mnt_len = strlen(dir_path) + strlen("/../mnt/");
-
-  char buf[strnlen(path, LINUX_PATH_MAX) + mnt_len];
-  strcpy(buf, dir_path);
-  strcat(buf, "/../mnt/");
-  strcat(buf, path);
-
-  return strdup(buf);
-}
-
-char*
 to_host_path(const char *path)
 {
   if (path[0] == '/') {
-    char *mnt_path = cat_linux_mnt(path);
+    int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
+    char *mnt_path = malloc(len + 1);
+    snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
     //if (access(mnt_path, F_OK) == 0) {
       return mnt_path;
     //}
@@ -347,14 +328,8 @@ DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 
 DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
 {
-  char *host_oldpath, *host_newpath;
-
-  host_oldpath = to_host_path(guest_to_host(oldpath));
-  if  (strcmp(host_oldpath, guest_to_host(oldpath)) != 0) {
-    host_newpath = cat_linux_mnt(guest_to_host(newpath));
-  } else {
-    host_newpath = strdup(guest_to_host(newpath));
-  }
+  char *host_oldpath = to_host_path(guest_to_host(oldpath));
+  char *host_newpath = to_host_path(guest_to_host(newpath));
 
   int ret = syswrap(rename(host_oldpath, host_newpath));
   
@@ -399,14 +374,8 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
 
 DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
 {
-  char *host_path1, *host_path2;
-  
-  host_path1 = to_host_path(guest_to_host(path1));
-  if  (strcmp(host_path1, guest_to_host(path2)) != 0) {
-    host_path2 = cat_linux_mnt(guest_to_host(path2));
-  } else {
-    host_path2 = strdup(guest_to_host(path2));
-  }
+  char *host_path1 = to_host_path(guest_to_host(path1));
+  char *host_path2 = to_host_path(guest_to_host(path2));
 
   int ret = syswrap(symlink(host_path1, host_path2));
 
@@ -563,8 +532,29 @@ DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
 
 DEFINE_SYSCALL(chroot, gstr_t, path)
 {
-  fprintf(stderr, "chroot is not implemented yet, ignoring...\n");
-  printk("chroot is not implemented yet, ignoring...\n");
+  char l_path[PATH_MAX];
+  int len = strncpy_from_user(l_path, path, PATH_MAX);
+  if (len == PATH_MAX) {
+    return -LINUX_ENAMETOOLONG;
+  }
+  if (len < 0) {
+    return -LINUX_EFAULT;
+  }
 
-  return -LINUX_ENOSYS;
+  /* We have not impelemented caps, just check if user is root */
+  if (getuid() != 0) {
+    return -LINUX_EPERM;
+  }
+
+  char *host_path = to_host_path(l_path);
+
+  int error = syswrap(access(host_path, X_OK | R_OK));
+  if (error < 0) {
+    free(host_path);
+    return error;
+  }
+
+  free(proc.root);
+  proc.root = host_path;
+  return 0;
 }

@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <cpuid.h>
 #include <getopt.h>
+#include <string.h>
 
 #include "vmm.h"
 #include "noah.h"
@@ -171,13 +172,14 @@ main(int argc, char *argv[], char **envp)
     { "version", no_argument, NULL, 'v' },
     { "output", required_argument, NULL, 'o' },
     { "strace", required_argument, NULL, 's' },
+    { "mnt", required_argument, NULL, 'm' },
     { 0, 0, 0, 0 }
   };
   int c, option_index = 0;
 
-  char *outfile = NULL;
+  char *root = NULL;
 
-  while ((c = getopt_long(argc, argv, "+hvo:s:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
     default:
       usage();
@@ -188,6 +190,9 @@ main(int argc, char *argv[], char **envp)
       break;
     case 's':
       init_meta_strace(optarg);
+      break;
+    case 'm':
+      root = optarg;
       break;
     }
   }
@@ -202,6 +207,11 @@ main(int argc, char *argv[], char **envp)
   }
 
   vmm_create();
+
+  if (root) {
+    free(proc.root);
+    proc.root = strdup(root);
+  }
 
   if (do_exec(argv[0], argc, argv, envp) < 0) {
     exit(1);
