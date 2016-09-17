@@ -90,49 +90,96 @@ to_host_path(const char *path)
 }
 
 int
-do_open(const char *path, int l_flags, int mode)
+linux_to_darwin_at_flags(int flags)
 {
-  int flags = 0;
+  int ret = 0;
+  if (flags & LINUX_AT_FDCWD) {
+    ret |= AT_FDCWD;
+    flags &= ~LINUX_AT_FDCWD;
+  }
+  if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
+    ret |= AT_SYMLINK_NOFOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_NOFOLLOW;
+  }
+  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
+  if (flags & LINUX_AT_EACCESS) {
+    ret |= AT_EACCESS;
+    flags &= ~LINUX_AT_EACCESS;
+  }
+  if (flags & LINUX_AT_SYMLINK_FOLLOW) {
+    ret |= AT_SYMLINK_FOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_FOLLOW;
+  }
+
+  if (flags) {
+    printk("unsupported at flags:0x%x\n", flags);
+    fprintf(stderr, "unsupported at flags:0x%x\n", flags);
+  }
+
+  return ret;
+}
+
+int
+linux_to_darwin_o_flags(int l_flags)
+{
+  int ret = 0;
   switch (l_flags & LINUX_O_ACCMODE) {
   case LINUX_O_WRONLY:
-    flags |= O_WRONLY;
+    ret |= O_WRONLY;
     break;
   case LINUX_O_RDWR:
-    flags |= O_RDWR;
+    ret |= O_RDWR;
     break;
   default:                      /* Note: LINUX_O_RDONLY == 0 */
-    flags |= O_RDONLY;
+    ret |= O_RDONLY;
   }
   if (l_flags & LINUX_O_NDELAY)
-    flags |= O_NONBLOCK;
+    ret |= O_NONBLOCK;
   if (l_flags & LINUX_O_APPEND)
-    flags |= O_APPEND;
+    ret |= O_APPEND;
   if (l_flags & LINUX_O_SYNC)
-    flags |= O_FSYNC;
+    ret |= O_FSYNC;
   if (l_flags & LINUX_O_NONBLOCK)
-    flags |= O_NONBLOCK;
+    ret |= O_NONBLOCK;
   if (l_flags & LINUX_FASYNC)
-    flags |= O_ASYNC;
+    ret |= O_ASYNC;
   if (l_flags & LINUX_O_CREAT)
-    flags |= O_CREAT;
+    ret |= O_CREAT;
   if (l_flags & LINUX_O_TRUNC)
-    flags |= O_TRUNC;
+    ret |= O_TRUNC;
   if (l_flags & LINUX_O_EXCL)
-    flags |= O_EXCL;
+    ret |= O_EXCL;
   if (l_flags & LINUX_O_NOCTTY)
-    flags |= O_NOCTTY;
+    ret |= O_NOCTTY;
   /* if (l_flags & LINUX_O_DIRECT) */
-  /*   flags |= O_DIRECT; */
+  /*   ret |= O_DIRECT; */
   if (l_flags & LINUX_O_NOFOLLOW)
-    flags |= O_NOFOLLOW;
+    ret |= O_NOFOLLOW;
   if (l_flags & LINUX_O_DIRECTORY)
-    flags |= O_DIRECTORY;
+    ret |= O_DIRECTORY;
 
+  return ret;
+}
+
+int
+do_open_at(int l_fd, const char *path, int l_flags, int mode)
+{
+  int flags = linux_to_darwin_o_flags(l_flags);
   char *host_path = to_host_path(path);
-  int ret = syswrap(open(host_path, flags, mode));
+  if (l_fd == LINUX_AT_FDCWD) {
+    l_fd = AT_FDCWD;
+  }
+
+  int ret = syswrap(openat(l_fd, host_path, flags, mode));
 
   free(host_path);
   return ret;
+}
+
+int
+do_open(const char *path, int l_flags, int mode)
+{
+  return do_open_at(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
 DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
@@ -181,36 +228,6 @@ DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
   stat_darwin_to_linux(&d_st, l_st);
 
   return 0;
-}
-
-int
-linux_to_darwin_at_flags(int flags)
-{
-  int ret = 0;
-  if (flags & LINUX_AT_FDCWD) {
-    ret |= AT_FDCWD;
-    flags &= ~LINUX_AT_FDCWD;
-  }
-  if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
-    ret |= AT_SYMLINK_NOFOLLOW;
-    flags &= ~LINUX_AT_SYMLINK_NOFOLLOW;
-  }
-  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
-  if (flags & LINUX_AT_EACCESS) {
-    ret |= AT_EACCESS;
-    flags &= ~LINUX_AT_EACCESS;
-  }
-  if (flags & LINUX_AT_SYMLINK_FOLLOW) {
-    ret |= AT_SYMLINK_FOLLOW;
-    flags &= ~LINUX_AT_SYMLINK_FOLLOW;
-  }
-
-  if (flags) {
-    printk("unsupported at flags:0x%x\n", flags);
-    fprintf(stderr, "unsupported at flags:0x%x\n", flags);
-  }
-
-  return ret;
 }
 
 DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
