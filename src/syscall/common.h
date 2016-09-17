@@ -24,9 +24,9 @@
 
 #define DEFINE_SCWRAPPER(name, ...)                                                \
   uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                                 \
-    _meta_strace_pre(NR_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
+    meta_strace_pre(NR_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
     uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));                         \
-    _meta_strace_post(NR_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
+    meta_strace_post(NR_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
     return ret;                                                                    \
   }
 
@@ -44,14 +44,6 @@
 
 #define MK_STRACE_CALL(t,v) #t, #v, temp__##v
 #define temp__0             0  // argument terminator
-
-#ifdef DEBUG_MODE
-#define _meta_strace_pre meta_strace_pre
-#define _meta_strace_post meta_strace_post
-#else
-#define _meta_strace_pre(...) 
-#define _meta_strace_post(...) 
-#endif
 
 
 /*
