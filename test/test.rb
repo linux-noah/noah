@@ -2,6 +2,7 @@
 
 require "open3"
 require "shellwords"
+require "pathname"
 
 @assertion = {pass: 0, fail: 0, crash: 0}
 @assertion_reports = []
@@ -26,10 +27,15 @@ Test Starts
   report()
 end
 
+def relative(path)
+  p = Pathname.new(path)
+  p.relative_path_from(Pathname.new(Dir.pwd)).to_s
+end
+
 def test_assertion(targets = nil)
   Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
     next if targets && !targets.include?(File.basename(target))
-    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape}")
+    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape}")
     print(out)
     @assertion[:pass] += out.chars.count(".")
     @assertion[:fail] += out.chars.count("F")
@@ -51,7 +57,7 @@ def test_stdout(targets = nil)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
     expected = File.read(testdata_base + ".expected")
-    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{target.shellescape} #{target_arg} < #{target_stdin}")
+    out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape} #{target_arg} < #{target_stdin}")
 
     if out == expected
       @stdout[:pass] += 1
@@ -75,7 +81,7 @@ def test_shell(targets = nil)
     next if targets && !targets.include?(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
-    _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{target.shellescape} /bin/bash #{run.shellescape}")
+    _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
 
     if status.success?
       @shell[:pass] += 1
