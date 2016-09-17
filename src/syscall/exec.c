@@ -351,8 +351,6 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   return 0;
 }
 
-#include <mach-o/dyld.h>
-
 DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int argc = 0, envc = 0;
@@ -361,14 +359,22 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 
   const char *elf_path = guest_to_host(gelf_path);
 
-  char *argv[argc + noah_run_info.optind + 1];
+  /* Copy Noah run options */
+  char *argv[argc + noah_run_info.optind + 3];
   for (int i = 0; i < noah_run_info.optind; i++) {
     argv[i] = noah_run_info.argv[i];
   }
+  /*
+   * Workaround. Pass root directory via CLI option. 
+   * It's time to write execve by ourselves... 
+   */
+  argv[noah_run_info.optind] = "-m";
+  argv[noah_run_info.optind + 1] = proc.root;
+  /* Copy guest arguments */
   for (int i = 0; i < argc; i++) {
-    argv[i + noah_run_info.optind] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+    argv[i + noah_run_info.optind + 2] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
   }
-  argv[argc + noah_run_info.optind] = NULL;
+  argv[argc + noah_run_info.optind + 2] = NULL;
 
   char *envp[envc + 1];
   for (int i = 0; i < envc; i++) {
@@ -377,7 +383,7 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   envp[envc] = NULL;
 
   /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
-  argv[noah_run_info.optind] = (char *) elf_path;
+  argv[noah_run_info.optind + 2] = (char *) elf_path;
 
   /* FIXME: Workaround. Return errors to illegal fiels */
   int ret = do_open(elf_path, O_RDONLY, S_IXUSR);

@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <pthread.h>
 #include <libgen.h>
+#include <sys/syslimits.h>
 
 #include "noah.h"
 #include "vmm.h"
@@ -389,12 +390,12 @@ vmm_create()
   list_add(&task->tasks, &proc.tasks);
   proc.nr_tasks = 1;
 
-  char *bin, *dir;
-  bin = strdup(noah_run_info.self_path);
+  char bin[PATH_MAX];
+  char *dir;
+  realpath(noah_run_info.self_path, bin);
   dir = dirname(bin);
   proc.root = malloc(snprintf(NULL, 0, "%s/../mnt", dir));
   sprintf(proc.root, "%s/../mnt", dir);
-  free(bin);
 
   init_vmcs();
   init_msr();
