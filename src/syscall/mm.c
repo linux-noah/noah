@@ -63,6 +63,10 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
 
   if (ptr == MAP_FAILED) {
     perror("holy cow!");
+    fprintf(stderr, "addr :0x%llx, len: 0x%lux, prot: %d, flags: %d, fd: %d, offset: 0x%llx\n",
+        addr,
+        len, prot, flags, fd, offset);
+    print_bt();
     exit(1);
   }
 
