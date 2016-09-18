@@ -4,6 +4,7 @@
 #include <cpuid.h>
 #include <getopt.h>
 #include <string.h>
+#include <sys/syslimits.h>
 
 #include "vmm.h"
 #include "noah.h"
@@ -177,7 +178,7 @@ main(int argc, char *argv[], char **envp)
   };
   int c, option_index = 0;
 
-  char *root = NULL;
+  char root[PATH_MAX] = {0};
 
   while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
@@ -192,7 +193,11 @@ main(int argc, char *argv[], char **envp)
       init_meta_strace(optarg);
       break;
     case 'm':
-      root = optarg;
+      if (realpath(optarg, root) == NULL) {
+        perror("Invalid --mnt flag: ");
+        exit(1);
+      }
+      argv[optind - 1] = root;
       break;
     }
   }
@@ -208,7 +213,7 @@ main(int argc, char *argv[], char **envp)
 
   vmm_create();
 
-  if (root) {
+  if (root[0] != '\0') {
     free(proc.root);
     proc.root = strdup(root);
   }

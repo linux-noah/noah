@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <time.h>
 #include <pthread.h>
+#include <execinfo.h>
 
 #include "noah.h"
 
@@ -54,6 +55,27 @@ printk(const char *fmt, ...)
   pthread_mutex_unlock(&printk_sync);
 
   va_end(ap);
+}
+
+void
+print_bt(void)
+{
+  void *array[10];
+  size_t size;
+  char **strings;
+  size_t i;
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+
+  size = backtrace(array, 10);
+  strings = backtrace_symbols(array, size);
+
+  fprintf(stderr, "[%d:%lld] Obtained %zd stack frames.\n", getpid(), tid, size);
+
+  for(i = 0; i < size; i++)
+    fprintf(stderr, "%s\n", strings[i]);
+
+  free(strings);
 }
 
 char *vmcs_field_to_str(uint32_t vmcs_field) {
