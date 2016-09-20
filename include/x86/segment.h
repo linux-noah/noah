@@ -1,6 +1,6 @@
 #define GSEL(s,r) (((s)<<3) | r)        /* a global selector */
 
-#define	DESC_UNUSABLE 0x00010000
+#define DESC_UNUSABLE 0x00010000
 
 #define SEG_NULL        0x0
 #define SEG_CODE        0x1
@@ -24,7 +24,7 @@
     .xx2 = 0,                          \
   }
 
-struct	segment_desc {
+struct segment_desc {
   u_int64_t offset_low:16;	/* segment extent (lsb) */
   u_int64_t base_low:24;		/* segment base address (lsb) */
   u_int64_t type:5;		/* segment type */
