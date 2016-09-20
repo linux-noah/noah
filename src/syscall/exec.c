@@ -73,7 +73,7 @@ load_elf_interp(const char *path, ulong load_addr)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
@@ -124,7 +124,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
@@ -240,7 +240,7 @@ push(const void *data, size_t n)
 void
 init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
 {
-  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
   hv_vcpu_write_register(task->vcpuid, HV_X86_RSP, STACK_TOP);
   hv_vcpu_write_register(task->vcpuid, HV_X86_RBP, STACK_TOP);

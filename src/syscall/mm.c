@@ -28,52 +28,49 @@ alloc_region(size_t len)
 }
 
 gaddr_t
-do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
+do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset)
 {
   assert((addr & 0xfff) == 0);
 
-  /* some flags are obsolete and just ignored */
-  flags &= ~LINUX_MAP_DENYWRITE;
-  flags &= ~LINUX_MAP_EXECUTABLE;
+  /* some l_flags are obsolete and just ignored */
+  l_flags &= ~LINUX_MAP_DENYWRITE;
+  l_flags &= ~LINUX_MAP_EXECUTABLE;
 
   /* We ignore these currenlty */
-  flags &= ~LINUX_MAP_NORESERVE;
+  l_flags &= ~LINUX_MAP_NORESERVE;
 
   /* the linux kernel does nothing for LINUX_MAP_STACK */
-  flags &= ~LINUX_MAP_STACK;
+  l_flags &= ~LINUX_MAP_STACK;
 
-  if ((flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
-    fprintf(stderr, "unsupported mmap flags: 0x%x\n", flags);
+  if ((l_flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
+    fprintf(stderr, "unsupported mmap l_flags: 0x%x\n", l_flags);
     exit(1);
   }
-  if (flags & LINUX_MAP_ANON) {
+  if (l_flags & LINUX_MAP_ANON) {
     fd = -1;
     offset = 0;
   }
-  if ((flags & LINUX_MAP_FIXED) == 0) {
+  if ((l_flags & LINUX_MAP_FIXED) == 0) {
     addr = alloc_region(len);
   }
 
   int mflags = 0;
-  if (flags & LINUX_MAP_SHARED) mflags |= MAP_SHARED;
-  if (flags & LINUX_MAP_PRIVATE) mflags |= MAP_PRIVATE;
-  if (flags & LINUX_MAP_ANON) mflags |= MAP_ANON;
+  if (l_flags & LINUX_MAP_SHARED) mflags |= MAP_SHARED;
+  if (l_flags & LINUX_MAP_PRIVATE) mflags |= MAP_PRIVATE;
+  if (l_flags & LINUX_MAP_ANON) mflags |= MAP_ANON;
 
-  void *ptr = mmap(0, len, PROT_READ | PROT_WRITE | PROT_EXEC, mflags, fd, offset);
-
+  void *ptr = mmap(0, len, d_prot, mflags, fd, offset);
   if (ptr == MAP_FAILED) {
     perror("holy cow!");
-    fprintf(stderr, "addr :0x%llx, len: 0x%lux, prot: %d, flags: %d, fd: %d, offset: 0x%llx\n",
-        addr,
-        len, prot, flags, fd, offset);
+    fprintf(stderr, "addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
     print_bt();
     exit(1);
   }
 
   hv_memory_flags_t mprot = 0;
-  if (prot & LINUX_PROT_READ) mprot |= HV_MEMORY_READ;
-  if (prot & LINUX_PROT_WRITE) mprot |= HV_MEMORY_WRITE;
-  if (prot & LINUX_PROT_EXEC) mprot |= HV_MEMORY_EXEC;
+  if (l_prot & LINUX_PROT_READ) mprot |= HV_MEMORY_READ;
+  if (l_prot & LINUX_PROT_WRITE) mprot |= HV_MEMORY_WRITE;
+  if (l_prot & LINUX_PROT_EXEC) mprot |= HV_MEMORY_EXEC;
   vmm_mmap(addr, len, mprot, ptr);
 
   return addr;
@@ -81,7 +78,7 @@ do_mmap(gaddr_t addr, size_t len, int prot, int flags, int fd, off_t offset)
 
 DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd, off_t, offset)
 {
-  return do_mmap(addr, len, prot, flags, fd, offset);
+  return do_mmap(addr, len, prot, prot, flags, fd, offset);
 }
 
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
@@ -110,7 +107,7 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
   if (brk < current_brk)
     return current_brk = brk;
 
-  do_mmap(current_brk, brk - current_brk, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  do_mmap(current_brk, brk - current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
   return current_brk = brk;
 }
