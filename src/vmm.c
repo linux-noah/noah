@@ -60,7 +60,7 @@ record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
       s->haddr = r->haddr;
       s->gaddr = r->gaddr;
       s->size = gaddr - r->gaddr;
-      s->prot = prot;
+      s->prot = r->prot;
       list_add(&s->list, list->prev);
     }
     if (gaddr + size < r->gaddr + r->size) {
