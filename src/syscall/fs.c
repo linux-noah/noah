@@ -291,6 +291,17 @@ DEFINE_SYSCALL(access, gstr_t, path, int, mode)
   return ret;
 }
 
+// Linux implementation of faccessat actually does not have "flags"
+DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path, int, mode)
+{
+  char *host_path = to_host_path(guest_to_host(path));
+
+  int ret = syswrap(faccessat(dirfd, host_path, mode, 0));
+  free(host_path);
+
+  return ret;
+}
+
 DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
 {
   long base;

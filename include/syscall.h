@@ -270,7 +270,7 @@
   SYSCALL(266, unimplemented)                   \
   SYSCALL(267, unimplemented)                   \
   SYSCALL(268, unimplemented)                   \
-  SYSCALL(269, unimplemented)                   \
+  SYSCALL(269, faccessat)                       \
   SYSCALL(270, unimplemented)                   \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
