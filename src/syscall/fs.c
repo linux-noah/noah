@@ -456,7 +456,7 @@ DEFINE_SYSCALL(fchdir, int, fd)
 DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(chmod(guest_to_host(path), mode));
+  int ret = syswrap(chmod(host_path, mode));
 
   free(host_path);
   return ret;
