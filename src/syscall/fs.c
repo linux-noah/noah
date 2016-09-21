@@ -35,7 +35,6 @@
 #include "linux/fs.h"
 #include "linux/misc.h"
 #include "linux/errno.h"
-#include "linux/ioctl.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -54,8 +53,6 @@
 #include <sys/mount.h>
 #include <sys/syslimits.h>
 #include <dirent.h>
-#include <termios.h>
-#include <sys/ioctl.h>
 
 #include <mach-o/dyld.h>
 
@@ -375,194 +372,9 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
   return -LINUX_ENOTSUP;
 }
 
-/*
- * termio related ioctls
- */
-
-struct linux_termio {
-	unsigned short c_iflag;
-	unsigned short c_oflag;
-	unsigned short c_cflag;
-	unsigned short c_lflag;
-	unsigned char c_line;
-	unsigned char c_cc[LINUX_NCC];
-};
-
-struct linux_termios {
-	unsigned int c_iflag;
-	unsigned int c_oflag;
-	unsigned int c_cflag;
-	unsigned int c_lflag;
-	unsigned char c_line;
-	unsigned char c_cc[LINUX_NCCS];
-};
-
-struct linux_winsize {
-	unsigned short ws_row, ws_col;
-	unsigned short ws_xpixel, ws_ypixel;
-};
-
-struct speedtab {
-	int sp_speed;			/* Speed. */
-	int sp_code;			/* Code. */
-};
-
-static struct speedtab sptab[] = {
-	{ B0, LINUX_B0 }, { B50, LINUX_B50 },
-	{ B75, LINUX_B75 }, { B110, LINUX_B110 },
-	{ B134, LINUX_B134 }, { B150, LINUX_B150 },
-	{ B200, LINUX_B200 }, { B300, LINUX_B300 },
-	{ B600, LINUX_B600 }, { B1200, LINUX_B1200 },
-	{ B1800, LINUX_B1800 }, { B2400, LINUX_B2400 },
-	{ B4800, LINUX_B4800 }, { B9600, LINUX_B9600 },
-	{ B19200, LINUX_B19200 }, { B38400, LINUX_B38400 },
-	{ B57600, LINUX_B57600 }, { B115200, LINUX_B115200 },
-	{-1, -1 }
-};
-
-static int
-darwin_to_linux_speed(int speed, struct speedtab *table)
-{
-	for ( ; table->sp_speed != -1; table++)
-		if (table->sp_speed == speed)
-			return (table->sp_code);
-	return -1;
-}
-
-void
-darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios)
-{
-	int i;
-
-	lios->c_iflag = 0;
-	if (bios->c_iflag & IGNBRK)
-		lios->c_iflag |= LINUX_IGNBRK;
-	if (bios->c_iflag & BRKINT)
-		lios->c_iflag |= LINUX_BRKINT;
-	if (bios->c_iflag & IGNPAR)
-		lios->c_iflag |= LINUX_IGNPAR;
-	if (bios->c_iflag & PARMRK)
-		lios->c_iflag |= LINUX_PARMRK;
-	if (bios->c_iflag & INPCK)
-		lios->c_iflag |= LINUX_INPCK;
-	if (bios->c_iflag & ISTRIP)
-		lios->c_iflag |= LINUX_ISTRIP;
-	if (bios->c_iflag & INLCR)
-		lios->c_iflag |= LINUX_INLCR;
-	if (bios->c_iflag & IGNCR)
-		lios->c_iflag |= LINUX_IGNCR;
-	if (bios->c_iflag & ICRNL)
-		lios->c_iflag |= LINUX_ICRNL;
-	if (bios->c_iflag & IXON)
-		lios->c_iflag |= LINUX_IXON;
-	if (bios->c_iflag & IXANY)
-		lios->c_iflag |= LINUX_IXANY;
-	if (bios->c_iflag & IXOFF)
-		lios->c_iflag |= LINUX_IXOFF;
-	if (bios->c_iflag & IMAXBEL)
-		lios->c_iflag |= LINUX_IMAXBEL;
-
-	lios->c_oflag = 0;
-	if (bios->c_oflag & OPOST)
-		lios->c_oflag |= LINUX_OPOST;
-	if (bios->c_oflag & ONLCR)
-		lios->c_oflag |= LINUX_ONLCR;
-	if (bios->c_oflag & TAB3)
-		lios->c_oflag |= LINUX_XTABS;
-
-	lios->c_cflag = darwin_to_linux_speed(bios->c_ispeed, sptab);
-	lios->c_cflag |= (bios->c_cflag & CSIZE) >> 4;
-	if (bios->c_cflag & CSTOPB)
-		lios->c_cflag |= LINUX_CSTOPB;
-	if (bios->c_cflag & CREAD)
-		lios->c_cflag |= LINUX_CREAD;
-	if (bios->c_cflag & PARENB)
-		lios->c_cflag |= LINUX_PARENB;
-	if (bios->c_cflag & PARODD)
-		lios->c_cflag |= LINUX_PARODD;
-	if (bios->c_cflag & HUPCL)
-		lios->c_cflag |= LINUX_HUPCL;
-	if (bios->c_cflag & CLOCAL)
-		lios->c_cflag |= LINUX_CLOCAL;
-	if (bios->c_cflag & CRTSCTS)
-		lios->c_cflag |= LINUX_CRTSCTS;
-
-	lios->c_lflag = 0;
-	if (bios->c_lflag & ISIG)
-		lios->c_lflag |= LINUX_ISIG;
-	if (bios->c_lflag & ICANON)
-		lios->c_lflag |= LINUX_ICANON;
-	if (bios->c_lflag & ECHO)
-		lios->c_lflag |= LINUX_ECHO;
-	if (bios->c_lflag & ECHOE)
-		lios->c_lflag |= LINUX_ECHOE;
-	if (bios->c_lflag & ECHOK)
-		lios->c_lflag |= LINUX_ECHOK;
-	if (bios->c_lflag & ECHONL)
-		lios->c_lflag |= LINUX_ECHONL;
-	if (bios->c_lflag & NOFLSH)
-		lios->c_lflag |= LINUX_NOFLSH;
-	if (bios->c_lflag & TOSTOP)
-		lios->c_lflag |= LINUX_TOSTOP;
-	if (bios->c_lflag & ECHOCTL)
-		lios->c_lflag |= LINUX_ECHOCTL;
-	if (bios->c_lflag & ECHOPRT)
-		lios->c_lflag |= LINUX_ECHOPRT;
-	if (bios->c_lflag & ECHOKE)
-		lios->c_lflag |= LINUX_ECHOKE;
-	if (bios->c_lflag & FLUSHO)
-		lios->c_lflag |= LINUX_FLUSHO;
-	if (bios->c_lflag & PENDIN)
-		lios->c_lflag |= LINUX_PENDIN;
-	if (bios->c_lflag & IEXTEN)
-		lios->c_lflag |= LINUX_IEXTEN;
-
-	for (i=0; i<LINUX_NCCS; i++)
-		lios->c_cc[i] = LINUX_POSIX_VDISABLE;
-	lios->c_cc[LINUX_VINTR] = bios->c_cc[VINTR];
-	lios->c_cc[LINUX_VQUIT] = bios->c_cc[VQUIT];
-	lios->c_cc[LINUX_VERASE] = bios->c_cc[VERASE];
-	lios->c_cc[LINUX_VKILL] = bios->c_cc[VKILL];
-	lios->c_cc[LINUX_VEOF] = bios->c_cc[VEOF];
-	lios->c_cc[LINUX_VEOL] = bios->c_cc[VEOL];
-	lios->c_cc[LINUX_VMIN] = bios->c_cc[VMIN];
-	lios->c_cc[LINUX_VTIME] = bios->c_cc[VTIME];
-	lios->c_cc[LINUX_VEOL2] = bios->c_cc[VEOL2];
-	lios->c_cc[LINUX_VSUSP] = bios->c_cc[VSUSP];
-	lios->c_cc[LINUX_VSTART] = bios->c_cc[VSTART];
-	lios->c_cc[LINUX_VSTOP] = bios->c_cc[VSTOP];
-	lios->c_cc[LINUX_VREPRINT] = bios->c_cc[VREPRINT];
-	lios->c_cc[LINUX_VDISCARD] = bios->c_cc[VDISCARD];
-	lios->c_cc[LINUX_VWERASE] = bios->c_cc[VWERASE];
-	lios->c_cc[LINUX_VLNEXT] = bios->c_cc[VLNEXT];
-
-	for (i=0; i<LINUX_NCCS; i++) {
-		if (i != LINUX_VMIN && i != LINUX_VTIME &&
-		    lios->c_cc[i] == _POSIX_VDISABLE)
-			lios->c_cc[i] = LINUX_POSIX_VDISABLE;
-	}
-	lios->c_line = 0;
-}
-
-DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
+DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
 {
   printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
-  if (fd == 1 && cmd == LINUX_TCGETS) {
-    struct termios dios;
-    struct linux_termios lios;
-
-    int ret = syswrap(ioctl(fd, TIOCGETA, &dios));
-    if (ret < 0) {
-      return ret;
-    }
-    darwin_to_linux_termios(&dios, &lios);
-    *(struct linux_termios*)(guest_to_host(val0)) = lios;
-
-    return ret;
-  } else if (fd == 1 && cmd == LINUX_TIOCGWINSZ) {
-    return syswrap(ioctl(fd, TIOCGWINSZ, guest_to_host(val0)));
-  }
-
   return -LINUX_EPERM;
 }
 

@@ -33,7 +33,7 @@ load_elf_interp(const char *path, ulong load_addr)
   struct stat st;
 
   if ((fd = do_open(path, O_RDONLY, 0)) < 0) {
-    fprintf(stderr, "load_elf_interp, could not open file: %s\n", path);
+    fprintf(stderr, "could not open file: %s\n", path);
     return -1;
   }
 

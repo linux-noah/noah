@@ -58,10 +58,7 @@ DEFINE_SYSCALL(clock_gettime, l_clockid_t, id, gaddr_t, spec)
 {
   struct timespec *l_ts = guest_to_host(spec);
 
-  if (id != LINUX_CLOCK_MONOTONIC && id != LINUX_CLOCK_MONOTONIC_COARSE && id != LINUX_CLOCK_REALTIME) {
-    fprintf(stderr, "id:%d\n", id);
-    exit(1);
-  }
+  assert(id == LINUX_CLOCK_MONOTONIC);
 
   clock_serv_t cclock;
   mach_timespec_t mts;
