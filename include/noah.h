@@ -65,6 +65,7 @@ struct mm_region {
 struct mm {
   struct list_head mm_regions;
   uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
+  pthread_rwlock_t alloc_lock;
 };
 
 /* task related data */
@@ -78,7 +79,7 @@ struct task {
 struct proc {
   struct list_head tasks;
   int nr_tasks;
-  pthread_rwlock_t alloc_lock; /* Protection for tasks (and nr_tasks), mm */
+  pthread_rwlock_t alloc_lock; /* Protection for tasks (and nr_tasks) */
   struct mm *mm;
   char *root; /* FS root */
 };

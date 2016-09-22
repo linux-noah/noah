@@ -118,6 +118,8 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 
   size = roundup(size, PAGE_SIZE(PAGE_4KB));
 
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+
   hv_vm_unmap(gaddr, size);
   if (hv_vm_map(haddr, gaddr, size, prot) != HV_SUCCESS) {
     fprintf(stderr, "hv_vm_map failed\n");
@@ -135,6 +137,8 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
     haddr = (char *) haddr + 0x1000;
     gaddr += 0x1000;
   }
+
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
 }
 
 bool
