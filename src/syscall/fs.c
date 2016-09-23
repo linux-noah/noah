@@ -353,8 +353,12 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
-  getcwd(guest_to_host(buf), size);
-  return 0;
+  int ret = syswrap((int)getcwd(guest_to_host(buf), size));
+  if (ret < 0) {
+    return ret;
+  } else {
+    return buf;
+  }
 }
 
 DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
