@@ -50,13 +50,16 @@ split_region(struct mm_region *region, gaddr_t gaddr)
   back->gaddr = gaddr;
   back->size = region->size - offset;
   back->prot = region->prot;
+  back->mm_flags = region->mm_flags;
+  back->mm_fd = region->mm_fd;
+  back->pgoff = region->pgoff;
 
   region->size = offset;
   list_add(&back->list, &region->list);
 }
 
-void
-record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
+struct mm_region*
+record_region(void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff)
 {
   struct list_head *list, *t;
   struct mm_region *region, *r;
@@ -66,10 +69,13 @@ record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
   region->gaddr = gaddr;
   region->size = size;
   region->prot = prot;
+  region->mm_flags = mm_flags;
+  region->mm_fd = mm_fd;
+  region->pgoff = pgoff;
 
   if (list_empty(&proc.mm->mm_regions)) { /* fast path */
     list_add(&region->list, &proc.mm->mm_regions);
-    return;
+    return region;
   }
   /* unmap */
   list_for_each_safe (list, t, &proc.mm->mm_regions) {
@@ -90,6 +96,9 @@ record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
       s->gaddr = r->gaddr;
       s->size = gaddr - r->gaddr;
       s->prot = r->prot;
+      s->mm_flags = r->mm_flags;
+      s->mm_fd = r->mm_fd;
+      s->pgoff = r->pgoff;
       list_add(&s->list, list->prev);
     }
     if (gaddr + size < r->gaddr + r->size) {
@@ -99,6 +108,9 @@ record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
       s->gaddr = r->gaddr + offset;
       s->size = r->size - offset;
       s->prot = prot;
+      s->mm_flags = mm_flags;
+      s->mm_fd = mm_fd;
+      s->pgoff = pgoff;
       list_add_tail(&s->list, list->next);
     }
   }
@@ -108,11 +120,13 @@ record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
     r = list_entry(list, struct mm_region, list);
     if (prev <= gaddr && gaddr + size <= r->gaddr) {
       list_add(&region->list, list->prev);
-      return;
+      return region;
     }
     prev = r->gaddr + r->size;
   }
   list_add_tail(&region->list, list);
+
+  return region;
 }
 
 void
@@ -147,14 +161,11 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 
   size = roundup(size, PAGE_SIZE(PAGE_4KB));
 
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-
   hv_vm_unmap(gaddr, size);
   if (hv_vm_map(haddr, gaddr, size, prot) != HV_SUCCESS) {
     fprintf(stderr, "hv_vm_map failed\n");
     exit(1);
   }
-  record_region(haddr, gaddr, size, prot);
 
   ulong perm = PTE_U | PTE_P;
   if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
@@ -166,8 +177,6 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
     haddr = (char *) haddr + 0x1000;
     gaddr += 0x1000;
   }
-
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
 }
 
 bool
@@ -261,9 +270,13 @@ kmap(void *ptr, size_t size, hv_memory_flags_t flags)
   assert((size & 0xfff) == 0);
   assert(((uint64_t) ptr & 0xfff) == 0);
 
-  vmm_mmap(noah_kern_brk, size, flags, ptr);
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
 
+  record_region(ptr, noah_kern_brk, size, flags, -1, -1, 0);
+  vmm_mmap(noah_kern_brk, size, flags, ptr);
   noah_kern_brk += size;
+
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
 
   return noah_kern_brk - size;
 }

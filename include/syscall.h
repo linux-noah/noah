@@ -26,7 +26,7 @@
   SYSCALL(22, pipe)                             \
   SYSCALL(23, select)                           \
   SYSCALL(24, unimplemented)                    \
-  SYSCALL(25, unimplemented)                    \
+  SYSCALL(25, mremap)                           \
   SYSCALL(26, unimplemented)                    \
   SYSCALL(27, unimplemented)                    \
   SYSCALL(28, madvise)                          \

@@ -58,7 +58,10 @@ struct mm_region {
   void *haddr;
   gaddr_t gaddr;
   size_t size;
-  int prot;
+  int prot;            /* Access permission in hv_memory_flags_t */
+  int mm_flags;        /* mm flags in the form of LINUX_MAP_* */
+  int mm_fd;
+  int pgoff;           /* offset within mm_fd in page size */
   struct list_head list;
 };
 
