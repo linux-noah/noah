@@ -14,6 +14,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <pthread.h>
+
+#include <Hypervisor/hv.h>
 
 gaddr_t
 alloc_region(size_t len)
@@ -83,7 +86,62 @@ DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd,
 
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
-  printk("mprotect: addr = 0x%llx, len = 0x%zx, prot = %d\n", addr, len, prot);
+  if (!is_page_aligned((void*)addr, PAGE_4KB) || len == 0) {
+    return -LINUX_EINVAL;
+  }
+  // TODO check if user is permiited to access the addr
+
+  len = roundup(len, PAGE_SIZE(PAGE_4KB));
+  gaddr_t end = addr + len;
+
+  hv_memory_flags_t hvprot = 0;
+  if (prot & LINUX_PROT_READ) hvprot |= HV_MEMORY_READ;
+  if (prot & LINUX_PROT_WRITE) hvprot |= HV_MEMORY_WRITE;
+  if (prot & LINUX_PROT_EXEC) hvprot |= HV_MEMORY_EXEC;
+
+  int ret = 0;
+
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+
+  struct mm_region *region = find_region(addr, proc.mm);
+  if (!region) {
+    ret = -LINUX_ENOMEM;
+    goto out;
+  }
+  if (addr > region->gaddr) {
+    split_region(region, addr);
+    region = list_entry(region->list.next, struct mm_region, list);
+
+    hv_vm_protect(region->gaddr, region->size, hvprot);
+    mprotect(region->haddr, region->size, prot);
+    region->prot = hvprot;
+  }
+  while (region->gaddr + region->size <= end) {
+    hv_vm_protect(region->gaddr, region->size, hvprot);
+    mprotect(region->haddr, region->size, prot);
+    region->prot = hvprot;
+
+    if (region->list.next == &proc.mm->mm_regions) {
+      ret = -LINUX_ENOMEM;
+      goto out;
+    }
+    struct mm_region *next = list_entry(region->list.next, struct mm_region, list);
+    if (next->gaddr != region->gaddr + region->size) {
+      ret = -LINUX_ENOMEM;
+      goto out;
+    }
+    region = next;
+  }
+  if (region->gaddr < end) {
+    split_region(region, end);
+    hv_vm_protect(region->gaddr, region->size, hvprot);
+    mprotect(region->haddr, region->size, prot);
+    region->prot = hvprot;
+  }
+
+out:
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+
   return 0;
 }
 

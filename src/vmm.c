@@ -25,6 +25,35 @@
 #include "x86/vmemparam.h"
 #include "x86/vmx.h"
 
+/* Look up the first mm_region which gaddr in [mm_region->gaddr, +size) */
+struct mm_region*
+find_region(gaddr_t gaddr, struct mm *mm)
+{
+  struct mm_region *r;
+  list_for_each_entry (r, &mm->mm_regions, list) {
+    if (gaddr < r->gaddr)
+      break;
+    if (gaddr < r->gaddr + r->size && gaddr >= r->gaddr)
+      return r;
+  }
+  return NULL;
+}
+
+void
+split_region(struct mm_region *region, gaddr_t gaddr)
+{
+  assert(is_page_aligned((void*)gaddr, PAGE_4KB));
+
+  struct mm_region *back = malloc(sizeof(struct mm_region));
+  int offset = gaddr - region->gaddr;
+  back->haddr = region->haddr + offset;
+  back->gaddr = gaddr;
+  back->size = region->size - offset;
+  back->prot = region->prot;
+
+  region->size = offset;
+  list_add(&back->list, &region->list);
+}
 
 void
 record_region(void *haddr, gaddr_t gaddr, size_t size, int prot)
