@@ -178,7 +178,8 @@ main(int argc, char *argv[], char **envp)
   };
   int c, option_index = 0;
 
-  char root[PATH_MAX] = {0};
+  char abs_self[PATH_MAX], root[PATH_MAX] = {0};
+  realpath(argv[0], abs_self);
 
   while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
@@ -201,8 +202,7 @@ main(int argc, char *argv[], char **envp)
       break;
     }
   }
-
-  noah_run_info = (struct noah_run_info) {.self_path = argv[0], .argc = argc, .argv = argv, .optind = optind};
+  noah_run_info = (struct noah_run_info) {.self_path = abs_self, .argc = argc, .argv = argv, .optind = optind};
 
   argc -= optind;
   argv += optind;
