@@ -373,6 +373,11 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
   return ret;
 }
 
+DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf, size_t, count, off_t, pos)
+{
+  return syswrap(pread(fd, guest_to_host(buf), count, pos));
+}
+
 DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, size_t, size)
 {
   printk("getxattr is unimplemented\n");

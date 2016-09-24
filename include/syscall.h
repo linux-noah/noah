@@ -18,7 +18,7 @@
   SYSCALL(14, rt_sigprocmask)                   \
   SYSCALL(15, unimplemented)                    \
   SYSCALL(16, ioctl)                            \
-  SYSCALL(17, unimplemented)                    \
+  SYSCALL(17, pread64)                          \
   SYSCALL(18, unimplemented)                    \
   SYSCALL(19, unimplemented)                    \
   SYSCALL(20, writev)                           \

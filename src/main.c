@@ -38,7 +38,7 @@ run_task()
       break;
 
     case VMX_REASON_EXC_NMI: {
-      uint64_t instlen, rip, idtvec, idterr, intstatus, exit_qual;
+      uint64_t instlen, rip, irqvec, irqerr, intstatus, exit_qual;
       uint64_t retval;
 
       printk("reason: exc or nmi\n");
@@ -47,10 +47,10 @@ run_task()
       printk("instr length = 0x%llx\n", instlen);
       hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &rip);
       printk("rip = 0x%llx\n", rip);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_IDT_VECTOR_INFO, &idtvec);
-      printk("idt info = %lld\n", idtvec);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_IDT_VECTOR_ERROR, &idterr);
-      printk("idt error = %lld\n", idterr);
+      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_IRQ_INFO, &irqvec);
+      printk("irq info = %lld\n", irqvec);
+      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_IRQ_ERROR, &irqerr);
+      printk("irq error = %lld\n", irqerr);
       hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_INT_STATUS, &intstatus);
       printk("guest int status = %lld\n", intstatus);
       hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_EXIT_QUALIFIC, &exit_qual);
