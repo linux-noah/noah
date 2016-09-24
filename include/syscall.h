@@ -26,7 +26,7 @@
   SYSCALL(22, pipe)                             \
   SYSCALL(23, select)                           \
   SYSCALL(24, unimplemented)                    \
-  SYSCALL(25, unimplemented)                    \
+  SYSCALL(25, mremap)                           \
   SYSCALL(26, unimplemented)                    \
   SYSCALL(27, unimplemented)                    \
   SYSCALL(28, madvise)                          \
@@ -47,7 +47,7 @@
   SYSCALL(43, accept)                           \
   SYSCALL(44, sendto)                           \
   SYSCALL(45, recvfrom)                         \
-  SYSCALL(46, unimplemented)                    \
+  SYSCALL(46, sendmsg)                          \
   SYSCALL(47, unimplemented)                    \
   SYSCALL(48, shutdown)                         \
   SYSCALL(49, bind)                             \
@@ -150,8 +150,8 @@
   SYSCALL(146, unimplemented)                   \
   SYSCALL(147, unimplemented)                   \
   SYSCALL(148, unimplemented)                   \
-  SYSCALL(149, unimplemented)                   \
-  SYSCALL(150, unimplemented)                   \
+  SYSCALL(149, mlock)                           \
+  SYSCALL(150, munlock)                         \
   SYSCALL(151, unimplemented)                   \
   SYSCALL(152, unimplemented)                   \
   SYSCALL(153, unimplemented)                   \
@@ -162,7 +162,7 @@
   SYSCALL(158, arch_prctl)                      \
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, setrlimit)                       \
-  SYSCALL(161, unimplemented)                   \
+  SYSCALL(161, chroot)                          \
   SYSCALL(162, unimplemented)                   \
   SYSCALL(163, unimplemented)                   \
   SYSCALL(164, unimplemented)                   \
@@ -270,7 +270,7 @@
   SYSCALL(266, unimplemented)                   \
   SYSCALL(267, unimplemented)                   \
   SYSCALL(268, unimplemented)                   \
-  SYSCALL(269, unimplemented)                   \
+  SYSCALL(269, faccessat)                       \
   SYSCALL(270, unimplemented)                   \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
@@ -308,7 +308,7 @@
   SYSCALL(304, unimplemented)                   \
   SYSCALL(305, unimplemented)                   \
   SYSCALL(306, unimplemented)                   \
-  SYSCALL(307, unimplemented)                   \
+  SYSCALL(307, sendmmsg)                        \
   SYSCALL(308, unimplemented)                   \
   SYSCALL(309, unimplemented)                   \
   SYSCALL(310, unimplemented)                   \

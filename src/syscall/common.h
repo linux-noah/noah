@@ -22,12 +22,12 @@
 #define DECLARE_SCFUNCT(name, ...)                      \
   uint64_t _sys_##name(_MAP(MK_DECL, __VA_ARGS__));
 
-#define DEFINE_SCWRAPPER(name, ...)                                     \
-  uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                      \
-    _noah_strace(#name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
-    uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));              \
-    _noah_strace_ret(#name, ret);                                       \
-    return ret;                                                         \
+#define DEFINE_SCWRAPPER(name, ...)                                                \
+  uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                                 \
+    meta_strace_pre(NR_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
+    uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));                         \
+    meta_strace_post(NR_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
+    return ret;                                                                    \
   }
 
 #define DEFINE_SCFUNCT(name, ...)                       \
@@ -45,14 +45,6 @@
 #define MK_STRACE_CALL(t,v) #t, #v, temp__##v
 #define temp__0             0  // argument terminator
 
-#ifdef DEBUG_MODE
-#define _noah_strace noah_strace
-#define _noah_strace_ret noah_strace_ret
-#else
-#define _noah_strace(...) 
-#define _noah_strace_ret(...) 
-#endif
-
 
 /*
  * syscall errno wrapper
@@ -63,3 +55,16 @@
 static inline int _syswrap(int sys_ret) {
   return (sys_ret < 0 && errno != 0) ? -darwin_to_linux_errno(errno) : sys_ret;
 }
+
+#include "syscall.h"
+
+enum sc_numbers {
+// omit duplicted "unimplemented"s by expanding them to NR_(an unique number)
+#define unimplemented __COUNTER__
+#define OMIT_UNIMPLEMENTED(NR_, name) NR_ ## name
+#define SYSCALL(n, name) OMIT_UNIMPLEMENTED(NR_, name) = n,
+  SYSCALLS
+#undef SYSCALL
+#undef unimplemented
+  NR_unimplemented = -1
+};

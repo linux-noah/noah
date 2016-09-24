@@ -6,6 +6,7 @@
 #include <Hypervisor/hv_arch_vmx.h>
 
 #include "types.h"
+#include "noah.h"
 #include "x86/vmx.h"
 
 struct vcpu_snapshot {
@@ -26,5 +27,8 @@ void vcpu_restore(struct vcpu_snapshot*);
 
 /* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
+struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);
+struct mm_region *record_region(void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);
+void split_region(struct mm_region *region, gaddr_t gaddr);
 
 #endif

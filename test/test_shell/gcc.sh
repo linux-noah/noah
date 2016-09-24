@@ -7,6 +7,6 @@ int main(){
 }
 EOF
 BIN=`mktemp /tmp/noah-hello.XXXXXX`
-$NOAH $TARGET $HELLO -o $BIN
+$NOAH /usr/bin/gcc $HELLO -o $BIN
 test -s $BIN -a "`$NOAH $BIN`" = "hello, world!" || exit 1
 

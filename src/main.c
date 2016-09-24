@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <cpuid.h>
 #include <getopt.h>
+#include <string.h>
+#include <sys/syslimits.h>
 
 #include "vmm.h"
 #include "noah.h"
@@ -161,6 +163,8 @@ __attribute__((noreturn)) usage()
   exit(1);
 }
 
+struct noah_run_info noah_run_info;
+
 int
 main(int argc, char *argv[], char **envp)
 {
@@ -168,23 +172,37 @@ main(int argc, char *argv[], char **envp)
     { "help", no_argument, NULL, 'h' },
     { "version", no_argument, NULL, 'v' },
     { "output", required_argument, NULL, 'o' },
+    { "strace", required_argument, NULL, 's' },
+    { "mnt", required_argument, NULL, 'm' },
     { 0, 0, 0, 0 }
   };
   int c, option_index = 0;
 
-  char *outfile = NULL;
+  char abs_self[PATH_MAX], root[PATH_MAX] = {0};
+  realpath(argv[0], abs_self);
 
-  while ((c = getopt_long(argc, argv, "+hvo:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
     default:
       usage();
     case 'v':
       version();
     case 'o':
-      outfile = optarg;
+      init_printk(optarg);
+      break;
+    case 's':
+      init_meta_strace(optarg);
+      break;
+    case 'm':
+      if (realpath(optarg, root) == NULL) {
+        perror("Invalid --mnt flag: ");
+        exit(1);
+      }
+      argv[optind - 1] = root;
       break;
     }
   }
+  noah_run_info = (struct noah_run_info) {.self_path = abs_self, .argc = argc, .argv = argv, .optind = optind};
 
   argc -= optind;
   argv += optind;
@@ -193,9 +211,12 @@ main(int argc, char *argv[], char **envp)
     usage();
   }
 
-  init_debug(outfile);
-
   vmm_create();
+
+  if (root[0] != '\0') {
+    free(proc.root);
+    proc.root = strdup(root);
+  }
 
   if (do_exec(argv[0], argc, argv, envp) < 0) {
     exit(1);

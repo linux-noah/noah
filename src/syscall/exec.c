@@ -33,7 +33,7 @@ load_elf_interp(const char *path, ulong load_addr)
   struct stat st;
 
   if ((fd = do_open(path, O_RDONLY, 0)) < 0) {
-    fprintf(stderr, "could not open file: %s\n", path);
+    fprintf(stderr, "load_elf_interp, could not open file: %s\n", path);
     return -1;
   }
 
@@ -73,7 +73,7 @@ load_elf_interp(const char *path, ulong load_addr)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
 
@@ -124,7 +124,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
-    do_mmap(vaddr, size, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+    do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
@@ -240,7 +240,7 @@ push(const void *data, size_t n)
 void
 init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
 {
-  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
   hv_vcpu_write_register(task->vcpuid, HV_X86_RSP, STACK_TOP);
   hv_vcpu_write_register(task->vcpuid, HV_X86_RBP, STACK_TOP);
@@ -351,30 +351,30 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   return 0;
 }
 
-#include <mach-o/dyld.h>
-
 DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int argc = 0, envc = 0;
   while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
   while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
 
-  /* get this executable's path */
-  uint32_t bufsize;
-  _NSGetExecutablePath(NULL, &bufsize);
-  char noah_path[bufsize];
-  if (_NSGetExecutablePath(noah_path, &bufsize)) {
-    return -1;
-  }
-
   const char *elf_path = guest_to_host(gelf_path);
 
-  char *argv[argc + 2];
-  argv[0] = noah_path;
-  for (int i = 0; i < argc; i++) {
-    argv[i + 1] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  /* Copy Noah run options */
+  char *argv[argc + noah_run_info.optind + 3];
+  for (int i = 0; i < noah_run_info.optind; i++) {
+    argv[i] = noah_run_info.argv[i];
   }
-  argv[argc + 1] = NULL;
+  /*
+   * Workaround. Pass root directory via CLI option. 
+   * It's time to write execve by ourselves... 
+   */
+  argv[noah_run_info.optind] = "-m";
+  argv[noah_run_info.optind + 1] = proc.root;
+  /* Copy guest arguments */
+  for (int i = 0; i < argc; i++) {
+    argv[i + noah_run_info.optind + 2] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  }
+  argv[argc + noah_run_info.optind + 2] = NULL;
 
   char *envp[envc + 1];
   for (int i = 0; i < envc; i++) {
@@ -383,9 +383,16 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   envp[envc] = NULL;
 
   /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
-  argv[1] = (char *) elf_path;
+  argv[noah_run_info.optind + 2] = (char *) elf_path;
+
+  /* FIXME: Workaround. Return errors to illegal fiels */
+  int ret = do_open(elf_path, O_RDONLY, S_IXUSR);
+  if (ret < 0) {
+    return ret;
+  }
+  close(ret);
 
   vmm_destroy();
 
-  return syswrap(execve(noah_path, argv, envp));
+  return syswrap(execve(noah_run_info.self_path, argv, envp));
 }

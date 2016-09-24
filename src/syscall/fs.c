@@ -35,6 +35,7 @@
 #include "linux/fs.h"
 #include "linux/misc.h"
 #include "linux/errno.h"
+#include "linux/ioctl.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -53,10 +54,10 @@
 #include <sys/mount.h>
 #include <sys/syslimits.h>
 #include <dirent.h>
-#include <libgen.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #include <mach-o/dyld.h>
-
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
@@ -77,81 +78,111 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 }
 
 char*
-cat_linux_mnt(const char *path)
-{
-  uint32_t noah_path_len = 0;
-  _NSGetExecutablePath(NULL, &noah_path_len);
-  char noah_path[noah_path_len];
-  _NSGetExecutablePath(noah_path, &noah_path_len);
-
-  char *dir_path = dirname(noah_path);
-  int mnt_len = strlen(dir_path) + strlen("/../mnt/");
-
-  char buf[strnlen(path, LINUX_PATH_MAX) + mnt_len];
-  strcpy(buf, dir_path);
-  strcat(buf, "/../mnt/");
-  strcat(buf, path);
-
-  return strdup(buf);
-}
-
-char*
 to_host_path(const char *path)
 {
   if (path[0] == '/') {
-    char *mnt_path = cat_linux_mnt(path);
-    if (access(mnt_path, F_OK) == 0) {
+    int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
+    char *mnt_path = malloc(len + 1);
+    snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
+    //if (access(mnt_path, F_OK) == 0) {
       return mnt_path;
-    }
-    free(mnt_path);
+    //}
+    //free(mnt_path);
   }
   return strdup(path);
 }
 
 int
-do_open(const char *path, int l_flags, int mode)
+linux_to_darwin_at_flags(int flags)
 {
-  int flags = 0;
+  int ret = 0;
+  if (flags & LINUX_AT_FDCWD) {
+    ret |= AT_FDCWD;
+    flags &= ~LINUX_AT_FDCWD;
+  }
+  if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
+    ret |= AT_SYMLINK_NOFOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_NOFOLLOW;
+  }
+  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
+  if (flags & LINUX_AT_EACCESS) {
+    ret |= AT_EACCESS;
+    flags &= ~LINUX_AT_EACCESS;
+  }
+  if (flags & LINUX_AT_SYMLINK_FOLLOW) {
+    ret |= AT_SYMLINK_FOLLOW;
+    flags &= ~LINUX_AT_SYMLINK_FOLLOW;
+  }
+
+  if (flags) {
+    printk("unsupported at flags:0x%x\n", flags);
+    fprintf(stderr, "unsupported at flags:0x%x\n", flags);
+  }
+
+  return ret;
+}
+
+int
+linux_to_darwin_o_flags(int l_flags)
+{
+  int ret = 0;
   switch (l_flags & LINUX_O_ACCMODE) {
   case LINUX_O_WRONLY:
-    flags |= O_WRONLY;
+    ret |= O_WRONLY;
     break;
   case LINUX_O_RDWR:
-    flags |= O_RDWR;
+    ret |= O_RDWR;
     break;
   default:                      /* Note: LINUX_O_RDONLY == 0 */
-    flags |= O_RDONLY;
+    ret |= O_RDONLY;
   }
   if (l_flags & LINUX_O_NDELAY)
-    flags |= O_NONBLOCK;
+    ret |= O_NONBLOCK;
   if (l_flags & LINUX_O_APPEND)
-    flags |= O_APPEND;
+    ret |= O_APPEND;
   if (l_flags & LINUX_O_SYNC)
-    flags |= O_FSYNC;
+    ret |= O_FSYNC;
   if (l_flags & LINUX_O_NONBLOCK)
-    flags |= O_NONBLOCK;
+    ret |= O_NONBLOCK;
   if (l_flags & LINUX_FASYNC)
-    flags |= O_ASYNC;
+    ret |= O_ASYNC;
   if (l_flags & LINUX_O_CREAT)
-    flags |= O_CREAT;
+    ret |= O_CREAT;
   if (l_flags & LINUX_O_TRUNC)
-    flags |= O_TRUNC;
+    ret |= O_TRUNC;
   if (l_flags & LINUX_O_EXCL)
-    flags |= O_EXCL;
+    ret |= O_EXCL;
   if (l_flags & LINUX_O_NOCTTY)
-    flags |= O_NOCTTY;
+    ret |= O_NOCTTY;
   /* if (l_flags & LINUX_O_DIRECT) */
-  /*   flags |= O_DIRECT; */
+  /*   ret |= O_DIRECT; */
   if (l_flags & LINUX_O_NOFOLLOW)
-    flags |= O_NOFOLLOW;
+    ret |= O_NOFOLLOW;
   if (l_flags & LINUX_O_DIRECTORY)
-    flags |= O_DIRECTORY;
+    ret |= O_DIRECTORY;
 
+  return ret;
+}
+
+int
+do_open_at(int l_fd, const char *path, int l_flags, int mode)
+{
+  int flags = linux_to_darwin_o_flags(l_flags);
   char *host_path = to_host_path(path);
-  int ret = syswrap(open(host_path, flags, mode));
+  if (l_fd == LINUX_AT_FDCWD) {
+    l_fd = AT_FDCWD;
+  }
+
+  int ret = syswrap(openat(l_fd, host_path, flags, mode));
 
   free(host_path);
   return ret;
+}
+
+int
+do_open(const char *path, int l_flags, int mode)
+{
+  return do_open_at(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
 DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
@@ -208,7 +239,7 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
   struct l_newstat *l_st = guest_to_host(st);
   struct stat d_st;
 
-  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at(flags)));
+  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at_flags(flags)));
   free(host_path);
   if (ret < 0) {
     return ret;
@@ -257,6 +288,17 @@ DEFINE_SYSCALL(access, gstr_t, path, int, mode)
   int ret = syswrap(access(host_path, mode));
 
   free(host_path);
+  return ret;
+}
+
+// Linux implementation of faccessat actually does not have "flags"
+DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path, int, mode)
+{
+  char *host_path = to_host_path(guest_to_host(path));
+
+  int ret = syswrap(faccessat(dirfd, host_path, mode, 0));
+  free(host_path);
+
   return ret;
 }
 
@@ -311,20 +353,18 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
-  getcwd(guest_to_host(buf), size);
-  return 0;
+  int ret = syswrap((int)getcwd(guest_to_host(buf), size));
+  if (ret < 0) {
+    return ret;
+  } else {
+    return buf;
+  }
 }
 
 DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
 {
-  char *host_oldpath, *host_newpath;
-
-  host_oldpath = to_host_path(guest_to_host(oldpath));
-  if  (strcmp(host_oldpath, guest_to_host(oldpath)) != 0) {
-    host_newpath = cat_linux_mnt(guest_to_host(newpath));
-  } else {
-    host_newpath = strdup(guest_to_host(newpath));
-  }
+  char *host_oldpath = to_host_path(guest_to_host(oldpath));
+  char *host_newpath = to_host_path(guest_to_host(newpath));
 
   int ret = syswrap(rename(host_oldpath, host_newpath));
   
@@ -344,9 +384,194 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
   return -LINUX_ENOTSUP;
 }
 
-DEFINE_SYSCALL(ioctl, int, fd, int, cmd)
+/*
+ * termio related ioctls
+ */
+
+struct linux_termio {
+	unsigned short c_iflag;
+	unsigned short c_oflag;
+	unsigned short c_cflag;
+	unsigned short c_lflag;
+	unsigned char c_line;
+	unsigned char c_cc[LINUX_NCC];
+};
+
+struct linux_termios {
+	unsigned int c_iflag;
+	unsigned int c_oflag;
+	unsigned int c_cflag;
+	unsigned int c_lflag;
+	unsigned char c_line;
+	unsigned char c_cc[LINUX_NCCS];
+};
+
+struct linux_winsize {
+	unsigned short ws_row, ws_col;
+	unsigned short ws_xpixel, ws_ypixel;
+};
+
+struct speedtab {
+	int sp_speed;			/* Speed. */
+	int sp_code;			/* Code. */
+};
+
+static struct speedtab sptab[] = {
+	{ B0, LINUX_B0 }, { B50, LINUX_B50 },
+	{ B75, LINUX_B75 }, { B110, LINUX_B110 },
+	{ B134, LINUX_B134 }, { B150, LINUX_B150 },
+	{ B200, LINUX_B200 }, { B300, LINUX_B300 },
+	{ B600, LINUX_B600 }, { B1200, LINUX_B1200 },
+	{ B1800, LINUX_B1800 }, { B2400, LINUX_B2400 },
+	{ B4800, LINUX_B4800 }, { B9600, LINUX_B9600 },
+	{ B19200, LINUX_B19200 }, { B38400, LINUX_B38400 },
+	{ B57600, LINUX_B57600 }, { B115200, LINUX_B115200 },
+	{-1, -1 }
+};
+
+static int
+darwin_to_linux_speed(int speed, struct speedtab *table)
+{
+	for ( ; table->sp_speed != -1; table++)
+		if (table->sp_speed == speed)
+			return (table->sp_code);
+	return -1;
+}
+
+void
+darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios)
+{
+	int i;
+
+	lios->c_iflag = 0;
+	if (bios->c_iflag & IGNBRK)
+		lios->c_iflag |= LINUX_IGNBRK;
+	if (bios->c_iflag & BRKINT)
+		lios->c_iflag |= LINUX_BRKINT;
+	if (bios->c_iflag & IGNPAR)
+		lios->c_iflag |= LINUX_IGNPAR;
+	if (bios->c_iflag & PARMRK)
+		lios->c_iflag |= LINUX_PARMRK;
+	if (bios->c_iflag & INPCK)
+		lios->c_iflag |= LINUX_INPCK;
+	if (bios->c_iflag & ISTRIP)
+		lios->c_iflag |= LINUX_ISTRIP;
+	if (bios->c_iflag & INLCR)
+		lios->c_iflag |= LINUX_INLCR;
+	if (bios->c_iflag & IGNCR)
+		lios->c_iflag |= LINUX_IGNCR;
+	if (bios->c_iflag & ICRNL)
+		lios->c_iflag |= LINUX_ICRNL;
+	if (bios->c_iflag & IXON)
+		lios->c_iflag |= LINUX_IXON;
+	if (bios->c_iflag & IXANY)
+		lios->c_iflag |= LINUX_IXANY;
+	if (bios->c_iflag & IXOFF)
+		lios->c_iflag |= LINUX_IXOFF;
+	if (bios->c_iflag & IMAXBEL)
+		lios->c_iflag |= LINUX_IMAXBEL;
+
+	lios->c_oflag = 0;
+	if (bios->c_oflag & OPOST)
+		lios->c_oflag |= LINUX_OPOST;
+	if (bios->c_oflag & ONLCR)
+		lios->c_oflag |= LINUX_ONLCR;
+	if (bios->c_oflag & TAB3)
+		lios->c_oflag |= LINUX_XTABS;
+
+	lios->c_cflag = darwin_to_linux_speed(bios->c_ispeed, sptab);
+	lios->c_cflag |= (bios->c_cflag & CSIZE) >> 4;
+	if (bios->c_cflag & CSTOPB)
+		lios->c_cflag |= LINUX_CSTOPB;
+	if (bios->c_cflag & CREAD)
+		lios->c_cflag |= LINUX_CREAD;
+	if (bios->c_cflag & PARENB)
+		lios->c_cflag |= LINUX_PARENB;
+	if (bios->c_cflag & PARODD)
+		lios->c_cflag |= LINUX_PARODD;
+	if (bios->c_cflag & HUPCL)
+		lios->c_cflag |= LINUX_HUPCL;
+	if (bios->c_cflag & CLOCAL)
+		lios->c_cflag |= LINUX_CLOCAL;
+	if (bios->c_cflag & CRTSCTS)
+		lios->c_cflag |= LINUX_CRTSCTS;
+
+	lios->c_lflag = 0;
+	if (bios->c_lflag & ISIG)
+		lios->c_lflag |= LINUX_ISIG;
+	if (bios->c_lflag & ICANON)
+		lios->c_lflag |= LINUX_ICANON;
+	if (bios->c_lflag & ECHO)
+		lios->c_lflag |= LINUX_ECHO;
+	if (bios->c_lflag & ECHOE)
+		lios->c_lflag |= LINUX_ECHOE;
+	if (bios->c_lflag & ECHOK)
+		lios->c_lflag |= LINUX_ECHOK;
+	if (bios->c_lflag & ECHONL)
+		lios->c_lflag |= LINUX_ECHONL;
+	if (bios->c_lflag & NOFLSH)
+		lios->c_lflag |= LINUX_NOFLSH;
+	if (bios->c_lflag & TOSTOP)
+		lios->c_lflag |= LINUX_TOSTOP;
+	if (bios->c_lflag & ECHOCTL)
+		lios->c_lflag |= LINUX_ECHOCTL;
+	if (bios->c_lflag & ECHOPRT)
+		lios->c_lflag |= LINUX_ECHOPRT;
+	if (bios->c_lflag & ECHOKE)
+		lios->c_lflag |= LINUX_ECHOKE;
+	if (bios->c_lflag & FLUSHO)
+		lios->c_lflag |= LINUX_FLUSHO;
+	if (bios->c_lflag & PENDIN)
+		lios->c_lflag |= LINUX_PENDIN;
+	if (bios->c_lflag & IEXTEN)
+		lios->c_lflag |= LINUX_IEXTEN;
+
+	for (i=0; i<LINUX_NCCS; i++)
+		lios->c_cc[i] = LINUX_POSIX_VDISABLE;
+	lios->c_cc[LINUX_VINTR] = bios->c_cc[VINTR];
+	lios->c_cc[LINUX_VQUIT] = bios->c_cc[VQUIT];
+	lios->c_cc[LINUX_VERASE] = bios->c_cc[VERASE];
+	lios->c_cc[LINUX_VKILL] = bios->c_cc[VKILL];
+	lios->c_cc[LINUX_VEOF] = bios->c_cc[VEOF];
+	lios->c_cc[LINUX_VEOL] = bios->c_cc[VEOL];
+	lios->c_cc[LINUX_VMIN] = bios->c_cc[VMIN];
+	lios->c_cc[LINUX_VTIME] = bios->c_cc[VTIME];
+	lios->c_cc[LINUX_VEOL2] = bios->c_cc[VEOL2];
+	lios->c_cc[LINUX_VSUSP] = bios->c_cc[VSUSP];
+	lios->c_cc[LINUX_VSTART] = bios->c_cc[VSTART];
+	lios->c_cc[LINUX_VSTOP] = bios->c_cc[VSTOP];
+	lios->c_cc[LINUX_VREPRINT] = bios->c_cc[VREPRINT];
+	lios->c_cc[LINUX_VDISCARD] = bios->c_cc[VDISCARD];
+	lios->c_cc[LINUX_VWERASE] = bios->c_cc[VWERASE];
+	lios->c_cc[LINUX_VLNEXT] = bios->c_cc[VLNEXT];
+
+	for (i=0; i<LINUX_NCCS; i++) {
+		if (i != LINUX_VMIN && i != LINUX_VTIME &&
+		    lios->c_cc[i] == _POSIX_VDISABLE)
+			lios->c_cc[i] = LINUX_POSIX_VDISABLE;
+	}
+	lios->c_line = 0;
+}
+
+DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
 {
   printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  if (fd == 1 && cmd == LINUX_TCGETS) {
+    struct termios dios;
+    struct linux_termios lios;
+
+    int ret = syswrap(ioctl(fd, TIOCGETA, &dios));
+    if (ret < 0) {
+      return ret;
+    }
+    darwin_to_linux_termios(&dios, &lios);
+    *(struct linux_termios*)(guest_to_host(val0)) = lios;
+
+    return ret;
+  } else if (fd == 1 && cmd == LINUX_TIOCGWINSZ) {
+    return syswrap(ioctl(fd, TIOCGWINSZ, guest_to_host(val0)));
+  }
+
   return -LINUX_EPERM;
 }
 
@@ -374,14 +599,8 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
 
 DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
 {
-  char *host_path1, *host_path2;
-  
-  host_path1 = to_host_path(guest_to_host(path1));
-  if  (strcmp(host_path1, guest_to_host(path2)) != 0) {
-    host_path2 = cat_linux_mnt(guest_to_host(path2));
-  } else {
-    host_path2 = strdup(guest_to_host(path2));
-  }
+  char *host_path1 = to_host_path(guest_to_host(path1));
+  char *host_path2 = to_host_path(guest_to_host(path2));
 
   int ret = syswrap(symlink(host_path1, host_path2));
 
@@ -430,7 +649,11 @@ DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
 
 DEFINE_SYSCALL(chdir, gstr_t, path)
 {
-  return syswrap(chdir(guest_to_host(path)));
+  char *host_path = to_host_path(guest_to_host(path));
+  int ret = syswrap(chdir(host_path));
+
+  free(host_path);
+  return ret;
 }
 
 DEFINE_SYSCALL(fchdir, int, fd)
@@ -441,7 +664,7 @@ DEFINE_SYSCALL(fchdir, int, fd)
 DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 {
   char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(chmod(guest_to_host(path), mode));
+  int ret = syswrap(chmod(host_path, mode));
 
   free(host_path);
   return ret;
@@ -534,4 +757,33 @@ DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
 
   free(host_path);
   return ret;
+}
+
+DEFINE_SYSCALL(chroot, gstr_t, path)
+{
+  char l_path[PATH_MAX];
+  int len = strncpy_from_user(l_path, path, PATH_MAX);
+  if (len == PATH_MAX) {
+    return -LINUX_ENAMETOOLONG;
+  }
+  if (len < 0) {
+    return -LINUX_EFAULT;
+  }
+
+  /* We have not impelemented caps, just check if user is root */
+  if (getuid() != 0) {
+    return -LINUX_EPERM;
+  }
+
+  char *host_path = to_host_path(l_path);
+
+  int error = syswrap(access(host_path, X_OK | R_OK));
+  if (error < 0) {
+    free(host_path);
+    return error;
+  }
+
+  free(proc.root);
+  proc.root = host_path;
+  return 0;
 }

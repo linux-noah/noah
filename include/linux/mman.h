@@ -23,4 +23,7 @@
 #define LINUX_MAP_STACK      0x20000
 #define LINUX_MAP_HUGETLB    0x40000
 
+#define LINUX_MREMAP_MAYMOVE	1
+#define LINUX_MREMAP_FIXED	2
+
 #endif

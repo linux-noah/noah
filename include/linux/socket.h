@@ -155,6 +155,11 @@ struct l_ifconf {
 #define LINUX_SCM_CREDENTIALS	0x02
 #define LINUX_SCM_TIMESTAMP	0x1D
 
+struct l_iovec {
+  l_uintptr_t iov_base;
+  l_size_t iov_len;
+};
+
 struct l_msghdr {
   l_uintptr_t	msg_name;
   l_int		msg_namelen;
@@ -190,7 +195,7 @@ struct l_cmsghdr {
 				((msg)->msg_controllen >= \
 				    sizeof(struct l_cmsghdr) ? \
 				    (struct l_cmsghdr *) \
-				        PTRIN((msg)->msg_control) : \
+				        guest_to_host((msg)->msg_control) : \
 				    (struct l_cmsghdr *)(NULL))
 #define LINUX_CMSG_NXTHDR(msg, cmsg) \
 				((((char *)(cmsg) + \
@@ -210,6 +215,7 @@ struct l_cmsghdr {
   DECL_LINUX(_,AF_UNSPEC,       0)\
   DECL_LINUX(_,AF_UNIX,         1)\
   DECL_ALIAS(_,AF_FILE,         AF_UNIX)\
+  DECL_ALIAS(_,AF_LOCAL,        AF_UNIX)\
   DECL_LINUX(_,AF_INET,         2)\
   DECL_LINUX(_,AF_AX25,         3,\
                                 LINUX_SPECIFIC)\
@@ -220,6 +226,7 @@ struct l_cmsghdr {
 DECLARE_CENUM(sa_family, LINUX_AF);
 DECLARE_CMAP_FUNC(darwin_to_linux, sa_family, LINUX_AF);
 DECLARE_CMAP_FUNC(linux_to_darwin, sa_family, LINUX_AF);
+DECLARE_CSTR_FUNC(sa_family, LINUX_AF);
 
 
 /* Supported socket types */
