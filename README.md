@@ -2,7 +2,17 @@
 
 Noah is a Darwin subsystem for Linux, or "Bash on Ubuntu on Mac OS X". Noah is implemented as a hypervisor that traps linux system calls and translates them into Darwin's system calls. Noah also has an interpreter of ELF files so that binary executables of Linux run directly and flawlessly without any modifications.
 
-## How to use with Vagrant on macOS
+## Quick Start
+
+Noah is installed via homebrew. We strongly recommend additionally installing noahstrap! With noahstrap, you get a comprehensive linux environment via a few lines of commands:
+
+    $ brew tap linux-noah/noah
+    $ brew install noah noahstrap
+    $ mkdir test-chroot
+    $ sudo noahstrap archlinux ./test-chroot
+    $ noah -m ./test-chroot /bin/bash -i
+
+## (Advanced Topic) How to set up an environment with Vagrant on macOS
 
 1. Install [Vagrant](https://www.vagrantup.com/) and [VirtualBox](https://www.virtualbox.org/).
 1. Run `$ vagrant init hashicorp/precise64` to generate `Vagrantfile`.
