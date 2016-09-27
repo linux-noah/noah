@@ -2,3 +2,4 @@
 *.dylib
 *.dSYM/
 build/noah
+!mnt/**/*.o
