@@ -1,9 +1,8 @@
 #! /bin/bash
 
+VERSION=$1
 
 # commit & push
-
-VERSION=$1
 
 VERNUMS=(${VERSION//./ })
 VERSION_MAJOR=${VERNUMS[0]}
@@ -14,12 +13,22 @@ echo major version: $VERSION_MAJOR
 echo minor version: $VERSION_MINOR
 echo patch version: $VERSION_PATCH
 
-FILE=../include/noah.h
+FILE=`pwd`/`git rev-parse --show-cdup`/include/noah.h
 sed -i "" "s/\\(define NOAH_MAJOR_VERSION\\).*/\\1 \"$VERSION_MAJOR\"/" $FILE
 sed -i "" "s/\\(define NOAH_MINOR_VERSION\\).*/\\1 \"$VERSION_MINOR\"/" $FILE
 sed -i "" "s/\\(define NOAH_PATCH_VERSION\\).*/\\1 \"$VERSION_PATCH\"/" $FILE
 
 git add $FILE
+
+while true; do
+    read -p "commit and push? (type 'd' to show the last commit) [y/n/d]" answer
+    case $answer in
+        "y") break;;
+        "n") exit 1;;
+        "d") git diff --cached
+    esac
+done
+
 git commit -m "version $VERSION"
 git push origin master
 
