@@ -1,17 +1,34 @@
 #! /bin/bash
 
+
+# commit & push
+
 VERSION=$1
 
-while [[ -z $VERSION ]]; do
-    read -p "select a version (type 'l' to show all versions): " VERSION
-    if [[ $VERSION = l ]]; then
-        git tag -l
-    else
-        break
-    fi
-done
+VERNUMS=(${VERSION//./ })
+VERSION_MAJOR=${VERNUMS[0]}
+VERSION_MINOR=${VERNUMS[1]}
+VERSION_PATCH=${VERNUMS[2]}
 
-echo installing $VERSION
+echo major version: $VERSION_MAJOR
+echo minor version: $VERSION_MINOR
+echo patch version: $VERSION_PATCH
+
+FILE=../include/noah.h
+sed -i "" "s/\\(define NOAH_MAJOR_VERSION\\).*/\\1 \"$VERSION_MAJOR\"/" $FILE
+sed -i "" "s/\\(define NOAH_MINOR_VERSION\\).*/\\1 \"$VERSION_MINOR\"/" $FILE
+sed -i "" "s/\\(define NOAH_PATCH_VERSION\\).*/\\1 \"$VERSION_PATCH\"/" $FILE
+
+git add $FILE
+git commit -m "version $VERSION"
+git push origin master
+
+git tag $VERSION
+git push origin --tags
+
+echo successfully pushed noah $VERSION
+
+# publish homebrew
 
 URL=https://github.com/linux-noah/noah/archive/$VERSION.tar.gz
 
