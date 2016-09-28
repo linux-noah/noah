@@ -18,7 +18,7 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
 #define NOAH_VERSION NOAH_MAJOR_VERSION "." NOAH_MINOR_VERSION "." NOAH_PATCH_VERSION
 #define NOAH_MAJOR_VERSION "0"
 #define NOAH_MINOR_VERSION "2"
-#define NOAH_PATCH_VERSION "2"
+#define NOAH_PATCH_VERSION "3"
 
 extern struct noah_run_info {
   char *self_path;
