@@ -9,10 +9,6 @@ VERSION_MAJOR=${VERNUMS[0]}
 VERSION_MINOR=${VERNUMS[1]}
 VERSION_PATCH=${VERNUMS[2]}
 
-echo major version: $VERSION_MAJOR
-echo minor version: $VERSION_MINOR
-echo patch version: $VERSION_PATCH
-
 FILE=`pwd`/`git rev-parse --show-cdup`/include/noah.h
 sed -i "" "s/\\(define NOAH_MAJOR_VERSION\\).*/\\1 \"$VERSION_MAJOR\"/" $FILE
 sed -i "" "s/\\(define NOAH_MINOR_VERSION\\).*/\\1 \"$VERSION_MINOR\"/" $FILE
