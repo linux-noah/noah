@@ -10,6 +10,7 @@
 #include "noah.h"
 #include "syscall.h"
 
+#include <mach-o/dyld.h>
 
 void
 run_task()
@@ -178,8 +179,7 @@ main(int argc, char *argv[], char **envp)
   };
   int c, option_index = 0;
 
-  char abs_self[PATH_MAX], root[PATH_MAX] = {0};
-  realpath(argv[0], abs_self);
+  char root[PATH_MAX] = {0};
 
   while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
@@ -201,6 +201,14 @@ main(int argc, char *argv[], char **envp)
       argv[optind - 1] = root;
       break;
     }
+  }
+
+  /* get this executable's path */
+  uint32_t bufsize;
+  _NSGetExecutablePath(NULL, &bufsize);
+  char abs_self[bufsize];
+  if (_NSGetExecutablePath(abs_self, &bufsize)) {
+    return -1;
   }
   noah_run_info = (struct noah_run_info) {.self_path = abs_self, .argc = argc, .argv = argv, .optind = optind};
 
