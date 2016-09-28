@@ -82,7 +82,6 @@ clone_thread_entry(void *varg)
   hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
 
   vcpu_restore(arg->vcpu_snapshot);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, HV_X86_RSP, arg->newsp);
 
   pthread_rwlock_wrlock(&proc.alloc_lock);
   proc.nr_tasks++;
