@@ -21,7 +21,7 @@ sed -i "" "s/\\(define NOAH_PATCH_VERSION\\).*/\\1 \"$VERSION_PATCH\"/" $FILE
 git add $FILE
 
 while true; do
-    read -p "commit and push? (type 'd' to show the last commit) [y/n/d]" answer
+    read -p "commit and push? (type 'd' to show the changes) [y/n/d]" answer
     case $answer in
         "y") break;;
         "n") exit 1;;
