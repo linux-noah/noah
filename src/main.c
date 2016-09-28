@@ -152,7 +152,7 @@ run_task()
 void
 __attribute__((noreturn)) version()
 {
-  fprintf(stderr, "noah %s\n", NOAH_VERSION);
+  fprintf(stderr, "%s\n", NOAH_VERSION);
   exit(1);
 }
 
