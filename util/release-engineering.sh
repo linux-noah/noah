@@ -70,3 +70,16 @@ cd ..
 rm -rf homebrew-noah
 
 echo successfully published noah $VERSION
+
+while true; do
+    read -p "upgrade noah on your system? [y/n]" answer
+    case $answer in
+        "y") break;;
+        "n") exit 0;;
+    esac
+done
+
+brew update
+brew upgrade noah
+
+echo successfully upgraded noah on your system

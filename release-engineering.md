@@ -1,6 +1,6 @@
 # Release Engineering
 
-Run the following command:
+Run the following command (replace `0.2.3` with the version name you are going to publish with!):
 
     $ util/release-engineering 0.2.3
 
