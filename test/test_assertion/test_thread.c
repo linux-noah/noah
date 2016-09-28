@@ -29,6 +29,7 @@ thread_tls(void *arg)
   assert_true(tls_data == 0xbeef);
   tls_data = 0xdead;
   assert_true(tls_data == 0xdead);
+  return NULL;
 }
 
 void
@@ -38,7 +39,7 @@ test_tls()
   tls_data = 0xface;
   assert_true(tls_data == 0xface);
   pthread_t thread;
-  pthread_create(&thread, NULL, thread_start, NULL);
+  pthread_create(&thread, NULL, thread_tls, NULL);
   usleep(5000); // FIXME: replace with pthread_join after implementing futex
   assert_true(tls_data == 0xface);
 }
