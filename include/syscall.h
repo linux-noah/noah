@@ -87,7 +87,7 @@
   SYSCALL(83, mkdir)                            \
   SYSCALL(84, rmdir)                            \
   SYSCALL(85, unimplemented)                    \
-  SYSCALL(86, unimplemented)                    \
+  SYSCALL(86, link)                             \
   SYSCALL(87, unlink)                           \
   SYSCALL(88, symlink)                          \
   SYSCALL(89, readlink)                         \
@@ -264,9 +264,9 @@
   SYSCALL(260, unimplemented)                   \
   SYSCALL(261, unimplemented)                   \
   SYSCALL(262, newfstatat)                      \
-  SYSCALL(263, unimplemented)                   \
+  SYSCALL(263, unlinkat)                        \
   SYSCALL(264, unimplemented)                   \
-  SYSCALL(265, unimplemented)                   \
+  SYSCALL(265, linkat)                          \
   SYSCALL(266, unimplemented)                   \
   SYSCALL(267, unimplemented)                   \
   SYSCALL(268, unimplemented)                   \
