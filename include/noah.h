@@ -2,18 +2,7 @@
 #define NOAH_H
 
 #include <stdint.h>
-
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
-
-static inline uint64_t rounddown(uint64_t x, uint64_t y) {
-  return x / y * y;
-}
-
-static inline uint64_t roundup(uint64_t x, uint64_t y) {
-  return (x + y - 1) / y * y;
-}
-
+#include "util/misc.h"
 
 #define NOAH_VERSION NOAH_MAJOR_VERSION "." NOAH_MINOR_VERSION "." NOAH_PATCH_VERSION
 #define NOAH_MAJOR_VERSION "0"
