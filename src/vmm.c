@@ -434,19 +434,7 @@ vmm_create()
 
   printk("successfully created the vm\n");
 
-  /* create the first vcpu */
-  hv_vcpuid_t vcpuid;
-
-  ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
-  if (ret != HV_SUCCESS) {
-    printk("could not create a vcpu: error code %x", ret);
-    return;
-  }
-
-  vcpu = calloc(sizeof(struct vcpu), 1);
-  vcpu->vcpuid = vcpuid;
-  list_add(&vcpu->list, &vcpus);
-  nr_vcpus += 1;
+  vmm_create_vcpu(NULL);
 
   printk("successfully created a vcpu\n");
 
