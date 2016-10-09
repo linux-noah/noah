@@ -30,6 +30,7 @@ extern struct noah_run_info {
 #include "types.h"
 #include "util/list.h"
 #include "x86/page.h"
+#include <pthread.h>
 
 /* uacces */
 
@@ -49,8 +50,6 @@ int do_open_at(int fd,const char *path, int flags, int mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
 void main_loop();
-
-#include <Hypervisor/hv.h>
 
 /* mm structures */
 

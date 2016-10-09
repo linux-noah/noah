@@ -5,6 +5,7 @@
 #include <getopt.h>
 #include <string.h>
 #include <sys/syslimits.h>
+#include <libgen.h>
 
 #include "vmm.h"
 #include "noah.h"
@@ -215,6 +216,13 @@ main(int argc, char *argv[], char **envp)
   }
 
   vmm_create();
+
+  char bin[PATH_MAX];
+  char *dir;
+  realpath(noah_run_info.self_path, bin);
+  dir = dirname(bin);
+  proc.root = malloc(snprintf(NULL, 0, "%s/../mnt", dir));
+  sprintf(proc.root, "%s/../mnt", dir);
 
   if (root[0] != '\0') {
     free(proc.root);

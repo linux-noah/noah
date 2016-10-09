@@ -444,13 +444,6 @@ vmm_create()
   pthread_rwlock_init(&proc.lock, NULL);
   proc.nr_tasks = 0;
 
-  char bin[PATH_MAX];
-  char *dir;
-  realpath(noah_run_info.self_path, bin);
-  dir = dirname(bin);
-  proc.root = malloc(snprintf(NULL, 0, "%s/../mnt", dir));
-  sprintf(proc.root, "%s/../mnt", dir);
-
   init_vmcs();
   init_msr();
   init_page();
