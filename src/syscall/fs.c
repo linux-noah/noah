@@ -351,6 +351,25 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
   return syswrap(dup2(fd1, fd2));
 }
 
+DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
+{
+  if (flags & ~LINUX_O_CLOEXEC) {
+    return -LINUX_EINVAL;
+  }
+  if (oldfd == newfd) {
+    return -LINUX_EINVAL;
+  }
+
+  // TODO: This implementation does not prevent race condition
+  //       Make sure that exec closes fds after robust fd control is implemented (i.e. VFS)
+  int ret = syswrap(dup2(oldfd, newfd));
+  if (ret == 0 && (flags & LINUX_O_CLOEXEC)) {
+    ret = syswrap(fcntl(newfd, F_SETFD, FD_CLOEXEC));
+  }
+
+  return ret;
+}
+
 DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
 {
   int ret = syswrap((int)getcwd(guest_to_host(buf), size));
