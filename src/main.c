@@ -15,7 +15,6 @@
 void
 main_loop()
 {
-  hv_return_t ret;
   uint64_t value;
 
   while (vmm_run() == 0) {
