@@ -24,7 +24,9 @@ void vmm_snapshot(struct vmm_snapshot*);
 void vmm_reentry(struct vmm_snapshot*);
 void vmm_snapshot_vcpu(struct vcpu_snapshot*);
 void vmm_restore_vcpu(struct vcpu_snapshot*);
+
 void vmm_create_vcpu(struct vcpu_snapshot *);
+void vmm_destroy_vcpu(void);
 
 int vmm_run(void);
 

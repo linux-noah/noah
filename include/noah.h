@@ -74,21 +74,19 @@ struct mm {
 /* task related data */
 
 struct task {
-  hv_vcpuid_t vcpuid;
   gaddr_t set_child_tid, clear_child_tid;
-  struct list_head tasks; /* Tasks in the current proc */
+  struct task_group *tgrp;
 };
 
 struct proc {
-  struct list_head tasks;
   int nr_tasks;
-  pthread_rwlock_t alloc_lock; /* Protection for tasks (and nr_tasks) */
+  pthread_rwlock_t lock;
   struct mm *mm;
   char *root; /* FS root */
 };
 
 extern struct proc proc;
-_Thread_local extern struct task *task;
+_Thread_local extern struct task task;
 
 
 #define LINUX_RELEASE "4.6.4"

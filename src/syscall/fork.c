@@ -21,16 +21,16 @@ post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gadd
   }
 
   if (clone_ret == 0) {
-    task->set_child_tid = task->clear_child_tid = 0;
+    task.set_child_tid = task.clear_child_tid = 0;
     if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
-      task->set_child_tid = child_tid;
+      task.set_child_tid = child_tid;
     }
     if (clone_flags & LINUX_CLONE_CHILD_CLEARTID) {
-      task->clear_child_tid = child_tid;
+      task.clear_child_tid = child_tid;
     }
 
-    if (task->set_child_tid != 0) {
-      *(int *) guest_to_host(task->set_child_tid) = getpid();
+    if (task.set_child_tid != 0) {
+      *(int *) guest_to_host(task.set_child_tid) = getpid();
     }
 
     if (clone_flags & LINUX_CLONE_SETTLS) {
@@ -76,8 +76,6 @@ clone_thread_entry(void *varg)
 {
   printk("clone_thread_entry\n");
   struct clone_thread_arg *arg = varg;
-  task = malloc(sizeof(struct task));
-  bzero(task, sizeof(struct task));
 
   vmm_create_vcpu(arg->vcpu_snapshot);
 

@@ -17,7 +17,7 @@
 #include "linux/errno.h"
 
 struct proc proc;
-_Thread_local struct task *task;
+_Thread_local struct task task;
 
 DEFINE_SYSCALL(getpid)
 {
@@ -104,28 +104,25 @@ DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 
 DEFINE_SYSCALL(exit, int, reason)
 {
-  if (task->clear_child_tid) {
-    *(int*)guest_to_host(task->clear_child_tid) = 0;
-    do_futex_wake(task->clear_child_tid, 1);
+  if (task.clear_child_tid) {
+    *(int*)guest_to_host(task.clear_child_tid) = 0;
+    do_futex_wake(task.clear_child_tid, 1);
   }
-  pthread_rwlock_wrlock(&proc.alloc_lock);
+  vmm_destroy_vcpu();
+  pthread_rwlock_wrlock(&proc.lock);
   if (proc.nr_tasks == 1) {
     _exit(reason);
   } else {
-    proc.nr_tasks--;
-    list_del(&task->tasks);
-    pthread_rwlock_unlock(&proc.alloc_lock);
-    hv_vcpu_destroy(task->vcpuid);
-    free(task);
+    pthread_rwlock_unlock(&proc.lock);
     pthread_exit(&reason);
   }
 }
 
 DEFINE_SYSCALL(exit_group, int, reason)
 {
-  if (task->clear_child_tid) {
-    *(int*)guest_to_host(task->clear_child_tid) = 0;
-    do_futex_wake(task->clear_child_tid, 1);
+  if (task.clear_child_tid) {
+    *(int*)guest_to_host(task.clear_child_tid) = 0;
+    do_futex_wake(task.clear_child_tid, 1);
   }
   _exit(reason);
 }
@@ -180,7 +177,7 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 
 DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 {
-  task->clear_child_tid = tidptr;
+  task.clear_child_tid = tidptr;
   return 0;
 }
 
