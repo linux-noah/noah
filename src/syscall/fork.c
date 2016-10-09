@@ -51,7 +51,7 @@ clone_proc(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, g
 {
   // Because Apple Hypervisor Framwork won't let us use multiple VMs,
   // we destroy the current vm and restore it later
-  struct vm_snapshot snapshot;
+  struct vmm_snapshot snapshot;
   vmm_snapshot(&snapshot);
   vmm_destroy();
 
@@ -81,7 +81,7 @@ clone_thread_entry(void *varg)
 
   hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
 
-  vcpu_restore(arg->vcpu_snapshot);
+  vmm_restore_vcpu(arg->vcpu_snapshot);
 
   pthread_rwlock_wrlock(&proc.alloc_lock);
   proc.nr_tasks++;
@@ -114,7 +114,7 @@ clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid,
   struct vcpu_snapshot *snapshot = malloc(sizeof(struct vcpu_snapshot));
   struct clone_thread_arg *arg = malloc(sizeof(struct clone_thread_arg));
   *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls, snapshot};
-  vcpu_snapshot(snapshot);
+  vmm_snapshot_vcpu(snapshot);
   pthread_create(&threadid, NULL, clone_thread_entry, arg);
   pthread_threadid_np(threadid, &tid);
 

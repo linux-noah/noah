@@ -515,7 +515,7 @@ dump_instr()
 }
 
 void
-vcpu_snapshot(struct vcpu_snapshot *snapshot)
+vmm_snapshot_vcpu(struct vcpu_snapshot *snapshot)
 {
   /* snapshot registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
@@ -535,7 +535,7 @@ vcpu_snapshot(struct vcpu_snapshot *snapshot)
 }
 
 void
-vmm_snapshot(struct vm_snapshot *snapshot)
+vmm_snapshot(struct vmm_snapshot *snapshot)
 {
   printk("vmm_snapshot\n");
 
@@ -546,13 +546,13 @@ vmm_snapshot(struct vm_snapshot *snapshot)
     exit(1);
   }
 
-  vcpu_snapshot(&snapshot->first_vcpu_snapshot);
+  vmm_snapshot_vcpu(&snapshot->first_vcpu_snapshot);
 
   pthread_rwlock_unlock(&proc.alloc_lock);
 }
 
 void
-vcpu_restore(struct vcpu_snapshot *snapshot)
+vmm_restore_vcpu(struct vcpu_snapshot *snapshot)
 {
   /* restore vmcs */
   static const uint32_t restore_mask[] = {
@@ -635,7 +635,7 @@ restore_ept()
 }
 
 void
-vmm_reentry(struct vm_snapshot *snapshot)
+vmm_reentry(struct vmm_snapshot *snapshot)
 {
   hv_return_t ret;
 
@@ -659,7 +659,7 @@ vmm_reentry(struct vm_snapshot *snapshot)
     printk("could not create a vcpu: error code %x", ret);
     return;
   }
-  vcpu_restore(&snapshot->first_vcpu_snapshot);
+  vmm_restore_vcpu(&snapshot->first_vcpu_snapshot);
 
   pthread_rwlock_unlock(&proc.alloc_lock);
   printk("vcpu_restore done\n");
