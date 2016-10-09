@@ -34,7 +34,7 @@ post_clone(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gadd
     }
 
     if (clone_flags & LINUX_CLONE_SETTLS) {
-      hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, tls);
+      vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);
     }
 
   } else {
@@ -84,10 +84,10 @@ clone_thread_entry(void *varg)
   int sys_ret = post_clone(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
 
   uint64_t rip;
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RAX, sys_ret);
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RSP, arg->newsp);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &rip);
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RIP, rip + 2);
+  vmm_write_register(HV_X86_RAX, sys_ret);
+  vmm_write_register(HV_X86_RSP, arg->newsp);
+  vmm_read_register(HV_X86_RIP, &rip);
+  vmm_write_register(HV_X86_RIP, rip + 2);
 
   free(arg->vcpu_snapshot);
   free(varg);

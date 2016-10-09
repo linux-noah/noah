@@ -28,7 +28,7 @@ run_task()
     print_regs();
 
     uint64_t exit_reason;
-    hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_EXIT_REASON, &exit_reason);
+    vmm_read_vmcs(VMCS_RO_EXIT_REASON, &exit_reason);
 
     switch (exit_reason) {
       uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
@@ -44,17 +44,17 @@ run_task()
 
       printk("reason: exc or nmi\n");
       printk("\n");
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+      vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
       printk("instr length = 0x%llx\n", instlen);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &rip);
+      vmm_read_register(HV_X86_RIP, &rip);
       printk("rip = 0x%llx\n", rip);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_IRQ_INFO, &irqvec);
+      vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_INFO, &irqvec);
       printk("irq info = %lld\n", irqvec);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_IRQ_ERROR, &irqerr);
+      vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_ERROR, &irqerr);
       printk("irq error = %lld\n", irqerr);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_INT_STATUS, &intstatus);
+      vmm_read_vmcs(VMCS_GUEST_INT_STATUS, &intstatus);
       printk("guest int status = %lld\n", intstatus);
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_EXIT_QUALIFIC, &exit_qual);
+      vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &exit_qual);
       printk("exit qualification = 0x%llx\n", exit_qual);
 
       // FIXME
@@ -68,35 +68,35 @@ run_task()
 
         // Exception such as #P
         printk("!!MAYBE AN Ignorable Exception!!\n");
-        hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_RIP, instlen + rip);
+        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         continue;
       }
 
       // Syscall
       printk("!!MAYBE A SYSENTER!!\n");
 
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RAX, &rax);
+      vmm_read_register(HV_X86_RAX, &rax);
 
       if (rax >= NR_SYSCALLS) {
         printf("unknown system call: %lld\n", rax);
         exit(1);
       }
 
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RDI, &rdi);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RSI, &rsi);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RDX, &rdx);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_R10, &r10);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_R8, &r8);
-      hv_vcpu_read_register(task->vcpuid, HV_X86_R9, &r9);
+      vmm_read_register(HV_X86_RDI, &rdi);
+      vmm_read_register(HV_X86_RSI, &rsi);
+      vmm_read_register(HV_X86_RDX, &rdx);
+      vmm_read_register(HV_X86_R10, &r10);
+      vmm_read_register(HV_X86_R8, &r8);
+      vmm_read_register(HV_X86_R9, &r9);
 
       printk(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
       retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
       printk("<<<syscall done: %lld\n", retval);
 
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RAX, retval);
+      vmm_write_register(HV_X86_RAX, retval);
 
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &value);
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RIP, value + 2);
+      vmm_read_register(HV_X86_RIP, &value);
+      vmm_write_register(HV_X86_RIP, value + 2);
 
       break;
     }
@@ -104,12 +104,12 @@ run_task()
     case VMX_REASON_EPT_VIOLATION:
       printk("reason: ept_violation\n");
 
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_PHYSICAL_ADDRESS, &value);
+      vmm_read_vmcs(VMCS_GUEST_PHYSICAL_ADDRESS, &value);
       printk("guest-physical address = 0x%llx\n", value);
 
       uint64_t qual;
 
-      hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_EXIT_QUALIFIC, &qual);
+      vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &qual);
       printk("exit qualification = 0x%llx\n", qual);
 
       if (qual & (1 << 0)) printk("cause: data read\n");
@@ -117,7 +117,7 @@ run_task()
       if (qual & (1 << 2)) printk("cause: inst fetch\n");
 
       if (qual & (1 << 7)) {
-        hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_GUEST_LIN_ADDR, &value);
+        vmm_read_vmcs(VMCS_RO_GUEST_LIN_ADDR, &value);
         printk("guest linear address = 0x%llx\n", value);
       } else {
         printk("guest linear address = (unavailable)\n");
@@ -130,13 +130,13 @@ run_task()
 
       __get_cpuid(rax, &eax, &ebx, &ecx, &edx);
 
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RAX, eax);
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RBX, ebx);
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RCX, ecx);
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RDX, edx);
+      vmm_write_register(HV_X86_RAX, eax);
+      vmm_write_register(HV_X86_RBX, ebx);
+      vmm_write_register(HV_X86_RCX, ecx);
+      vmm_write_register(HV_X86_RDX, edx);
 
-      hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &value);
-      hv_vcpu_write_register(task->vcpuid, HV_X86_RIP, value + 2);
+      vmm_read_register(HV_X86_RIP, &value);
+      vmm_write_register(HV_X86_RIP, value + 2);
 
       break;
     }

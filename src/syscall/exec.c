@@ -80,7 +80,7 @@ load_elf_interp(const char *path, ulong load_addr)
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
   }
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_RIP, load_addr + h->e_entry);
+  vmm_write_vmcs(VMCS_GUEST_RIP, load_addr + h->e_entry);
   brk_min = map_top;
 
   munmap(data, st.st_size);
@@ -155,7 +155,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     }
   }
   else {
-    hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_RIP, ehdr->e_entry);
+    vmm_write_vmcs(VMCS_GUEST_RIP, ehdr->e_entry);
     brk_min = map_top;
   }
 
@@ -222,9 +222,9 @@ push(const void *data, size_t n)
   uint64_t size = roundup(n, 8);
   uint64_t rsp;
 
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RSP, &rsp);
+  vmm_read_register(HV_X86_RSP, &rsp);
   rsp -= size;
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RSP, rsp);
+  vmm_write_register(HV_X86_RSP, rsp);
 
   char *stackmem = guest_to_host(rsp);
 
@@ -242,8 +242,8 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
 {
   do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RSP, STACK_TOP);
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RBP, STACK_TOP);
+  vmm_write_register(HV_X86_RSP, STACK_TOP);
+  vmm_write_register(HV_X86_RBP, STACK_TOP);
 
   char random[16];
 

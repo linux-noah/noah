@@ -244,20 +244,20 @@ init_vmcs()
 
 #define cap2ctrl(cap,ctrl) (((ctrl) | ((cap) & 0xffffffff)) & ((cap) >> 32))
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_PIN_BASED, cap2ctrl(vmx_cap_pinbased, 0));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_CPU_BASED, cap2ctrl(vmx_cap_procbased,
-                                                 CPU_BASED_HLT |
-                                                 CPU_BASED_CR8_LOAD |
-                                                 CPU_BASED_CR8_STORE));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_CPU_BASED2, cap2ctrl(vmx_cap_procbased2, 0));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_VMENTRY_CONTROLS,  cap2ctrl(vmx_cap_entry,
-                                                 VMENTRY_LOAD_EFER |
-                                                 VMENTRY_GUEST_IA32E));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_VMEXIT_CONTROLS, cap2ctrl(vmx_cap_exit, VMEXIT_LOAD_EFER));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_EXC_BITMAP, 0xffffffff);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_CR0_SHADOW, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_CR4_MASK, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_CTRL_CR4_SHADOW, 0);
+  vmm_write_vmcs(VMCS_CTRL_PIN_BASED, cap2ctrl(vmx_cap_pinbased, 0));
+  vmm_write_vmcs(VMCS_CTRL_CPU_BASED, cap2ctrl(vmx_cap_procbased,
+                                               CPU_BASED_HLT |
+                                               CPU_BASED_CR8_LOAD |
+                                               CPU_BASED_CR8_STORE));
+  vmm_write_vmcs(VMCS_CTRL_CPU_BASED2, cap2ctrl(vmx_cap_procbased2, 0));
+  vmm_write_vmcs(VMCS_CTRL_VMENTRY_CONTROLS,  cap2ctrl(vmx_cap_entry,
+                                                       VMENTRY_LOAD_EFER |
+                                                       VMENTRY_GUEST_IA32E));
+  vmm_write_vmcs(VMCS_CTRL_VMEXIT_CONTROLS, cap2ctrl(vmx_cap_exit, VMEXIT_LOAD_EFER));
+  vmm_write_vmcs(VMCS_CTRL_EXC_BITMAP, 0xffffffff);
+  vmm_write_vmcs(VMCS_CTRL_CR0_SHADOW, 0);
+  vmm_write_vmcs(VMCS_CTRL_CR4_MASK, 0);
+  vmm_write_vmcs(VMCS_CTRL_CR4_SHADOW, 0);
 }
 
 #define __page_aligned __attribute__((aligned(0x1000)))
@@ -296,20 +296,20 @@ init_page()
   kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
   pml4[0] |= kmap(pdp, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE) & 0x000ffffffffff000ul;
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CR3, host_to_guest(pml4));
+  vmm_write_vmcs(VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+  vmm_write_vmcs(VMCS_GUEST_CR3, host_to_guest(pml4));
 }
 
 void
 init_special_regs()
 {
   uint64_t cr4;
-  hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_CR4, &cr4);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE);
+  vmm_read_vmcs(VMCS_GUEST_CR4, &cr4);
+  vmm_write_vmcs(VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE);
 
   uint64_t efer;
-  hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_IA32_EFER, &efer);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
+  vmm_read_vmcs(VMCS_GUEST_IA32_EFER, &efer);
+  vmm_write_vmcs(VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
 }
 
 uint64_t gdt[3] __page_aligned = {
@@ -323,58 +323,58 @@ init_segment()
 {
   kmap(gdt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
+  vmm_write_vmcs(VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
+  vmm_write_vmcs(VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_TR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_TR_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_TR_AR, 0x0000008b);
+  vmm_write_vmcs(VMCS_GUEST_TR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_TR_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_TR_AR, 0x0000008b);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_LDTR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_LDTR_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
+  vmm_write_vmcs(VMCS_GUEST_LDTR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_LDTR_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_IDTR_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_IDTR_LIMIT, 0xffff);
+  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, 0xffff);
 
   uint32_t codeseg_ar = 0x0000209B;
   uint32_t dataseg_ar = 0x00000093;
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CS_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_CS_AR, codeseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_CS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_CS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_CS_AR, codeseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_DS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_DS_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_DS_AR, dataseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_DS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_DS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_DS_AR, dataseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_ES, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_ES_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_ES_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_ES_AR, dataseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_ES, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_AR, dataseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_AR, dataseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_FS, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_AR, dataseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS_AR, dataseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_GS, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_AR, dataseg_ar);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_SS, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_SS_BASE, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_SS_LIMIT, 0);
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_SS_AR, dataseg_ar);
+  vmm_write_vmcs(VMCS_GUEST_SS, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_AR, dataseg_ar);
 
-  hv_vcpu_write_register(task->vcpuid, HV_X86_CS, GSEL(SEG_CODE, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_DS, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_ES, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_FS, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_GS, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_SS, GSEL(SEG_DATA, 0));
-  hv_vcpu_write_register(task->vcpuid, HV_X86_TR, 0);
-  hv_vcpu_write_register(task->vcpuid, HV_X86_LDTR, 0);
+  vmm_write_register(HV_X86_CS, GSEL(SEG_CODE, 0));
+  vmm_write_register(HV_X86_DS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_ES, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_FS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_GS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_SS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_TR, 0);
+  vmm_write_register(HV_X86_LDTR, 0);
 }
 
 struct gate_desc idt[256] __page_aligned;
@@ -384,15 +384,15 @@ init_idt()
 {
   kmap(idt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
-  hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_IDTR_LIMIT, sizeof idt);
+  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
+  vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, sizeof idt);
 }
 
 void
 init_regs()
 {
   /* set up cpu regs */
-  hv_vcpu_write_register(task->vcpuid, HV_X86_RFLAGS, 0x2);
+  vmm_write_register(HV_X86_RFLAGS, 0x2);
 }
 
 void
@@ -482,21 +482,21 @@ print_regs()
 {
   uint64_t value;
 
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &value);
+  vmm_read_register(HV_X86_RIP, &value);
   printk("\trip = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RAX, &value);
+  vmm_read_register(HV_X86_RAX, &value);
   printk("\trax = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RBX, &value);
+  vmm_read_register(HV_X86_RBX, &value);
   printk("\trbx = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RCX, &value);
+  vmm_read_register(HV_X86_RCX, &value);
   printk("\trcx = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RDX, &value);
+  vmm_read_register(HV_X86_RDX, &value);
   printk("\trdx = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RDI, &value);
+  vmm_read_register(HV_X86_RDI, &value);
   printk("\trdi = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RSI, &value);
+  vmm_read_register(HV_X86_RSI, &value);
   printk("\trsi = 0x%llx\n", value);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RBP, &value);
+  vmm_read_register(HV_X86_RBP, &value);
   printk("\trbp = 0x%llx\n", value);
 }
 
@@ -504,8 +504,8 @@ void
 dump_instr()
 {
   uint64_t instlen, rip;
-  hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RIP, &rip);
+  vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+  vmm_read_register(HV_X86_RIP, &rip);
   char inst_str[instlen * 3 + 1];
   for (int i = 0; i < instlen; i ++) {
     sprintf(inst_str + 3 * i, "%02x ", *((uchar*)guest_to_host(rip) + i));
@@ -519,18 +519,11 @@ vmm_snapshot_vcpu(struct vcpu_snapshot *snapshot)
 {
   /* snapshot registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_read_register(task->vcpuid, x86_reg_list[i], &snapshot->vcpu_reg[i]) != HV_SUCCESS) {
-      printk("store_regs failed\n");
-      return;
-    }
+    vmm_read_register(x86_reg_list[i], &snapshot->vcpu_reg[i]);
   }
   /* snapshot vmcs */
   for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
-    uint64_t success = hv_vmx_vcpu_read_vmcs(task->vcpuid, vmcs_field_list[i], &snapshot->vmcs[i]);
-    if (success != HV_SUCCESS) {
-      printk("store_vmcs failed\n");
-      return;
-    }
+    vmm_read_vmcs(vmcs_field_list[i], &snapshot->vmcs[i]);
   }
 }
 
@@ -602,19 +595,13 @@ vmm_restore_vcpu(struct vcpu_snapshot *snapshot)
         goto cont;
       }
     }
-    uint64_t success = hv_vmx_vcpu_write_vmcs(task->vcpuid, vmcs_field_list[i], snapshot->vmcs[i]);
-    if (success != HV_SUCCESS) {
-      printk("restore vmcs failed, %s\n", vmcs_field_str[i]);
-    }
+    vmm_write_vmcs(vmcs_field_list[i], snapshot->vmcs[i]);
 cont: ;
   }
 
   /* restore registers */
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (hv_vcpu_write_register(task->vcpuid, x86_reg_list[i], snapshot->vcpu_reg[i]) != HV_SUCCESS) {
-      printk("restore regs failed\n");
-      return;
-    }
+    vmm_write_register(x86_reg_list[i], snapshot->vcpu_reg[i]);
   }
 
   /* restore MSRs. Initializing them is enough now */
@@ -680,4 +667,55 @@ vmm_reentry(struct vmm_snapshot *snapshot)
   restore_ept();
   printk("ept_restore done\n");
 
+}
+
+void
+vmm_read_register(hv_x86_reg_t reg, uint64_t *val)
+{
+  if (hv_vcpu_read_register(task->vcpuid, reg, val) != HV_SUCCESS) {
+    fprintf(stderr, "read_register failed\n");
+    abort();
+  }
+}
+
+void
+vmm_write_register(hv_x86_reg_t reg, uint64_t val) {
+  if (hv_vcpu_write_register(task->vcpuid, reg, val) != HV_SUCCESS) {
+    fprintf(stderr, "write_register failed\n");
+    abort();
+  }
+}
+
+void
+vmm_read_msr(hv_x86_reg_t reg, uint64_t *val)
+{
+  if (hv_vcpu_read_msr(task->vcpuid, reg, val) != HV_SUCCESS) {
+    fprintf(stderr, "read_msr failed\n");
+    abort();
+  }
+}
+
+void
+vmm_write_msr(hv_x86_reg_t reg, uint64_t val) {
+  if (hv_vcpu_write_msr(task->vcpuid, reg, val) != HV_SUCCESS) {
+    fprintf(stderr, "write_msr failed\n");
+    abort();
+  }
+}
+
+void
+vmm_read_vmcs(hv_x86_reg_t field, uint64_t *val)
+{
+  if (hv_vmx_vcpu_read_vmcs(task->vcpuid, field, val) != HV_SUCCESS) {
+    fprintf(stderr, "read_vmcs failed\n");
+    abort();
+  }
+}
+
+void
+vmm_write_vmcs(hv_x86_reg_t field, uint64_t val) {
+  if (hv_vmx_vcpu_write_vmcs(task->vcpuid, field, val) != HV_SUCCESS) {
+    fprintf(stderr, "write_vmcs failed\n");
+    abort();
+  }
 }

@@ -26,6 +26,13 @@ void vmm_snapshot_vcpu(struct vcpu_snapshot*);
 void vmm_restore_vcpu(struct vcpu_snapshot*);
 void vmm_create_vcpu(struct vcpu_snapshot *);
 
+void vmm_read_register(hv_x86_reg_t, uint64_t *);
+void vmm_write_register(hv_x86_reg_t, uint64_t);
+void vmm_read_msr(uint32_t, uint64_t *);
+void vmm_write_msr(uint32_t, uint64_t);
+void vmm_read_vmcs(uint32_t, uint64_t *);
+void vmm_write_vmcs(uint32_t, uint64_t);
+
 /* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);

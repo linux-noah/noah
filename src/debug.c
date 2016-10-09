@@ -391,10 +391,8 @@ void fprint_vmcs(FILE *out, hv_vcpuid_t vcpuid, uint32_t vmcs_field)
 {
   uint64_t vmcs;
 
-  if (hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field, &vmcs) != HV_SUCCESS) {
-    fprintf(stderr, "read_vmcs failed, field: %s\n", vmcs_field_to_str(vmcs_field));
-    return;
-  }
+  hv_vmx_vcpu_read_vmcs(vcpuid, vmcs_field, &vmcs);
+
   fprintf(out, "%s: 0x%016llx\n", vmcs_field_to_str(vmcs_field), vmcs);
 }
 

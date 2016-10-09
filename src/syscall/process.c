@@ -162,16 +162,16 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   switch (code) {
   case LINUX_ARCH_SET_GS:
-    hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_GS_BASE, addr);
+    vmm_write_vmcs(VMCS_GUEST_GS_BASE, addr);
     return 0;
   case LINUX_ARCH_SET_FS:
-    hv_vmx_vcpu_write_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, addr);
+    vmm_write_vmcs(VMCS_GUEST_FS_BASE, addr);
     return 0;
   case LINUX_ARCH_GET_FS:
-    hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_FS_BASE, guest_to_host(addr));
+    vmm_read_vmcs(VMCS_GUEST_FS_BASE, guest_to_host(addr));
     return 0;
   case LINUX_ARCH_GET_GS:
-    hv_vmx_vcpu_read_vmcs(task->vcpuid, VMCS_GUEST_GS_BASE, guest_to_host(addr));
+    vmm_read_vmcs(VMCS_GUEST_GS_BASE, guest_to_host(addr));
     return 0;
   default:
     return -LINUX_EINVAL;

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "noah.h"
+#include "vmm.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -34,7 +35,7 @@ DEFINE_SYSCALL(unimplemented)
 {
   uint64_t rax;
 
-  hv_vcpu_read_register(task->vcpuid, HV_X86_RAX, &rax);
+  vmm_read_register(HV_X86_RAX, &rax);
 
   printk("unimplemented syscall: %lld\n", rax);
   fprintf(stderr, "unimplemented syscall: %lld\n", rax);
