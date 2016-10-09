@@ -24,6 +24,7 @@ void vmm_snapshot(struct vmm_snapshot*);
 void vmm_reentry(struct vmm_snapshot*);
 void vmm_snapshot_vcpu(struct vcpu_snapshot*);
 void vmm_restore_vcpu(struct vcpu_snapshot*);
+void vmm_create_vcpu(struct vcpu_snapshot *);
 
 /* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);

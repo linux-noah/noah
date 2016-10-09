@@ -621,6 +621,19 @@ cont: ;
   init_msr();
 }
 
+void
+vmm_create_vcpu(struct vcpu_snapshot *snapshot)
+{
+  hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
+
+  vmm_restore_vcpu(snapshot);
+
+  pthread_rwlock_wrlock(&proc.alloc_lock);
+  proc.nr_tasks++;
+  list_add_tail(&task->tasks, &proc.tasks);
+  pthread_rwlock_unlock(&proc.alloc_lock);
+}
+
 bool
 restore_ept()
 {

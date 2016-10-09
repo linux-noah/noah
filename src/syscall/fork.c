@@ -79,14 +79,7 @@ clone_thread_entry(void *varg)
   task = malloc(sizeof(struct task));
   bzero(task, sizeof(struct task));
 
-  hv_vcpu_create(&task->vcpuid, HV_VCPU_DEFAULT);
-
-  vmm_restore_vcpu(arg->vcpu_snapshot);
-
-  pthread_rwlock_wrlock(&proc.alloc_lock);
-  proc.nr_tasks++;
-  list_add_tail(&task->tasks, &proc.tasks);
-  pthread_rwlock_unlock(&proc.alloc_lock);
+  vmm_create_vcpu(arg->vcpu_snapshot);
 
   int sys_ret = post_clone(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
 
