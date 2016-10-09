@@ -228,7 +228,7 @@ main(int argc, char *argv[], char **envp)
 
   if (do_exec(argv[0], argc, argv, envp) < 0) {
     exit(1);
-  };
+  }
 
   run_task();
 
