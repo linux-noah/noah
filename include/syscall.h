@@ -293,8 +293,8 @@
   SYSCALL(289, unimplemented)                   \
   SYSCALL(290, unimplemented)                   \
   SYSCALL(291, unimplemented)                   \
-  SYSCALL(293, unimplemented)                   \
   SYSCALL(292, dup3)                            \
+  SYSCALL(293, pipe2)                           \
   SYSCALL(294, unimplemented)                   \
   SYSCALL(295, unimplemented)                   \
   SYSCALL(296, unimplemented)                   \

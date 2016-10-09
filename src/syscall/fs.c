@@ -341,6 +341,54 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
   return syswrap(pipe(guest_to_host(fildes_ptr)));
 }
 
+DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
+{
+  if (flags & ~(LINUX_O_NONBLOCK | LINUX_O_CLOEXEC | LINUX_O_DIRECT)) {
+    return -LINUX_EINVAL;
+  }
+
+  int fildes[2];
+
+  int err = pipe(fildes);
+  if (err < 0) {
+    return err;
+  }
+
+  int err0, err1;
+  if (flags & LINUX_O_CLOEXEC) {
+    // TODO: This implementation does not prevent race condition
+    //       Make sure that exec closes fds after robust fd control is implemented (i.e. VFS)
+    err0 = syswrap(fcntl(fildes[0], F_SETFD, FD_CLOEXEC));
+    err1 = syswrap(fcntl(fildes[1], F_SETFD, FD_CLOEXEC));
+    if (err0 < 0 || err1 < 0) {
+      goto fail_fcntl;
+    }
+  }
+  if (flags & LINUX_O_NONBLOCK) {
+    err0 = syswrap(fcntl(fildes[0], F_SETFL, O_NONBLOCK));
+    err1 = syswrap(fcntl(fildes[1], F_SETFL, O_NONBLOCK));
+    if (err0 < 0 || err1 < 0) {
+      goto fail_fcntl;
+    }
+  }
+  if (flags & LINUX_O_DIRECT) {
+    err0 = syswrap(fcntl(fildes[0], F_NOCACHE, 1));
+    err1 = syswrap(fcntl(fildes[1], F_NOCACHE, 1));
+    if (err0 < 0 || err1 < 0) {
+      goto fail_fcntl;
+    }
+  }
+
+  copy_to_user(fildes_ptr, fildes, sizeof(fildes));
+
+  return 0;
+
+fail_fcntl:
+  close(fildes[0]);
+  close(fildes[1]);
+  return (err0 < 0) ? err0 : err1;
+}
+
 DEFINE_SYSCALL(dup, unsigned int, fd)
 {
   return syswrap(dup(fd));
