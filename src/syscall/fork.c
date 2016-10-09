@@ -78,6 +78,10 @@ clone_thread_entry(struct clone_thread_arg *arg)
 
   vmm_create_vcpu(arg->vcpu_snapshot);
 
+  pthread_rwlock_wrlock(&proc.lock);
+  proc.nr_tasks++;
+  pthread_rwlock_unlock(&proc.lock);
+
   int sys_ret = fixup_task(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
 
   vmm_write_register(HV_X86_RAX, sys_ret);

@@ -113,6 +113,7 @@ DEFINE_SYSCALL(exit, int, reason)
   if (proc.nr_tasks == 1) {
     _exit(reason);
   } else {
+    proc.nr_tasks--;
     pthread_rwlock_unlock(&proc.lock);
     pthread_exit(&reason);
   }
