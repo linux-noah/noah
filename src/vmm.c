@@ -719,3 +719,12 @@ vmm_write_vmcs(hv_x86_reg_t field, uint64_t val) {
     abort();
   }
 }
+
+int
+vmm_run()
+{
+  if (hv_vcpu_run(task->vcpuid) == HV_SUCCESS) {
+    return 0;
+  }
+  return -1;
+}

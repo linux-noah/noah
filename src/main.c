@@ -18,11 +18,7 @@ run_task()
   hv_return_t ret;
   uint64_t value;
 
-  while (true) {
-    if ((ret = hv_vcpu_run(task->vcpuid)) != HV_SUCCESS) {
-      printk("oops, hv_vcpu_run fails\n");
-      return;
-    }
+  while (vmm_run() == 0) {
 
     dump_instr();
     print_regs();
