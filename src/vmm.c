@@ -507,7 +507,7 @@ dump_instr()
   vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
   vmm_read_register(HV_X86_RIP, &rip);
   char inst_str[instlen * 3 + 1];
-  for (int i = 0; i < instlen; i ++) {
+  for (size_t i = 0; i < instlen; i ++) {
     sprintf(inst_str + 3 * i, "%02x ", *((uchar*)guest_to_host(rip) + i));
   }
   inst_str[instlen * 3] = '\0';
