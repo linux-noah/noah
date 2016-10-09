@@ -48,7 +48,7 @@ int do_open(const char *path, int flags, int mode);
 int do_open_at(int fd,const char *path, int flags, int mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
-void run_task();
+void main_loop();
 
 #include <Hypervisor/hv.h>
 

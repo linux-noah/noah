@@ -13,7 +13,7 @@
 #include <mach-o/dyld.h>
 
 void
-run_task()
+main_loop()
 {
   hv_return_t ret;
   uint64_t value;
@@ -226,7 +226,7 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   }
 
-  run_task();
+  main_loop();
 
   vmm_destroy();
 
