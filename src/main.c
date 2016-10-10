@@ -149,6 +149,8 @@ main_loop()
 void
 boot(const char *root, int argc, char *argv[], char **envp)
 {
+  init_malloc();
+
   proc.root = strdup(root);
 
   if (do_exec(argv[0], argc, argv, envp) < 0) {

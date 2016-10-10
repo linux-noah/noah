@@ -6,6 +6,7 @@
 #include "types.h"
 #include "util/misc.h"
 #include "util/list.h"
+#include "malloc.h"
 
 #define NOAH_VERSION NOAH_MAJOR_VERSION "." NOAH_MINOR_VERSION "." NOAH_PATCH_VERSION
 #define NOAH_MAJOR_VERSION "0"
@@ -18,12 +19,6 @@ extern struct noah_run_info {
   char **argv;
   int  optind;
 } noah_run_info;
-
-/* primitive memory management functions */
-
-void *shm_malloc(size_t nbytes);
-void shm_free(void *);
-
 
 /* interface to user memory */
 

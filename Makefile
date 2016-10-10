@@ -6,6 +6,7 @@ SRCS := \
 	src/vmm.c\
 	src/meta_strace.c\
 	src/debug.c\
+	src/malloc.c\
 	src/syscall/common.c\
 	src/syscall/fs.c\
 	src/syscall/exec.c\

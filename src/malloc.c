@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "malloc.h"
 
 struct header {
   struct header *next;
