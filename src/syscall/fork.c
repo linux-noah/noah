@@ -14,7 +14,7 @@
 #include "linux/signal.h"
 
 void
-init_task(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
+init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
 {
   task.set_child_tid = task.clear_child_tid = 0;
   if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
@@ -51,7 +51,7 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
   }
 
   if (ret == 0) {
-    init_task(clone_flags, newsp, parent_tid, child_tid, tls);
+    init_task(clone_flags, child_tid, tls);
   } else {
     if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
       *(int *) guest_to_host(parent_tid) = ret;
@@ -87,7 +87,7 @@ __start_thread(struct clone_thread_arg *arg)
   proc.nr_tasks++;
   pthread_rwlock_unlock(&proc.lock);
 
-  init_task(arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
+  init_task(arg->clone_flags, arg->child_tid, arg->tls);
 
   free(arg->vcpu_snapshot);
   free(arg);
