@@ -13,37 +13,24 @@
 #include "linux/misc.h"
 #include "linux/signal.h"
 
-int
-fixup_task(pid_t clone_ret, unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
+void
+init_task(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gaddr_t child_tid, gaddr_t tls)
 {
-  if (clone_ret < 0) {
-    return clone_ret;
+  task.set_child_tid = task.clear_child_tid = 0;
+  if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
+    task.set_child_tid = child_tid;
+  }
+  if (clone_flags & LINUX_CLONE_CHILD_CLEARTID) {
+    task.clear_child_tid = child_tid;
   }
 
-  if (clone_ret == 0) {
-    task.set_child_tid = task.clear_child_tid = 0;
-    if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
-      task.set_child_tid = child_tid;
-    }
-    if (clone_flags & LINUX_CLONE_CHILD_CLEARTID) {
-      task.clear_child_tid = child_tid;
-    }
-
-    if (task.set_child_tid != 0) {
-      *(int *) guest_to_host(task.set_child_tid) = getpid();
-    }
-
-    if (clone_flags & LINUX_CLONE_SETTLS) {
-      vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);
-    }
-
-  } else {
-    if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
-      *(int *) guest_to_host(parent_tid) = clone_ret;
-    }
+  if (task.set_child_tid != 0) {
+    *(int *) guest_to_host(task.set_child_tid) = getpid();
   }
 
-  return clone_ret;
+  if (clone_flags & LINUX_CLONE_SETTLS) {
+    vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);
+  }
 }
 
 int
@@ -59,7 +46,19 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
 
   vmm_reentry(&snapshot);
 
-  return fixup_task(ret, clone_flags, newsp, parent_tid, child_tid, tls);
+  if (ret < 0) {
+    return ret;
+  }
+
+  if (ret == 0) {
+    init_task(clone_flags, newsp, parent_tid, child_tid, tls);
+  } else {
+    if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
+      *(int *) guest_to_host(parent_tid) = ret;
+    }
+  }
+
+  return ret;
 }
 
 struct clone_thread_arg {
@@ -82,9 +81,9 @@ clone_thread_entry(struct clone_thread_arg *arg)
   proc.nr_tasks++;
   pthread_rwlock_unlock(&proc.lock);
 
-  int sys_ret = fixup_task(0, arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
+  init_task(arg->clone_flags, arg->newsp, arg->parent_tid, arg->child_tid, arg->tls);
 
-  vmm_write_register(HV_X86_RAX, sys_ret);
+  vmm_write_register(HV_X86_RAX, 0);
   vmm_write_register(HV_X86_RSP, arg->newsp);
   uint64_t rip;
   vmm_read_register(HV_X86_RIP, &rip);
