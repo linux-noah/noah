@@ -14,9 +14,6 @@ struct header {
 
 typedef struct header Header;
 
-/* static Header base; */
-/* static Header *freep; */
-
 #define MEMORY_ARENA_SIZE (16 << 20)
 
 void *arena_start;              /* never changed after the boot sequence completed */
