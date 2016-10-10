@@ -14,7 +14,8 @@ struct header {
 
 typedef struct header Header;
 
-#define MEMORY_ARENA_SIZE (16 << 20)
+/* 1GB should suffice, I guess? */
+#define MEMORY_ARENA_SIZE (1 * 1024 * 1024 * 1024)
 
 void *arena_start;              /* never changed after the boot sequence completed */
 
@@ -37,9 +38,11 @@ init_malloc(void)
 {
   /* this function is part of the "boot" sequence */
 
-  int zerofd = open("/dev/zero", O_RDWR);
-  arena_start = mmap(NULL, MEMORY_ARENA_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_HASSEMAPHORE | MAP_SHARED, zerofd, 0);
-  close(zerofd);
+  arena_start = mmap(NULL, MEMORY_ARENA_SIZE, PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON | MAP_HASSEMAPHORE | MAP_SHARED, -1, 0);
+  if (arena_start == MAP_FAILED) {
+    perror("init_malloc");
+    exit(1);
+  }
 
   pthread_rwlock_init(&lock, NULL);
   bzero(&base, sizeof base);
@@ -49,7 +52,7 @@ init_malloc(void)
 
 static void *__shm_sbrk(size_t s) {
   /* we must be in the critical section in shm_malloc so don't get the lock here... */
-  if (brkp + s >= (char *)0x400000)
+  if (brkp + s >= (char *) arena_start + MEMORY_ARENA_SIZE)
     return NULL;
   brkp += s;
   return brkp - s;
