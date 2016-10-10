@@ -147,6 +147,18 @@ main_loop()
 }
 
 void
+boot(const char *root, int argc, char *argv[], char **envp)
+{
+  proc.root = strdup(root);
+
+  if (do_exec(argv[0], argc, argv, envp) < 0) {
+    exit(1);
+  }
+
+  main_loop();
+}
+
+void
 __attribute__((noreturn)) version()
 {
   fprintf(stderr, "%s\n", NOAH_VERSION);
@@ -206,7 +218,20 @@ main(int argc, char *argv[], char **envp)
   if (_NSGetExecutablePath(abs_self, &bufsize)) {
     return -1;
   }
-  noah_run_info = (struct noah_run_info) {.self_path = abs_self, .argc = argc, .argv = argv, .optind = optind};
+  noah_run_info = (struct noah_run_info) {
+    .self_path = abs_self,
+    .argc = argc,
+    .argv = argv,
+    .optind = optind
+  };
+
+  /* root path */
+  if (root[0] == 0) {
+    char *dir;
+    realpath(noah_run_info.self_path, root);
+    dir = dirname(root);
+    sprintf(root, "%s/../mnt", dir);
+  }
 
   argc -= optind;
   argv += optind;
@@ -217,23 +242,7 @@ main(int argc, char *argv[], char **envp)
 
   vmm_create();
 
-  char bin[PATH_MAX];
-  char *dir;
-  realpath(noah_run_info.self_path, bin);
-  dir = dirname(bin);
-  proc.root = malloc(snprintf(NULL, 0, "%s/../mnt", dir));
-  sprintf(proc.root, "%s/../mnt", dir);
-
-  if (root[0] != '\0') {
-    free(proc.root);
-    proc.root = strdup(root);
-  }
-
-  if (do_exec(argv[0], argc, argv, envp) < 0) {
-    exit(1);
-  }
-
-  main_loop();
+  boot(root, argc, argv, envp);
 
   vmm_destroy();
 
