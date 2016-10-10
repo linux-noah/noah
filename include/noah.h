@@ -2,7 +2,10 @@
 #define NOAH_H
 
 #include <stdint.h>
+#include <pthread.h>
+#include "types.h"
 #include "util/misc.h"
+#include "util/list.h"
 
 #define NOAH_VERSION NOAH_MAJOR_VERSION "." NOAH_MINOR_VERSION "." NOAH_PATCH_VERSION
 #define NOAH_MAJOR_VERSION "0"
@@ -16,12 +19,13 @@ extern struct noah_run_info {
   int  optind;
 } noah_run_info;
 
-#include "types.h"
-#include "util/list.h"
-#include "x86/page.h"
-#include <pthread.h>
+/* primitive memory management functions */
 
-/* uacces */
+void *shm_malloc(size_t nbytes);
+void shm_free(void *);
+
+
+/* interface to user memory */
 
 gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
@@ -52,6 +56,8 @@ struct mm_region {
   int pgoff;           /* offset within mm_fd in page size */
   struct list_head list;
 };
+
+#include "x86/page.h"
 
 struct mm {
   struct list_head mm_regions;
