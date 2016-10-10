@@ -3,3 +3,6 @@
 *.dSYM/
 build/noah
 !mnt/**/*.o
+GPATH
+GRTAGS
+GTAGS
