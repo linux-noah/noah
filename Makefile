@@ -4,6 +4,7 @@ LDFLAGS += -framework Hypervisor -lpthread
 SRCS := \
 	src/main.c\
 	src/vmm.c\
+	src/mm.c\
 	src/meta_strace.c\
 	src/debug.c\
 	src/malloc.c\

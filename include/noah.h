@@ -39,27 +39,6 @@ int do_futex_wake(gaddr_t uaddr, int count);
 
 void main_loop();
 
-/* mm structures */
-
-struct mm_region {
-  void *haddr;
-  gaddr_t gaddr;
-  size_t size;
-  int prot;            /* Access permission in hv_memory_flags_t */
-  int mm_flags;        /* mm flags in the form of LINUX_MAP_* */
-  int mm_fd;
-  int pgoff;           /* offset within mm_fd in page size */
-  struct list_head list;
-};
-
-#include "x86/page.h"
-
-struct mm {
-  struct list_head mm_regions;
-  uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
-  pthread_rwlock_t alloc_lock;
-};
-
 /* task related data */
 
 struct task {

@@ -1,6 +1,8 @@
 #ifndef NOAH_PAGE_H
 #define NOAH_PAGE_H
 
+#include <stdint.h>
+
 #define PTE_P           0x001   // Present
 #define PTE_W           0x002   // Writeable
 #define PTE_U           0x004   // User

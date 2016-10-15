@@ -2,6 +2,7 @@
 
 #include "noah.h"
 #include "vmm.h"
+#include "mm.h"
 #include "x86/page.h"
 
 #include "linux/mman.h"
