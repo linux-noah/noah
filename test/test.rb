@@ -35,7 +35,6 @@ end
 def test_assertion(targets = nil)
   Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
     next if targets && !targets.include?(File.basename(target))
-    puts("- #{File.basename(target)}")
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape}")
     
     nr_tests = /1->([0-9]+)/.match(out.lines[0])[1].to_i
@@ -51,7 +50,6 @@ def test_assertion(targets = nil)
       @assertion[:premature] += 1
       print("X")
     end
-    puts("")
 
     if fails > 0 || is_premature
       @assertion_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, premature: is_premature}
@@ -62,7 +60,6 @@ end
 def test_stdout(targets = nil)
   Dir.glob(__dir__ + "/test_stdout/build/*").each do |target|
     next if targets && !targets.include?(target)
-    puts("- #{File.basename(target)}")
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
@@ -79,7 +76,6 @@ def test_stdout(targets = nil)
       @stdout[:premature] += 1
       print("X")
     end
-    puts("")
 
     unless err.empty? && status.success? && out == expected
       @stdout_reports << {name: File.basename(target), diff: [expected, out], err: err, premature: !status.success?}
@@ -90,7 +86,6 @@ end
 def test_shell(targets = nil)
   Dir.glob(__dir__ + "/test_shell/build/*").each do |target|
     next if targets && !targets.include?(target)
-    puts("- #{File.basename(target)}")
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
     _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
@@ -102,7 +97,6 @@ def test_shell(targets = nil)
       @shell[:fail] += 1
       print("F")
     end
-    puts("")
 
     unless err.empty? && status.success?
       @shell_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, premature: false}
