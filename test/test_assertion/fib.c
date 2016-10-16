@@ -13,6 +13,8 @@ int fib(int n)
 
 int main()
 {
+  nr_tests(1);
+
   assert_true(fib(10) == 55);
   return 0;
 }

@@ -7,6 +7,7 @@ int global_var = 1;
 
 int main()
 {
+  nr_tests(5);
   pid_t parent_pid = getpid();
   pid_t fork_pid = fork();
   if (fork_pid == 0) {

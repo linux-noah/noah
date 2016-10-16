@@ -46,6 +46,7 @@ test_tls()
 
 int main()
 {
+  nr_tests(6);
   test_thread_create();
   test_tls();
 }

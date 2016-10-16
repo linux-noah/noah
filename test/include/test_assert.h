@@ -13,3 +13,8 @@
     write(2, m, sizeof(m) - 1);\
   }\
 } while(0)
+
+#define nr_tests(num) do \
+{ \
+  write(1, "1->" #num "\n", sizeof("1->" #num "\n") - 1); \
+} while(0);

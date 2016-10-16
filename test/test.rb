@@ -4,11 +4,11 @@ require "open3"
 require "shellwords"
 require "pathname"
 
-@assertion = {pass: 0, fail: 0, crash: 0}
+@assertion = {pass: 0, fail: 0, premature: 0}
 @assertion_reports = []
-@stdout = {pass: 0, fail: 0, crash: 0}
+@stdout = {pass: 0, fail: 0, premature: 0}
 @stdout_reports = []
-@shell = {pass: 0, fail: 0, crash: 0}
+@shell = {pass: 0, fail: 0, premature: 0}
 @shell_reports = []
 
 def main
@@ -37,17 +37,24 @@ def test_assertion(targets = nil)
     next if targets && !targets.include?(File.basename(target))
     puts("- #{File.basename(target)}")
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape}")
-    print(out)
-    puts("")
-    @assertion[:pass] += out.chars.count(".")
-    @assertion[:fail] += out.chars.count("F")
-    unless status.success?
-      @assertion[:crash] += 1
+    
+    nr_tests = /1->([0-9]+)/.match(out.lines[0])[1].to_i
+    print(out.lines[1..-1].join(""))
+
+    passes = out.chars.count(".")
+    fails = out.chars.count("F")
+    is_premature = !status.success? || nr_tests != out.chars.count(".") + out.chars.count("F")
+
+    @assertion[:pass] += passes
+    @assertion[:fail] += fails
+    if is_premature
+      @assertion[:premature] += 1
       print("X")
     end
+    puts("")
 
-    unless err.empty? && status.success?
-      @assertion_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: !status.success?}
+    if fails > 0 || is_premature
+      @assertion_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, premature: is_premature}
     end
   end
 end
@@ -69,13 +76,13 @@ def test_stdout(targets = nil)
       @stdout[:fail] += 1
       print("F")
     else
-      @stdout[:crash] += 1
+      @stdout[:premature] += 1
       print("X")
     end
     puts("")
 
     unless err.empty? && status.success? && out == expected
-      @stdout_reports << {name: File.basename(target), diff: [expected, out], err: err, crash: !status.success?}
+      @stdout_reports << {name: File.basename(target), diff: [expected, out], err: err, premature: !status.success?}
     end
   end
 end
@@ -98,7 +105,7 @@ def test_shell(targets = nil)
     puts("")
 
     unless err.empty? && status.success?
-      @shell_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, crash: false}
+      @shell_reports << {name: File.basename(target), diff: ["(diff unavailable)", "(diff unavailable)"], err: err, premature: false}
     end
   end
 end
@@ -115,7 +122,7 @@ def report
       puts report[:diff][1]
       puts "=="
     end
-    puts(report[:name] + " Crashed !!") if report[:crash]
+    puts(report[:name] + " stopped prematurely!!") if report[:premature]
   end
 
   puts <<-"EOS"
@@ -123,11 +130,11 @@ def report
 ===============
 Assertion Test:
   Pass: #{@assertion[:pass]}, Fail: #{@assertion[:fail]}
-  Crash Test Programs: #{@assertion[:crash]}
+  Premature Test Programs: #{@assertion[:premature]}
   Total Assertions: #{@assertion[:pass] + @assertion[:fail]}
 Output Test:
   Pass: #{@stdout[:pass]}, Fail: #{@stdout[:fail]}
-  Crash Test Programs: #{@stdout[:crash]}
+  Premature Test Programs: #{@stdout[:premature]}
   Total Test Programs: #{@stdout.values.reduce(&:+)}
 Shell Test:
   Pass: #{@shell[:pass]}, Fail: #{@shell[:fail]}
