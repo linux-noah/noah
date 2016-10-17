@@ -339,7 +339,7 @@ vmm_create()
   proc.mm = malloc(sizeof(struct mm));
   INIT_LIST_HEAD(&proc.mm->mm_regions);
   pthread_rwlock_init(&proc.lock, NULL);
-  proc.nr_tasks = 0;
+  proc.nr_tasks = 1;
 
   init_vmcs();
   init_msr();
