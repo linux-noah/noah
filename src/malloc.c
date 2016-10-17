@@ -51,7 +51,8 @@ init_malloc(void)
   brkp = brk_start;
 }
 
-static void *__shm_sbrk(size_t s) {
+static void *__shm_sbrk(size_t s)
+{
   /* we must be in the critical section in shm_malloc so don't get the lock here... */
   if (brkp + s >= (char *) arena_start + MEMORY_ARENA_SIZE)
     return NULL;
@@ -97,7 +98,7 @@ static void __shm_free(void *ap)
     return;
 
   bp = (Header *)ap - 1;
-  for (p = freep; !(p < bp && bp < p->next); p = p->next)
+  for (p = freep; ! (p < bp && bp < p->next); p = p->next)
     if (p->next <= p && (p < bp || bp < p->next))
       break;
 
