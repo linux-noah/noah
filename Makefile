@@ -53,7 +53,8 @@ clean:
 	$(RM) -r src/*.o
 	$(RM) -r src/syscall/*.o
 	$(RM) -r build/noah
-	$(RM) test/test_assertion/build/* test/test_stdout/build/* test/test_shell/build/*
+	$(RM) test/test_assertion/build/* test/test_stdout/build/*
+	$(RM) `ls test/test_shell/build/* | grep -v gcc`
 
 test: build/noah $(TEST_UPROGS)
 	./test/test.rb
