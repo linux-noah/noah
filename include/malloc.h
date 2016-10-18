@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-void init_malloc(void);
+void init_shm_malloc(void);
 void *shm_malloc(size_t nbytes);
 void shm_free(void *);
 

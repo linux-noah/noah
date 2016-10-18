@@ -149,7 +149,7 @@ main_loop()
 void
 boot(const char *root, int argc, char *argv[], char **envp)
 {
-  init_malloc();
+  init_shm_malloc();
 
   proc.root = strdup(root);
 

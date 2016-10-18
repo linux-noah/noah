@@ -35,7 +35,7 @@ struct malloc_data {
 #define brk_start (((struct malloc_data *) arena_start)->brk_start)
 
 void
-init_malloc(void)
+init_shm_malloc(void)
 {
   /* this function is part of the "boot" sequence */
 
