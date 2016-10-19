@@ -2,23 +2,23 @@ CFLAGS += -g -Iinclude -std=gnu11
 LDFLAGS += -framework Hypervisor -lpthread
 
 SRCS := \
+	lib/vmm.c\
 	src/main.c\
-	src/vmm.c\
-	src/mm.c\
 	src/meta_strace.c\
+	src/common.c\
 	src/debug.c\
-	src/malloc.c\
-	src/syscall/common.c\
-	src/syscall/fs.c\
-	src/syscall/exec.c\
-	src/syscall/fork.c\
-	src/syscall/process.c\
-	src/syscall/mm.c\
-	src/syscall/signal.c\
-	src/syscall/time.c\
-	src/syscall/sys.c\
-	src/syscall/net.c\
-	src/syscall/futex.c
+	src/proc/exec.c\
+	src/proc/fork.c\
+	src/proc/process.c\
+	src/net/net.c\
+	src/ipc/futex.c\
+	src/ipc/signal.c\
+	src/fs/fs.c\
+	src/sys/sys.c\
+	src/sys/time.c\
+	src/mm/mm.c\
+	src/mm/mmap.c\
+	src/mm/malloc.c
 
 TEST_UPROGS := \
 	$(addprefix test/test_assertion/build/, fib test_fork test_thread)\
@@ -50,8 +50,7 @@ MAKE_TEST_UPROGS = ssh $(LINUX_BUILD_SERV) "rm /tmp/$(USER)/*";\
 run: build/noah test/test_stdout/build/hello
 	./build/noah test/test_stdout/build/hello
 clean:
-	$(RM) -r src/*.o
-	$(RM) -r src/syscall/*.o
+	$(RM) -r lib/*.o src/*.o src/*/*.o
 	$(RM) -r build/noah
 	$(RM) test/test_assertion/build/* test/test_stdout/build/*
 	$(RM) `ls test/test_shell/build/* | grep -v gcc`

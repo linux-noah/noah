@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <pthread.h>
 
-#include "syscall/common.h"
+#include "common.h"
 #include "syscall.h"
 #include "noah.h"
 
