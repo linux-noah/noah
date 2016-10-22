@@ -63,10 +63,9 @@ page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
 void
 vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 {
-  assert(((uint64_t) haddr & 0xfff) == 0);
-  assert((gaddr & 0xfff) == 0);
-
-  size = roundup(size, PAGE_SIZE(PAGE_4KB));
+  assert(is_page_aligned(haddr, PAGE_4KB));
+  assert(is_page_aligned((void *) gaddr, PAGE_4KB));
+  assert(is_page_aligned((void *) size, PAGE_4KB));
 
   hv_vm_unmap(gaddr, size);
   if (hv_vm_map(haddr, gaddr, size, prot) != HV_SUCCESS) {

@@ -48,6 +48,8 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
   /* the linux kernel does nothing for LINUX_MAP_STACK */
   l_flags &= ~LINUX_MAP_STACK;
 
+  len = roundup(len, PAGE_SIZE(PAGE_4KB));
+
   if ((l_flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
     fprintf(stderr, "unsupported mmap l_flags: 0x%x\n", l_flags);
     exit(1);
@@ -91,7 +93,7 @@ do_unmap(gaddr_t gaddr, size_t size)
   if (!is_page_aligned((void*)gaddr, PAGE_4KB)) {
     return -LINUX_EINVAL;
   }
-  size = roundup(size, PAGE_SIZE(PAGE_4KB));
+  size = roundup(size, PAGE_SIZE(PAGE_4KB)); // Linux kernel also does this
 
   int ret =0;
 
@@ -147,6 +149,10 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
 
   if (new_size == 0)
     return -LINUX_EINVAL;
+
+  /* Linux kernel also does these aligning */
+  old_size = roundup(old_size, PAGE_SIZE(PAGE_4KB));
+  new_size = roundup(new_size, PAGE_SIZE(PAGE_4KB));
 
   gaddr_t ret = old_addr;
 
