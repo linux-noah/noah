@@ -18,7 +18,7 @@ int main()
     assert_true(parent_pid == getpid());
     assert_true(fork_pid != getpid());
 
-    /* Test that unistdunistdmory space of parents and childs are separated */
+    /* Test that memory space of parents and childs are separated */
     int stat;
     wait4(fork_pid, &stat, 0, NULL);
     assert_true(global_var == 1);
