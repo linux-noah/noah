@@ -11,7 +11,13 @@ require "pathname"
 @shell = {pass: 0, fail: 0, premature: 0}
 @shell_reports = []
 
+@verbose = false
+
 def main
+  if ARGV[0] == "-v"
+    ARGV.shift
+    @verbose = true
+  end
   targets = ARGV.empty? ? nil : ARGV
   puts <<-"EOS"
 
@@ -32,9 +38,14 @@ def relative(path)
   p.relative_path_from(Pathname.new(Dir.pwd)).to_s
 end
 
+def puts_testname(target)
+  puts "\n===#{File.basename(target)}" if @verbose
+end
+
 def test_assertion(targets = nil)
   Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
     next if targets && !targets.include?(File.basename(target))
+    puts_testname(target)
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape}")
     
     nr_tests_match = /1->([0-9]+)/.match(out.lines[0])
@@ -66,6 +77,7 @@ end
 def test_stdout(targets = nil)
   Dir.glob(__dir__ + "/test_stdout/build/*").each do |target|
     next if targets && !targets.include?(target)
+    puts_testname(target)
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
@@ -92,6 +104,7 @@ end
 def test_shell(targets = nil)
   Dir.glob(__dir__ + "/test_shell/build/*").each do |target|
     next if targets && !targets.include?(target)
+    puts_testname(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
     _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../build/noah TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
