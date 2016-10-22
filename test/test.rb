@@ -37,8 +37,14 @@ def test_assertion(targets = nil)
     next if targets && !targets.include?(File.basename(target))
     out, err, status = Open3.capture3("#{__dir__.shellescape}/../build/noah #{relative(target).shellescape}")
     
-    nr_tests = /1->([0-9]+)/.match(out.lines[0])[1].to_i
-    print(out.lines[1..-1].join(""))
+    nr_tests_match = /1->([0-9]+)/.match(out.lines[0])
+    if nr_tests_match
+      nr_tests = nr_tests_match[1].to_i
+    else
+      nr_tests = -1 # It seems that the test crashed
+    end
+
+    print(out.lines[1..-1].join("")) if out.lines.length > 0
 
     passes = out.chars.count(".")
     fails = out.chars.count("F")
