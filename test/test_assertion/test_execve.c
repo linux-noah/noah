@@ -29,14 +29,14 @@ int main(int argc, char *argv[], char *envp[])
   nr_tests(3);
 
   // Test execve fails
-  char *dummy_argv[] = {argv[0], ""};
+  char *dummy_argv[] = {argv[0], "", NULL};
   int err = execve("/dev/null", dummy_argv, envp);
   assert_true(err == -1);
 
   // Normal cases
   global_data = 2; // Modify global variables
   global_bss = 1;
-  char *e_argv[] = {argv[0], "test_data_area"};
+  char *e_argv[] = {argv[0], "test_data_area", NULL};
   execve(argv[0], e_argv, envp);
 }
 
