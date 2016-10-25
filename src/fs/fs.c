@@ -281,25 +281,33 @@ DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
   return 0;
 }
 
+int do_faccessat(int l_dirfd, const char *l_path, int l_mode)
+{
+  char *host_path = to_host_path(l_path);
+  if (l_dirfd == LINUX_AT_FDCWD) {
+    l_dirfd = AT_FDCWD;
+  }
+
+  int ret = syswrap(faccessat(l_dirfd, host_path, l_mode, 0));
+  free(host_path);
+
+  return ret;
+}
+
+int do_access(const char *path, int l_mode)
+{
+  return do_faccessat(LINUX_AT_FDCWD, path, l_mode);
+}
+
 DEFINE_SYSCALL(access, gstr_t, path, int, mode)
 {
-  char *host_path = to_host_path(guest_to_host(path));
-
-  int ret = syswrap(access(host_path, mode));
-
-  free(host_path);
-  return ret;
+  return do_access(guest_to_host(path), mode);
 }
 
 // Linux implementation of faccessat actually does not have "flags"
 DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path, int, mode)
 {
-  char *host_path = to_host_path(guest_to_host(path));
-
-  int ret = syswrap(faccessat(dirfd, host_path, mode, 0));
-  free(host_path);
-
-  return ret;
+  return do_faccessat(dirfd, guest_to_host(path), mode);
 }
 
 DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)

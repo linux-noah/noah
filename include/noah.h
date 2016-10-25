@@ -34,7 +34,9 @@ size_t copy_to_user(gaddr_t gaddr, const void *haddr, size_t n);
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 gaddr_t do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset);
 int do_open(const char *path, int flags, int mode);
-int do_open_at(int fd,const char *path, int flags, int mode);
+int do_open_at(int fd, const char *path, int flags, int mode);
+int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
+int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
 void main_loop();
