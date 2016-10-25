@@ -13,13 +13,6 @@
 #define NOAH_MINOR_VERSION "2"
 #define NOAH_PATCH_VERSION "5"
 
-extern struct noah_run_info {
-  char *self_path;
-  int  argc;
-  char **argv;
-  int  optind;
-} noah_run_info;
-
 /* interface to user memory */
 
 gaddr_t host_to_guest(void *);

@@ -84,10 +84,7 @@ to_host_path(const char *path)
     int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
     char *mnt_path = malloc(len + 1);
     snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
-    //if (access(mnt_path, F_OK) == 0) {
-      return mnt_path;
-    //}
-    //free(mnt_path);
+    return mnt_path;
   }
   return strdup(path);
 }

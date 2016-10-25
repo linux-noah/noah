@@ -186,8 +186,6 @@ __attribute__((noreturn)) usage()
   exit(1);
 }
 
-struct noah_run_info noah_run_info;
-
 int
 main(int argc, char *argv[], char **envp)
 {
@@ -225,25 +223,16 @@ main(int argc, char *argv[], char **envp)
     }
   }
 
-  /* get this executable's path */
-  uint32_t bufsize;
-  _NSGetExecutablePath(NULL, &bufsize);
-  char abs_self[bufsize];
-  if (_NSGetExecutablePath(abs_self, &bufsize)) {
-    return -1;
-  }
-  noah_run_info = (struct noah_run_info) {
-    .self_path = abs_self,
-    .argc = argc,
-    .argv = argv,
-    .optind = optind
-  };
-
-  /* root path */
   if (root[0] == 0) {
-    char *dir;
-    realpath(noah_run_info.self_path, root);
-    dir = dirname(root);
+    // Set mount point default "(/path/to/noah/)mnt" if -m is not specified
+    uint32_t bufsize;
+    _NSGetExecutablePath(NULL, &bufsize);
+    char abs_self[bufsize];
+    if (_NSGetExecutablePath(abs_self, &bufsize)) {
+      return -1;
+    }
+    realpath(abs_self, root);
+    char *dir = dirname(root);
     sprintf(root, "%s/../mnt", dir);
   }
 
