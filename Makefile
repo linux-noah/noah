@@ -21,7 +21,7 @@ SRCS := \
 	src/mm/malloc.c
 
 TEST_UPROGS := \
-	$(addprefix test/test_assertion/build/, fib test_fork test_thread test_execve)\
+	$(addprefix test/test_assertion/build/, fib test_fork test_thread test_execve test_execve2)\
 	$(addprefix test/test_stdout/build/, hello cat echo)\
 	$(addprefix test/test_shell/build/, mv env gcc)
 
