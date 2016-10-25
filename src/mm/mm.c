@@ -26,18 +26,18 @@ split_region(struct mm_region *region, gaddr_t gaddr)
 {
   assert(is_page_aligned((void*)gaddr, PAGE_4KB));
 
-  struct mm_region *back = malloc(sizeof(struct mm_region));
+  struct mm_region *tail = malloc(sizeof(struct mm_region));
   int offset = gaddr - region->gaddr;
-  back->haddr = region->haddr + offset;
-  back->gaddr = gaddr;
-  back->size = region->size - offset;
-  back->prot = region->prot;
-  back->mm_flags = region->mm_flags;
-  back->mm_fd = region->mm_fd;
-  back->pgoff = region->pgoff;
+  tail->haddr = region->haddr + offset;
+  tail->gaddr = gaddr;
+  tail->size = region->size - offset;
+  tail->prot = region->prot;
+  tail->mm_flags = region->mm_flags;
+  tail->mm_fd = region->mm_fd;
+  tail->pgoff = region->pgoff;
 
   region->size = offset;
-  list_add(&back->list, &region->list);
+  list_add(&tail->list, &region->list);
 }
 
 struct mm_region*
