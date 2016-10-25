@@ -11,10 +11,22 @@
 #include "common.h"
 #include "noah.h"
 #include "vmm.h"
+#include "mm.h"
 
 #include "linux/common.h"
 #include "linux/misc.h"
 #include "linux/errno.h"
+
+void
+init_proc(struct proc *proc)
+{
+  proc->nr_tasks = 1;
+  pthread_rwlock_init(&proc->lock, NULL);
+  proc->mm = malloc(sizeof(struct mm));
+  proc->root = NULL;
+
+  init_mm(proc->mm);
+}
 
 struct proc proc;
 _Thread_local struct task task;

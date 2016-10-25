@@ -85,6 +85,19 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
   }
 }
 
+void
+vmm_munmap(gaddr_t gaddr, size_t size)
+{
+  assert(is_page_aligned((void *) size, PAGE_4KB));
+
+  hv_vm_unmap(gaddr, size);
+  for (uint64_t i = 0; i < size / PAGE_SIZE(PAGE_4KB); i++) {
+    page_map_help(proc.mm->ept, 0, gaddr, 0);
+    page_map_help(proc.mm->rept, gaddr, 0, 0);
+    gaddr += 0x1000;
+  }
+}
+
 bool
 page_walk(uint64_t *table, uint64_t addr, uint64_t *res, uint64_t *perm)
 {
@@ -178,7 +191,7 @@ kmap(void *ptr, size_t size, hv_memory_flags_t flags)
 
   pthread_rwlock_wrlock(&proc.mm->alloc_lock);
 
-  record_region(ptr, noah_kern_brk, size, flags, -1, -1, 0);
+  record_region(ptr, noah_kern_brk, size, flags, -1, -1, 0, true);
   vmm_mmap(noah_kern_brk, size, flags, ptr);
   noah_kern_brk += size;
 
@@ -333,20 +346,6 @@ vmm_create()
   vmm_create_vcpu(NULL);
 
   printk("successfully created a vcpu\n");
-
-  /* FIXME */
-  proc.mm = malloc(sizeof(struct mm));
-  INIT_LIST_HEAD(&proc.mm->mm_regions);
-  pthread_rwlock_init(&proc.lock, NULL);
-  proc.nr_tasks = 1;
-
-  init_vmcs();
-  init_msr();
-  init_page();
-  init_special_regs();
-  init_segment();
-  init_idt();
-  init_regs();
 }
 
 void

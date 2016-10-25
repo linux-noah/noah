@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include "linux/errno.h"
 
+// FIXME: VM space memory of data may not be contiguous in host user space
 size_t
 copy_from_user(void *to, gaddr_t src_ptr, size_t n)
 {
@@ -21,6 +22,16 @@ strncpy_from_user(void *to, gaddr_t src_ptr, size_t n)
   const void *src = guest_to_host(src_ptr);
   char *end = stpncpy(to, src, n);
   return end - (char *) to;
+}
+
+// Get the size of a user string INCLUDING trailing NULL in the same manner as Linux kernel's strnlen_user
+// Check retruen value <= n to make sure that the str is not too long
+ssize_t
+strnsize_user(gaddr_t src_ptr, size_t n)
+{
+  const void *src = guest_to_host(src_ptr);
+  size_t ret = strnlen(src, n) + 1;
+  return ret;
 }
 
 size_t

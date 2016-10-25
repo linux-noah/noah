@@ -149,8 +149,6 @@ main_loop()
 void
 boot(const char *root, int argc, char *argv[], char **envp)
 {
-  init_shm_malloc();
-
   proc.root = strdup(root);
 
   if (do_exec(argv[0], argc, argv, envp) < 0) {
@@ -158,6 +156,20 @@ boot(const char *root, int argc, char *argv[], char **envp)
   }
 
   main_loop();
+}
+
+void
+init_vkernel()
+{
+  init_proc(&proc);
+  init_shm_malloc();
+  init_vmcs();
+  init_msr();
+  init_page();
+  init_special_regs();
+  init_segment();
+  init_idt();
+  init_regs();
 }
 
 void
@@ -243,6 +255,7 @@ main(int argc, char *argv[], char **envp)
   }
 
   vmm_create();
+  init_vkernel();
 
   boot(root, argc, argv, envp);
 

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Yuichi Nishiwaki
+ * Copyright (c) 2016 Yuichi Nishiwaki, Takaya Saeki
  * Copyright (c) 2015 Dmitry Chagin
  * Copyright (c) 2013 Dmitry Chagin
  * Copyright (c) 2002 Doug Rabson
@@ -45,7 +45,10 @@ typedef struct {
 /*
  * Miscellaneous
  */
-#define	LINUX_CTL_MAXNAME	10
+#define LINUX_CTL_MAXNAME	10
+
+#define LINUX_MAX_ARG_STRLEN    (0x1000 * 32)
+#define LINUX_MAX_ARG_STRINGS   0x7FFFFFFF
 
 #define LINUX_AT_COUNT		19	/* Count of used aux entry types. */
 

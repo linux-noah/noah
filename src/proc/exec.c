@@ -13,11 +13,14 @@
 
 #include "noah.h"
 #include "vmm.h"
+#include "mm.h"
 #include "x86/page.h"
 #include "x86/vmemparam.h"
 #include "elf.h"
 
+#include "linux/common.h"
 #include "linux/mman.h"
+#include "linux/misc.h"
 
 extern uint64_t brk_min;
 
@@ -316,18 +319,34 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
   push(&argc64, sizeof argc64);
 }
 
+void init_brk();
 int
 do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
+  int err;
   int fd;
   struct stat st;
   char *data;
-
+  
+  if ((err = do_access(elf_path, X_OK)) < 0) {
+    return err;
+  }
   if ((fd = do_open(elf_path, O_RDONLY, 0)) < 0) {
-    fprintf(stderr, "do_exec: could not open file: %s\n", elf_path);
-    return -1;
+    return fd;
+  }
+  if (proc.nr_tasks > 1) {
+    fprintf(stderr, "Multi-thread execve is not implemented yet\n");
+    return -LINUX_EINVAL;
   }
 
+  /* Reinitialize proc and task structures */
+  /* Not handling locks seriously now because multi-thread execve is not implemented yet */
+  proc.nr_tasks = 1;
+  clear_mm(proc.mm, false); // munlock is also done by unmapping mm
+
+  // TODO: handle close-on-exec after introducing vfs
+
+  /* Now do exec */
   fstat(fd, &st);
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
@@ -347,52 +366,74 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   }
 
   munmap(data, st.st_size);
+  init_brk();
 
   return 0;
 }
 
+static int count_strings(gaddr_t v, int max)
+{
+  int ret = 0;
+  while (((gaddr_t*)guest_to_host(v))[ret] != 0) {
+    ret++;
+    if (ret > max) {
+      return -LINUX_E2BIG;
+    }
+  }
+  return ret;
+}
+
 DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
-  int argc = 0, envc = 0;
-  while (((gaddr_t*)guest_to_host(gargv))[argc] != 0) argc++;
-  while (((gaddr_t*)guest_to_host(genvp))[envc] != 0) envc++;
-
+  int err;
   const char *elf_path = guest_to_host(gelf_path);
 
-  /* Copy Noah run options */
-  char *argv[argc + noah_run_info.optind + 3];
-  for (int i = 0; i < noah_run_info.optind; i++) {
-    argv[i] = noah_run_info.argv[i];
+  if ((err = count_strings(gargv, LINUX_MAX_ARG_STRINGS)) < 0) {
+    return err;
   }
-  /*
-   * Workaround. Pass root directory via CLI option. 
-   * It's time to write execve by ourselves... 
-   */
-  argv[noah_run_info.optind] = "-m";
-  argv[noah_run_info.optind + 1] = proc.root;
-  /* Copy guest arguments */
-  for (int i = 0; i < argc; i++) {
-    argv[i + noah_run_info.optind + 2] = (char*)guest_to_host(((gaddr_t*)guest_to_host(gargv))[i]);
+  int argc = err;
+  if ((err = count_strings(genvp, LINUX_MAX_ARG_STRINGS)) < 0) {
+    return err;
   }
-  argv[argc + noah_run_info.optind + 2] = NULL;
+  int envc = err;
 
-  char *envp[envc + 1];
-  for (int i = 0; i < envc; i++) {
-    envp[i] = (char*)guest_to_host(((gaddr_t*)guest_to_host(genvp))[i]);
+  char *argv[argc + 1], *envp[envc + 1];
+
+  // Copy args
+  char **vecs[] = {argv, envp};
+  gaddr_t gvecs[] = {gargv, genvp};
+  int maxs[] = {argc, envc};
+
+  for (int i = 0; i < 2; i++) {
+    char **vec = vecs[i];
+    gaddr_t *gvec = (gaddr_t *) guest_to_host(gvecs[i]);
+    int max_c = maxs[i];
+
+    for (int j = 0; j < max_c; j++) {
+      int size = strnsize_user(gvec[j], LINUX_MAX_ARG_STRLEN);
+      if (size > LINUX_MAX_ARG_STRLEN) {
+        return -LINUX_E2BIG;
+      }
+      vec[j] = alloca(size);
+      strncpy_from_user(vec[j], gvec[j], size);
+      // The string may be changed after strnsize_user by another thread
+      if (vec[j][size - 1] != 0) {
+        return -LINUX_E2BIG;
+      }
+    }
+
+    vec[max_c] = NULL;
   }
-  envp[envc] = NULL;
 
-  /* XXX fix up the path to the program. Noah fails loading the program when the path is relative. */
-  argv[noah_run_info.optind + 2] = (char *) elf_path;
-
-  /* FIXME: Workaround. Return errors to illegal fiels */
-  int ret = do_open(elf_path, O_RDONLY, S_IXUSR);
-  if (ret < 0) {
-    return ret;
+  err = do_exec(elf_path, argc, argv, envp);
+  if (err < 0) {
+    return err;
   }
-  close(ret);
 
-  vmm_destroy();
+  // Now executable file was lodaed successfully
+  uint64_t entry;
+  vmm_read_register(HV_X86_RIP, &entry);
+  vmm_write_register(HV_X86_RIP, entry - 2); // because syscall handler adds 2 to current rip when return to vmm_run
 
-  return syswrap(execve(noah_run_info.self_path, argv, envp));
+  return 0;
 }

@@ -19,15 +19,19 @@
 
 #include <Hypervisor/hv.h>
 
+static uint64_t current_mmap_top;
+
+void
+init_mmap()
+{
+  current_mmap_top = 0x00000000c0000000;
+}
+
 gaddr_t
 alloc_region(size_t len)
 {
-  static uint64_t current_mmap_top = 0x00000000c0000000;
-
   len = roundup(len, PAGE_SIZE(PAGE_4KB));
-
   current_mmap_top += len;
-
   return current_mmap_top - len;
 }
 
@@ -80,7 +84,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
   if (l_prot & LINUX_PROT_WRITE) mprot |= HV_MEMORY_WRITE;
   if (l_prot & LINUX_PROT_EXEC) mprot |= HV_MEMORY_EXEC;
 
-  record_region(ptr, addr, len, mprot, l_flags, fd, offset);
+  record_region(ptr, addr, len, mprot, l_flags, fd, offset, false);
   vmm_mmap(addr, len, mprot, ptr);
 
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
@@ -208,7 +212,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
 
   /* Map new one */
   ret = alloc_region(new_size);
-  struct mm_region *new = record_region(moved_to, ret, new_size, region->prot, region->mm_flags, region->mm_fd, region->pgoff);
+  struct mm_region *new = record_region(moved_to, ret, new_size, region->prot, region->mm_flags, region->mm_fd, region->pgoff, region->is_global);
   vmm_mmap(new->gaddr, new->size, new->prot, new->haddr);
 
   free(region);
@@ -287,11 +291,14 @@ DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
 
 uint64_t brk_min, current_brk;
 
+void
+init_brk()
+{
+  current_brk = brk_min;
+}
+
 DEFINE_SYSCALL(brk, unsigned long, brk)
 {
-  if (current_brk == 0)
-    current_brk = brk_min;
-
   brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
 
   if (brk < brk_min)
