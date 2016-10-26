@@ -38,8 +38,6 @@ alloc_region(size_t len)
 gaddr_t
 do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset)
 {
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-
   assert((addr & 0xfff) == 0);
 
   /* some l_flags are obsolete and just ignored */
@@ -87,7 +85,6 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
   record_region(ptr, addr, len, mprot, l_flags, fd, offset, false);
   vmm_mmap(addr, len, mprot, ptr);
 
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
   return addr;
 }
 
@@ -101,16 +98,13 @@ do_unmap(gaddr_t gaddr, size_t size)
 
   int ret =0;
 
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-
   struct mm_region *region = find_region(gaddr + size, proc.mm);
   if (region && region->gaddr < gaddr + size) {
     split_region(region, gaddr + size);
   }
   region = find_region(gaddr, proc.mm);
   if (region == NULL) {
-    ret = -LINUX_ENOMEM;
-    goto out;
+    return -LINUX_ENOMEM;
   }
   if (region->gaddr < gaddr) {
     split_region(region, gaddr);
@@ -126,15 +120,16 @@ do_unmap(gaddr_t gaddr, size_t size)
     region = next;
   }
 
-out:
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
-
   return ret;
 }
 
 DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd, off_t, offset)
 {
-  return do_mmap(addr, len, prot, prot, flags, fd, offset);
+  uint64_t ret;
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+  ret = do_mmap(addr, len, prot, prot, flags, fd, offset);
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+  return  ret;
 }
 
 DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, int, flags, gaddr_t, new_addr)
@@ -286,7 +281,11 @@ out:
 
 DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
 {
-  return do_unmap(gaddr, size);
+  uint64_t ret;
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+  ret = do_unmap(gaddr, size);
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+  return ret;
 }
 
 uint64_t brk_min, current_brk;
