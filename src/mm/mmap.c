@@ -89,7 +89,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
 }
 
 int
-do_unmap(gaddr_t gaddr, size_t size)
+do_munmap(gaddr_t gaddr, size_t size)
 {
   if (!is_page_aligned((void*)gaddr, PAGE_4KB)) {
     return -LINUX_EINVAL;
@@ -283,7 +283,7 @@ DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
 {
   uint64_t ret;
   pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-  ret = do_unmap(gaddr, size);
+  ret = do_munmap(gaddr, size);
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
   return ret;
 }
