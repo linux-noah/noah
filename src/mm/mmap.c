@@ -289,7 +289,7 @@ DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
 void
 init_brk()
 {
-  proc.mm->current_brk = proc.mm->brk_min;
+  proc.mm->current_brk = proc.mm->start_brk;
 }
 
 DEFINE_SYSCALL(brk, unsigned long, brk)
@@ -298,8 +298,8 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
   brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
 
   pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-  if (brk < proc.mm->brk_min) {
-    ret = proc.mm->brk_min;
+  if (brk < proc.mm->start_brk) {
+    ret = proc.mm->start_brk;
     goto out;
   }
 
