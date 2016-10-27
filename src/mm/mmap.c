@@ -19,20 +19,18 @@
 
 #include <Hypervisor/hv.h>
 
-static uint64_t current_mmap_top;
-
 void
 init_mmap()
 {
-  current_mmap_top = 0x00000000c0000000;
+  proc.mm->current_mmap_top = 0x00000000c0000000;
 }
 
 gaddr_t
 alloc_region(size_t len)
 {
   len = roundup(len, PAGE_SIZE(PAGE_4KB));
-  current_mmap_top += len;
-  return current_mmap_top - len;
+  proc.mm->current_mmap_top += len;
+  return proc.mm->current_mmap_top - len;
 }
 
 gaddr_t
@@ -288,27 +286,35 @@ DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
   return ret;
 }
 
-uint64_t brk_min, current_brk;
-
 void
 init_brk()
 {
-  current_brk = brk_min;
+  proc.mm->current_brk = proc.mm->brk_min;
 }
 
 DEFINE_SYSCALL(brk, unsigned long, brk)
 {
+  uint64_t ret;
   brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
 
-  if (brk < brk_min)
-    return brk_min;
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+  if (brk < proc.mm->brk_min) {
+    ret = proc.mm->brk_min;
+    goto out;
+  }
 
-  if (brk < current_brk)
-    return current_brk = brk;
+  if (brk < proc.mm->current_brk) {
+    ret = proc.mm->current_brk = brk;
+    goto out;
+  }
 
-  do_mmap(current_brk, brk - current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  do_mmap(proc.mm->current_brk, brk - proc.mm->current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  ret = proc.mm->current_brk = brk;
 
-  return current_brk = brk;
+out:
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+
+  return ret;
 }
 
 DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)

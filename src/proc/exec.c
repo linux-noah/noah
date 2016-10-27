@@ -22,8 +22,6 @@
 #include "linux/mman.h"
 #include "linux/misc.h"
 
-extern uint64_t brk_min;
-
 void init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base);
 
 int
@@ -84,7 +82,7 @@ load_elf_interp(const char *path, ulong load_addr)
   }
 
   vmm_write_vmcs(VMCS_GUEST_RIP, load_addr + h->e_entry);
-  brk_min = map_top;
+  proc.mm->brk_min = map_top;
 
   munmap(data, st.st_size);
 
@@ -159,7 +157,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
   }
   else {
     vmm_write_vmcs(VMCS_GUEST_RIP, ehdr->e_entry);
-    brk_min = map_top;
+    proc.mm->brk_min = map_top;
   }
 
   init_userstack(argc, argv, envp, load_base, ehdr, interp ? map_top : 0);

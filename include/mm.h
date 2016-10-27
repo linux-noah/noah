@@ -24,6 +24,8 @@ struct mm_region {
 struct mm {
   struct list_head mm_regions;
   uint64_t ept[NR_PAGE_ENTRY], rept[NR_PAGE_ENTRY];
+  uint64_t brk_min, current_brk;
+  uint64_t current_mmap_top;
   pthread_rwlock_t alloc_lock;
 };
 

@@ -17,6 +17,9 @@
 #include "linux/misc.h"
 #include "linux/errno.h"
 
+struct proc proc;
+_Thread_local struct task task;
+
 void
 init_proc(struct proc *proc)
 {
@@ -27,9 +30,6 @@ init_proc(struct proc *proc)
 
   init_mm(proc->mm);
 }
-
-struct proc proc;
-_Thread_local struct task task;
 
 DEFINE_SYSCALL(getpid)
 {
