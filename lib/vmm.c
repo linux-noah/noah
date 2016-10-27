@@ -189,13 +189,13 @@ kmap(void *ptr, size_t size, hv_memory_flags_t flags)
   assert((size & 0xfff) == 0);
   assert(((uint64_t) ptr & 0xfff) == 0);
 
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+  pthread_rwlock_wrlock(&vkern_mm.alloc_lock);
 
-  record_region(ptr, noah_kern_brk, size, flags, -1, -1, 0, true);
+  record_region(&vkern_mm, ptr, noah_kern_brk, size, flags, -1, -1, 0);
   vmm_mmap(noah_kern_brk, size, flags, ptr);
   noah_kern_brk += size;
 
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+  pthread_rwlock_unlock(&vkern_mm.alloc_lock);
 
   return noah_kern_brk - size;
 }
@@ -548,6 +548,11 @@ restore_ept()
 {
   struct list_head *list;
 
+  list_for_each (list, &vkern_mm.mm_regions) {
+    struct mm_region *p = list_entry(list, struct mm_region, list);
+    if (hv_vm_map(p->haddr, p->gaddr, p->size, p->prot) != HV_SUCCESS)
+      return false;
+  }
   list_for_each (list, &proc.mm->mm_regions) {
     struct mm_region *p = list_entry(list, struct mm_region, list);
     if (hv_vm_map(p->haddr, p->gaddr, p->size, p->prot) != HV_SUCCESS)

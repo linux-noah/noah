@@ -8,6 +8,7 @@
 #include <libgen.h>
 
 #include "vmm.h"
+#include "mm.h"
 #include "noah.h"
 #include "syscall.h"
 
@@ -162,6 +163,7 @@ void
 init_vkernel()
 {
   init_proc(&proc);
+  init_mm(&vkern_mm);
   init_shm_malloc();
   init_vmcs();
   init_msr();

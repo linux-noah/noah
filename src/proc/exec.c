@@ -317,7 +317,16 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
   push(&argc64, sizeof argc64);
 }
 
-void init_brk();
+static void
+prepare_newproc(void)
+{
+  /* Reinitialize proc and task structures */
+  /* Not handling locks seriously now because multi-thread execve is not implemented yet */
+  proc.nr_tasks = 1;
+  destroy_mm(proc.mm); // munlock is also done by unmapping mm
+  init_mm(proc.mm);
+}
+
 int
 do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 {
@@ -337,11 +346,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     return -LINUX_EINVAL;
   }
 
-  /* Reinitialize proc and task structures */
-  /* Not handling locks seriously now because multi-thread execve is not implemented yet */
-  proc.nr_tasks = 1;
-  clear_mm(proc.mm, false); // munlock is also done by unmapping mm
-
+  prepare_newproc();
   // TODO: handle close-on-exec after introducing vfs
 
   /* Now do exec */
@@ -352,19 +357,19 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   close(fd);
 
   if (4 <= st.st_size && memcmp(data, ELFMAG, 4) == 0) {
-    if (load_elf((Elf64_Ehdr *) data, argc, argv, envp) < 0)
-      return -1;
+    if ((err = load_elf((Elf64_Ehdr *) data, argc, argv, envp)) < 0)
+      return err;
   }
   else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
-    if (load_script(data, st.st_size, argc, argv, envp) < 0)
-      return -1;
+    if ((err = load_script(data, st.st_size, argc, argv, envp)) < 0)
+      return err;
   }
   else {
     return -LINUX_ENOEXEC;                  /* unsupported file type */
   }
 
   munmap(data, st.st_size);
-  init_brk();
+  proc.mm->current_brk = proc.mm->start_brk;
 
   return 0;
 }

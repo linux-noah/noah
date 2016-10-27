@@ -29,14 +29,16 @@ struct mm {
   pthread_rwlock_t alloc_lock;
 };
 
+extern struct mm vkern_mm;
+
 void init_mm(struct mm *mm);
 void init_shm_malloc();
 
 /* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);
-struct mm_region *record_region(void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff, bool global);
+struct mm_region *record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);
 void split_region(struct mm_region *region, gaddr_t gaddr);
-void clear_mm(struct mm *mm, bool clear_global);
+void destroy_mm(struct mm *mm);
 
 gaddr_t do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset);
 
