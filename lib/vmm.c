@@ -34,6 +34,8 @@ struct list_head vcpus;
 int nr_vcpus;
 pthread_rwlock_t alloc_lock;
 
+uint64_t va_map[NR_PAGE_ENTRY], rva_map[NR_PAGE_ENTRY];
+
 _Thread_local static struct vcpu *vcpu;
 
 void
@@ -78,8 +80,8 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
   if ((prot & HV_MEMORY_EXEC) == 0) perm |= PTE_NX;
 
   for (uint64_t i = 0; i < size / 0x1000; i++) {
-    page_map_help(proc.mm->ept, (uint64_t) haddr, gaddr, perm);
-    page_map_help(proc.mm->rept, gaddr, (uint64_t) haddr, perm);
+    page_map_help(va_map, (uint64_t) haddr, gaddr, perm);
+    page_map_help(rva_map, gaddr, (uint64_t) haddr, perm);
     haddr = (char *) haddr + 0x1000;
     gaddr += 0x1000;
   }
@@ -92,8 +94,8 @@ vmm_munmap(gaddr_t gaddr, size_t size)
 
   hv_vm_unmap(gaddr, size);
   for (uint64_t i = 0; i < size / PAGE_SIZE(PAGE_4KB); i++) {
-    page_map_help(proc.mm->ept, 0, gaddr, 0);
-    page_map_help(proc.mm->rept, gaddr, 0, 0);
+    page_map_help(va_map, 0, gaddr, 0);
+    page_map_help(rva_map, gaddr, 0, 0);
     gaddr += 0x1000;
   }
 }
@@ -132,7 +134,7 @@ void *
 guest_to_host(gaddr_t gaddr)
 {
   uint64_t haddr;
-  if (! page_walk(proc.mm->ept, gaddr, &haddr, NULL)) {
+  if (! page_walk(va_map, gaddr, &haddr, NULL)) {
     return NULL;
   }
   return (void *) haddr;
@@ -142,7 +144,7 @@ gaddr_t
 host_to_guest(void *haddr)
 {
   uint64_t gaddr;
-  if (! page_walk(proc.mm->rept, (uint64_t) haddr, &gaddr, NULL)) {
+  if (! page_walk(rva_map, (uint64_t) haddr, &gaddr, NULL)) {
     return 0;
   }
   return gaddr;
