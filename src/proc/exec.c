@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <sys/resource.h>
 
 #include "noah.h"
 #include "vmm.h"
@@ -349,7 +350,19 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   }
 
   prepare_newproc();
-  // TODO: handle close-on-exec after introducing vfs
+
+  // Handle close-on-exec by bruteforce now. FIXME after introducing vfs
+  struct rlimit rlimit;
+  getrlimit(RLIMIT_NOFILE, &rlimit);
+  for (int i = 0; i < rlimit.rlim_cur; i++) {
+    int flag = fcntl(i, F_GETFD);
+    if (flag < 0) {
+      continue;
+    }
+    if (flag & FD_CLOEXEC) {
+      close(i);
+    }
+  }
 
   /* Now do exec */
   fstat(fd, &st);
