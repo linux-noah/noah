@@ -325,6 +325,8 @@ prepare_newproc(void)
   proc.nr_tasks = 1;
   destroy_mm(proc.mm); // munlock is also done by unmapping mm
   init_mm(proc.mm);
+  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
 }
 
 int
