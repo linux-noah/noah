@@ -746,12 +746,23 @@ DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 
 DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, errorfds, gaddr_t, timeout)
 {
+  // Darwin's fd_set and timeval is compatible with those of Linux
   struct timeval *h_timeout = (struct timeval*)guest_to_host(timeout);
 
-  // Darwin's fd_set is compatible with that of Linux
   fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
 
   return syswrap(select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout));
+}
+
+DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, errorfds, gaddr_t, timeout, gaddr_t, sigmask)
+{
+  // Darwin's fd_set and timeval is compatible with those of Linux
+  struct timespec *h_timeout = (struct timespec *) guest_to_host(timeout);
+
+  fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
+  // FIXME: Ignore sigmask now. Support it after implementing signal handling
+
+  return syswrap(pselect(nfds, h_readfds, h_writefds, h_errorfds, h_timeout, NULL));
 }
 
 DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)

@@ -271,7 +271,7 @@
   SYSCALL(267, unimplemented)                   \
   SYSCALL(268, unimplemented)                   \
   SYSCALL(269, faccessat)                       \
-  SYSCALL(270, unimplemented)                   \
+  SYSCALL(270, pselect6)                        \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
   SYSCALL(273, set_robust_list)                 \
