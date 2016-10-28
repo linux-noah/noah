@@ -328,6 +328,8 @@ prepare_newproc(void)
   init_mm(proc.mm);
   vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
   vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
+
+  task.clear_child_tid = task.set_child_tid = 0;
 }
 
 int
