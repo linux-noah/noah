@@ -21,13 +21,14 @@ struct proc proc;
 _Thread_local struct task task;
 
 void
-init_proc(struct proc *proc)
+set_initial_proc(struct proc *proc, char *root)
 {
-  proc->nr_tasks = 1;
-  pthread_rwlock_init(&proc->lock, NULL);
-  proc->mm = malloc(sizeof(struct mm));
-  proc->root = NULL;
-
+  *proc = (struct proc) {
+    .nr_tasks = 1,
+    .lock = PTHREAD_RWLOCK_INITIALIZER,
+    .mm = malloc(sizeof(struct mm)),
+    .root = root,
+  };
   init_mm(proc->mm);
 }
 

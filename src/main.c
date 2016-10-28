@@ -11,6 +11,7 @@
 #include "mm.h"
 #include "noah.h"
 #include "syscall.h"
+#include "linux/errno.h"
 
 #include <mach-o/dyld.h>
 
@@ -148,21 +149,8 @@ main_loop()
 }
 
 void
-boot(const char *root, int argc, char *argv[], char **envp)
-{
-  proc.root = strdup(root);
-
-  if (do_exec(argv[0], argc, argv, envp) < 0) {
-    exit(1);
-  }
-
-  main_loop();
-}
-
-void
 init_vkernel()
 {
-  init_proc(&proc);
   init_mm(&vkern_mm);
   init_shm_malloc();
   init_vmcs();
@@ -186,6 +174,18 @@ __attribute__((noreturn)) usage()
 {
   fprintf(stderr, "usage: noah [OPTION] elf_file ...\n");
   exit(1);
+}
+
+static void
+default_mnt(char *path)
+{
+  uint32_t bufsize;
+  _NSGetExecutablePath(NULL, &bufsize);
+  char abs_self[bufsize];
+  _NSGetExecutablePath(abs_self, &bufsize);
+  realpath(abs_self, path);
+  char *dir = dirname(path);
+  sprintf(path, "%s/../mnt", dir);
 }
 
 int
@@ -225,19 +225,6 @@ main(int argc, char *argv[], char **envp)
     }
   }
 
-  if (root[0] == 0) {
-    // Set mount point default "(/path/to/noah/)mnt" if -m is not specified
-    uint32_t bufsize;
-    _NSGetExecutablePath(NULL, &bufsize);
-    char abs_self[bufsize];
-    if (_NSGetExecutablePath(abs_self, &bufsize)) {
-      return -1;
-    }
-    realpath(abs_self, root);
-    char *dir = dirname(root);
-    sprintf(root, "%s/../mnt", dir);
-  }
-
   argc -= optind;
   argv += optind;
 
@@ -248,7 +235,19 @@ main(int argc, char *argv[], char **envp)
   vmm_create();
   init_vkernel();
 
-  boot(root, argc, argv, envp);
+  if (root[0] == 0) {
+    default_mnt(root);
+  }
+  set_initial_proc(&proc, strdup(root));
+
+  int err;
+  if ((err = do_exec(argv[0], argc, argv, envp)) < 0) {
+    errno = linux_to_darwin_errno(-err);
+    perror("Error");
+    exit(1);
+  }
+
+  main_loop();
 
   vmm_destroy();
 
