@@ -75,13 +75,9 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
     exit(1);
   }
 
-  hv_memory_flags_t mprot = 0;
-  if (l_prot & LINUX_PROT_READ) mprot |= HV_MEMORY_READ;
-  if (l_prot & LINUX_PROT_WRITE) mprot |= HV_MEMORY_WRITE;
-  if (l_prot & LINUX_PROT_EXEC) mprot |= HV_MEMORY_EXEC;
+  record_region(proc.mm, ptr, addr, len, l_prot, l_flags, fd, offset);
 
-  record_region(proc.mm, ptr, addr, len, mprot, l_flags, fd, offset);
-  vmm_mmap(addr, len, mprot, ptr);
+  vmm_mmap(addr, len, linux_mprot_to_hv_mflag(l_prot), ptr);
 
   return addr;
 }
@@ -326,4 +322,24 @@ DEFINE_SYSCALL(mlock, gaddr_t, addr, size_t, length)
 DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
 {
   return syswrap(munlock(guest_to_host(addr), length));
+}
+
+int
+hv_mflag_to_linux_mprot(hv_memory_flags_t mflag)
+{
+  int l_prot = 0;
+  if (mflag & HV_MEMORY_READ) l_prot |= LINUX_PROT_READ;
+  if (mflag & HV_MEMORY_WRITE) l_prot |= LINUX_PROT_WRITE;
+  if (mflag & HV_MEMORY_EXEC) l_prot |= LINUX_PROT_EXEC;
+  return l_prot;
+}
+
+hv_memory_flags_t
+linux_mprot_to_hv_mflag(int mprot)
+{
+  hv_memory_flags_t mflag = 0;
+  if (mprot & LINUX_PROT_READ) mflag |= HV_MEMORY_READ;
+  if (mprot & LINUX_PROT_WRITE) mflag |= HV_MEMORY_WRITE;
+  if (mprot & LINUX_PROT_EXEC) mflag |= HV_MEMORY_EXEC;
+  return mflag;
 }

@@ -13,7 +13,7 @@ struct mm_region {
   void *haddr;
   gaddr_t gaddr;
   size_t size;
-  int prot;            /* Access permission in hv_memory_flags_t */
+  int prot;            /* Access permission that consists of LINUX_PROT_* */
   int mm_flags;        /* mm flags in the form of LINUX_MAP_* */
   int mm_fd;
   int pgoff;           /* offset within mm_fd in page size */
@@ -33,12 +33,14 @@ extern struct mm vkern_mm;
 void init_mm(struct mm *mm);
 void init_shm_malloc();
 
-/* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);
 struct mm_region *record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);
 void split_region(struct mm_region *region, gaddr_t gaddr);
 void destroy_mm(struct mm *mm);
 
 gaddr_t do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset);
+
+int hv_mflag_to_linux_mprot(hv_memory_flags_t mflag);
+hv_memory_flags_t linux_mprot_to_hv_mflag(int mprot);
 
 #endif
