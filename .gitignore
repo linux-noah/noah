@@ -1,7 +1,7 @@
 *.o
 *.dylib
 *.dSYM/
-build/noah
+libexec/noah
 !mnt/**/*.o
 GPATH
 GRTAGS

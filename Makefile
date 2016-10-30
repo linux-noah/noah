@@ -27,12 +27,12 @@ TEST_UPROGS := \
 
 LINUX_BUILD_SERV := idylls.jp
 
-all: build/noah
+all: libexec/noah
 
 dev: CFLAGS += -DDEBUG_MODE=1 -O0
-dev: build/noah
+dev: libexec/noah
 
-build/noah: $(SRCS)
+libexec/noah: $(SRCS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 test/test_assertion/build/%: test/test_assertion/%.c test/include/*.h
@@ -47,15 +47,15 @@ MAKE_TEST_UPROGS = ssh $(LINUX_BUILD_SERV) "rm /tmp/$(USER)/*";\
                    ssh $(LINUX_BUILD_SERV) "gcc -std=gnu99 -g -O0 /tmp/$(USER)/$*.c -lpthread -o /tmp/$(USER)/$*";\
                    rsync $(LINUX_BUILD_SERV):/tmp/$(USER)/$* $@
 
-run: build/noah test/test_stdout/build/hello
-	./build/noah test/test_stdout/build/hello
+run: libexec/noah test/test_stdout/build/hello
+	./libexec/noah test/test_stdout/build/hello
 clean:
 	$(RM) -r lib/*.o src/*.o src/*/*.o
-	$(RM) -r build/noah
+	$(RM) -r libexec/noah
 	$(RM) test/test_assertion/build/* test/test_stdout/build/*
 	$(RM) `ls test/test_shell/build/* | grep -v gcc`
 
-test: build/noah $(TEST_UPROGS)
+test: all $(TEST_UPROGS)
 	./test/test.rb
 
 .PHONY: all run test clean
