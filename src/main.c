@@ -162,20 +162,6 @@ init_vkernel()
   init_regs();
 }
 
-void
-__attribute__((noreturn)) version()
-{
-  fprintf(stderr, "%s\n", NOAH_VERSION);
-  exit(1);
-}
-
-void
-__attribute__((noreturn)) usage()
-{
-  fprintf(stderr, "usage: noah [OPTION] elf_file ...\n");
-  exit(1);
-}
-
 static void
 default_mnt(char *path)
 {
@@ -192,8 +178,6 @@ int
 main(int argc, char *argv[], char **envp)
 {
   static struct option long_options[] = {
-    { "help", no_argument, NULL, 'h' },
-    { "version", no_argument, NULL, 'v' },
     { "output", required_argument, NULL, 'o' },
     { "strace", required_argument, NULL, 's' },
     { "mnt", required_argument, NULL, 'm' },
@@ -203,12 +187,8 @@ main(int argc, char *argv[], char **envp)
 
   char root[PATH_MAX] = {0};
 
-  while ((c = getopt_long(argc, argv, "+hvo:s:m:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+o:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
-    default:
-      usage();
-    case 'v':
-      version();
     case 'o':
       init_printk(optarg);
       break;
@@ -229,7 +209,7 @@ main(int argc, char *argv[], char **envp)
   argv += optind;
 
   if (argc == 0) {
-    usage();
+    abort();
   }
 
   vmm_create();
