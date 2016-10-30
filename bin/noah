@@ -33,7 +33,8 @@ if (! -d $noahdir) {
 if (! defined $root) {
   $root = "$noahdir/tree";
   if (! -d $root) {
-    print "It seems the initial run. Creating the root filesystem...\n";
+    my $ans = prompt("Noah is installing the initial filesystem into ~/.noah/tree. Proceed? [Y/n]");
+    ($ans eq '' or $ans eq 'y' or $ans eq 'Y') or exit 1;
     system "sudo noahstrap -p archlinux $root";
   }
 }
@@ -46,6 +47,14 @@ if (@ARGV != 0) {
 }
 
 system "${noah} -m $root $init";
+
+sub prompt {
+  my ($query) = @_; # take a prompt string as argument
+  local $| = 1; # activate autoflush to immediately show the prompt
+  print $query . " ";
+  chomp(my $answer = <STDIN>);
+  return $answer;
+}
 
 __END__
 
