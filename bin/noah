@@ -9,19 +9,43 @@ use Cwd;
 
 our $VERSION = "0.0.1";
 
-my $prefix = dirname(Cwd::abs_path($0)) . "/../";
+my $prefix = dirname(Cwd::abs_path($0)) . "/..";
+
+my ($root);
 
 GetOptions(
-    'h|help' => sub {
-        pod2usage(1);
-    },
-    'v|version' => sub {
-        print "$VERSION\n";
-        exit 0;
-    }
+  'root' => \$root,
+  'h|help' => sub {
+    pod2usage(1);
+  },
+  'v|version' => sub {
+    print "$VERSION\n";
+    exit 0;
+  }
 ) or exit 1;
 
-print "It works.\n";
+my $noahdir = "$ENV{HOME}/.noah";
+
+if (! -d $noahdir) {
+  mkdir $noahdir;
+}
+
+if (! defined $root) {
+  $root = "$noahdir/tree";
+  if (! -d $root) {
+    print "It seems the initial run. Creating the root filesystem...\n";
+    system "sudo noahstrap -p archlinux $root";
+  }
+}
+
+my $noah = "${prefix}/libexec/noah";
+
+my $init = "/bin/bash -i";
+if (@ARGV != 0) {
+  $init = "@ARGV";
+}
+
+system "${noah} -m $root $init";
 
 __END__
 
@@ -31,13 +55,18 @@ noah -- Darwin Subsystem for Linux
 
 =head1 SYNOPSIS
 
-  noah [OPTION...] executable [ARG...]
+    noah [OPTION...]
+    noah [OPTION...] path_to_executable [ARG...]
 
 =head1 DESCRIPTION
 
 TBA
 
 =head1 OPTIONS
+
+=head2 --root=DIR
+
+Use DIR as root fs.
 
 =head2 --help, -h
 
