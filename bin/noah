@@ -1,0 +1,52 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+use Pod::Usage;
+use File::Basename;
+use Cwd;
+
+our $VERSION = "0.0.1";
+
+my $prefix = dirname(Cwd::abs_path($0)) . "/../";
+
+GetOptions(
+    'h|help' => sub {
+        pod2usage(1);
+    },
+    'v|version' => sub {
+        print "$VERSION\n";
+        exit 0;
+    }
+) or exit 1;
+
+print "It works.\n";
+
+__END__
+
+=head1 NAME
+
+noah -- Darwin Subsystem for Linux
+
+=head1 SYNOPSIS
+
+  noah [OPTION...] executable [ARG...]
+
+=head1 DESCRIPTION
+
+TBA
+
+=head1 OPTIONS
+
+=head2 --help, -h
+
+Shows this message.
+
+=head2 --version, -v
+
+Shows version information.
+
+=head1 AUTHORS
+
+Yuichi Nishiwaki, and Takaya Saeki
