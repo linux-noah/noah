@@ -16,7 +16,7 @@ struct header {
 typedef struct header Header;
 
 /* 1GB should suffice, I guess? */
-#define MEMORY_ARENA_SIZE (1 * 1024 * 1024 * 1024)
+#define MEMORY_ARENA_SIZE (1L * 1024 * 1024 * 1024)
 
 void *arena_start;              /* never changed after the boot sequence completed */
 
