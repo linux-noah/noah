@@ -1,0 +1,90 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use Getopt::Long;
+use Pod::Usage;
+use File::Basename;
+use Cwd;
+
+our $VERSION = "0.0.1";
+
+my $prefix = dirname(Cwd::abs_path($0)) . "/..";
+
+my ($root);
+
+GetOptions(
+  'root' => \$root,
+  'h|help' => sub {
+    pod2usage(1);
+  },
+  'v|version' => sub {
+    print "$VERSION\n";
+    exit 0;
+  }
+) or exit 1;
+
+my $noahdir = "$ENV{HOME}/.noah";
+
+if (! -d $noahdir) {
+  mkdir $noahdir;
+}
+
+if (! defined $root) {
+  $root = "$noahdir/tree";
+  if (! -d $root) {
+    my $ans = prompt("Noah is installing the initial filesystem into ~/.noah/tree. Proceed? [Y/n]");
+    ($ans eq '' or $ans eq 'y' or $ans eq 'Y') or exit 1;
+    system "sudo noahstrap -p archlinux $root";
+  }
+}
+
+my $noah = "${prefix}/libexec/noah";
+
+my $init = "/bin/bash -i";
+if (@ARGV != 0) {
+  $init = "@ARGV";
+}
+
+system "${noah} -m $root $init";
+
+sub prompt {
+  my ($query) = @_; # take a prompt string as argument
+  local $| = 1; # activate autoflush to immediately show the prompt
+  print $query . " ";
+  chomp(my $answer = <STDIN>);
+  return $answer;
+}
+
+__END__
+
+=head1 NAME
+
+noah -- Darwin Subsystem for Linux
+
+=head1 SYNOPSIS
+
+    noah [OPTION...]
+    noah [OPTION...] path_to_executable [ARG...]
+
+=head1 DESCRIPTION
+
+TBA
+
+=head1 OPTIONS
+
+=head2 --root=DIR
+
+Use DIR as root fs.
+
+=head2 --help, -h
+
+Shows this message.
+
+=head2 --version, -v
+
+Shows version information.
+
+=head1 AUTHORS
+
+Yuichi Nishiwaki, and Takaya Saeki

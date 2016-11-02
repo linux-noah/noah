@@ -7,10 +7,8 @@ Noah is a Darwin subsystem for Linux, or "Bash on Ubuntu on Mac OS X". Noah is i
 Noah is installed via homebrew. We strongly recommend additionally installing noahstrap! With noahstrap, you get a comprehensive linux environment via a few lines of commands:
 
     $ brew tap linux-noah/noah
-    $ brew install noah noahstrap
-    $ mkdir test-chroot
-    $ sudo noahstrap archlinux ./test-chroot
-    $ noah -m ./test-chroot /bin/bash -i
+    $ brew install noah
+    $ noah
 
 ## (Advanced Topic) How to set up an environment with Vagrant on macOS
 
