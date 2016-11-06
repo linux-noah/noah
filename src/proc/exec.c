@@ -17,6 +17,7 @@
 #include "mm.h"
 #include "x86/page.h"
 #include "x86/vmemparam.h"
+#include "x86/segment.h"
 #include "elf.h"
 
 #include "linux/common.h"
@@ -319,6 +320,38 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
 }
 
 static void
+init_reg_state(void)
+{
+  vmm_write_register(HV_X86_RAX, 0);
+  vmm_write_register(HV_X86_RBX, 0);
+  vmm_write_register(HV_X86_RCX, 0);
+  vmm_write_register(HV_X86_RDX, 0);
+  vmm_write_register(HV_X86_RSI, 0);
+  vmm_write_register(HV_X86_RDI, 0);
+  vmm_write_register(HV_X86_R8, 0);
+  vmm_write_register(HV_X86_R9, 0);
+  vmm_write_register(HV_X86_R10, 0);
+  vmm_write_register(HV_X86_R11, 0);
+  vmm_write_register(HV_X86_R12, 0);
+  vmm_write_register(HV_X86_R13, 0);
+  vmm_write_register(HV_X86_R14, 0);
+  vmm_write_register(HV_X86_R15, 0);
+
+  vmm_write_vmcs(VMCS_GUEST_FS, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS, 0);
+  vmm_write_vmcs(VMCS_GUEST_DS, 0);
+  vmm_write_vmcs(VMCS_GUEST_CS, GSEL(SEG_CODE, 0));
+  vmm_write_vmcs(VMCS_GUEST_DS, GSEL(SEG_DATA, 0));
+
+  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
+
+  vmm_write_vmcs(VMCS_GUEST_LDTR, 0);
+  // TODO: initialize FPU state if it is implemented
+}
+
+static void
 prepare_newproc(void)
 {
   /* Reinitialize proc and task structures */
@@ -326,8 +359,8 @@ prepare_newproc(void)
   proc.nr_tasks = 1;
   destroy_mm(proc.mm); // munlock is also done by unmapping mm
   init_mm(proc.mm);
-  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
+  init_reg_state();
+  // TODO: destroy LDT if it is implemented
 
   task.clear_child_tid = task.set_child_tid = 0;
 }
@@ -450,10 +483,9 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     return err;
   }
 
-  // Now executable file was lodaed successfully
   uint64_t entry;
   vmm_read_register(HV_X86_RIP, &entry);
-  vmm_write_register(HV_X86_RIP, entry - 2); // because syscall handler adds 2 to current rip when return to vmm_run
+  vmm_write_register(HV_X86_RIP, entry - 2); // because syscall handler adds 2 to current rip when returning to vmm_run
 
   return 0;
 }
