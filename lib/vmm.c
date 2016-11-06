@@ -447,7 +447,14 @@ dump_instr()
   vmm_read_register(HV_X86_RIP, &rip);
   char inst_str[instlen * 3 + 1];
   for (size_t i = 0; i < instlen; i ++) {
-    sprintf(inst_str + 3 * i, "%02x ", *((uchar*)guest_to_host(rip) + i));
+    unsigned char *ip = guest_to_host(rip);
+    if (ip) {
+      sprintf(inst_str + 3 * i, "%02x ", ip[i]);
+    } else {
+      printk("rip is in invalid user address: 0x%016llx\n", rip);
+      volatile int raise_segv = ip[i]; // Raise segmentation fault in host
+      return;
+    }
   }
   inst_str[instlen * 3] = '\0';
   printk("len: %lld, instruction: %s\n", instlen, inst_str);
