@@ -56,9 +56,9 @@ else
     cd homebrew-noah
 fi
 
-sed -i "" -e "8 s@.*@  url \"$URL\"@g" noah.rb
-sed -i "" -e "9 s@.*@  version \"$VERSION\"@g" noah.rb
-sed -i "" -e "10 s@.*@  sha256 \"$SHA256\"@g" noah.rb
+sed -i "" -e "4 s@.*@  url \"$URL\"@g" noah.rb
+sed -i "" -e "5 s@.*@  version \"$VERSION\"@g" noah.rb
+sed -i "" -e "6 s@.*@  sha256 \"$SHA256\"@g" noah.rb
 
 git add noah.rb
 git commit -m "version $VERSION"
