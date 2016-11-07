@@ -10,8 +10,8 @@
 
 #define NOAH_VERSION NOAH_MAJOR_VERSION "." NOAH_MINOR_VERSION "." NOAH_PATCH_VERSION
 #define NOAH_MAJOR_VERSION "0"
-#define NOAH_MINOR_VERSION "2"
-#define NOAH_PATCH_VERSION "6"
+#define NOAH_MINOR_VERSION "3"
+#define NOAH_PATCH_VERSION "0"
 
 /* interface to user memory */
 

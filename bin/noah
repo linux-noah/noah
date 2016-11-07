@@ -7,7 +7,7 @@ use Pod::Usage;
 use File::Basename;
 use Cwd;
 
-our $VERSION = "0.0.1";
+our $VERSION = "0.3.0";
 
 my $prefix = dirname(Cwd::abs_path($0)) . "/..";
 
