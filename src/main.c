@@ -174,9 +174,27 @@ default_mnt(char *path)
   sprintf(path, "%s/../mnt", dir);
 }
 
+void
+drop_privilege(void)
+{
+  if (seteuid(getuid()) != 0) {
+    abort();
+  }
+}
+
+void
+elevate_privilege(void)
+{
+  if (seteuid(0) != 0) {
+    abort();
+  }
+}
+
 int
 main(int argc, char *argv[], char **envp)
 {
+  drop_privilege();
+
   static struct option long_options[] = {
     { "output", required_argument, NULL, 'o' },
     { "strace", required_argument, NULL, 's' },

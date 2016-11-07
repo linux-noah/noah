@@ -13,6 +13,11 @@
 #define NOAH_MINOR_VERSION "3"
 #define NOAH_PATCH_VERSION "0"
 
+/* privilege management */
+
+void drop_privilege(void);
+void elevate_privilege(void);
+
 /* interface to user memory */
 
 gaddr_t host_to_guest(void *);
