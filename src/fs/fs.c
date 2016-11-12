@@ -175,18 +175,26 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   struct file *file = vfs_acquire(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int n = file->ops->read(file, buf, size);
-  if (n > 0) {
-    copy_to_user(buf_ptr, buf, n);
+  int r;
+  if (file->ops->read == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
   }
+  r = file->ops->read(file, buf, size);
+  if (r > 0) {
+    copy_to_user(buf_ptr, buf, r);
+  }
+ out:
   vfs_release(file);
-  return n;
+  return r;
 }
 
 DEFINE_SYSCALL(close, int, fd)
 {
   /* FIXME: free fd slot */
   struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
   int n = file->ops->close(file);
   vfs_release(file);
   return n;
@@ -195,6 +203,8 @@ DEFINE_SYSCALL(close, int, fd)
 DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
 {
   struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
   struct l_newstat st;
   int n = file->ops->stat(file, &st);
   if (n >= 0) {
