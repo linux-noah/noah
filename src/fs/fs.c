@@ -71,6 +71,7 @@ struct file_operations {
   int (*close)(struct file *f);
   int (*stat)(struct file *f, struct l_newstat *stat);
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
+  int (*lseek)(struct file *f, l_off_t offset, int whence);
 };
 
 int
@@ -127,6 +128,12 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
   return -LINUX_EPERM;
 }
 
+int
+darwinfs_lseek(struct file *file, l_off_t offset, int whence)
+{
+  return syswrap(lseek(file->fd, offset, whence));
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -136,6 +143,7 @@ vfs_acquire(int fd)
     .close = darwinfs_close,
     .stat = darwinfs_stat,
     .ioctl = darwinfs_ioctl,
+    .lseek = darwinfs_lseek,
   };
 
   struct file *file;
@@ -226,6 +234,16 @@ DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
   }
   r = file->ops->ioctl(file, cmd, val0);
  out:
+  vfs_release(file);
+  return r;
+}
+
+DEFINE_SYSCALL(lseek, int, fd, off_t, offset, int, whence)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r = file->ops->lseek(file, offset, whence);
   vfs_release(file);
   return r;
 }
@@ -669,11 +687,6 @@ DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
 
   free(host_path);
   return ret;
-}
-
-DEFINE_SYSCALL(lseek, int, fildes, off_t, offset, int, whence)
-{
-  return syswrap(lseek(fildes, offset, whence));
 }
 
 DEFINE_SYSCALL(mkdir, gstr_t, path, int, mode)
