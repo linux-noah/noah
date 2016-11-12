@@ -83,7 +83,7 @@ darwinfs_read(struct file *file, char *buf, size_t size)
 }
 
 struct file *
-vfs_aquire(int fd)
+vfs_acquire(int fd)
 {
   static struct file_operations ops = {
     .write = darwinfs_write,
@@ -107,7 +107,7 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
   copy_from_user(buf, buf_ptr, size);
-  struct file *file = vfs_aquire(fd);
+  struct file *file = vfs_acquire(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   int r = file->ops->write(file, buf, size);
@@ -118,7 +118,7 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
-  struct file *file = vfs_aquire(fd);
+  struct file *file = vfs_acquire(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   int n = file->ops->read(file, buf, size);
