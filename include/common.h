@@ -20,18 +20,18 @@
 #define MK_CAST(t,v) (t) temp__##v
 
 #define DECLARE_SCFUNCT(name, ...)                      \
-  uint64_t _sys_##name(_MAP(MK_DECL, __VA_ARGS__));
+  uint64_t sys_##name(_MAP(MK_DECL, __VA_ARGS__));
 
 #define DEFINE_SCWRAPPER(name, ...)                                                \
-  uint64_t sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                                 \
+  uint64_t _sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                                 \
     meta_strace_pre(NR_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
-    uint64_t ret = _sys_##name(_MAP(MK_CAST,__VA_ARGS__));                         \
+    uint64_t ret = sys_##name(_MAP(MK_CAST,__VA_ARGS__));                         \
     meta_strace_post(NR_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
     return ret;                                                                    \
   }
 
 #define DEFINE_SCFUNCT(name, ...)                       \
-  uint64_t _sys_##name(_MAP(MK_DECL, __VA_ARGS__))
+  uint64_t sys_##name(_MAP(MK_DECL, __VA_ARGS__))
 
 #define DEFINE_SYSCALL(name, ...)               \
   DECLARE_SCFUNCT(name, ##__VA_ARGS__)          \

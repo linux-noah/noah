@@ -286,23 +286,6 @@ DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
   return do_open(guest_to_host(path), flags, mode);
 }
 
-DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  struct l_newstat *l_st = guest_to_host(st);
-  struct stat d_st;
-
-  int ret = syswrap(stat(host_path, &d_st));
-  free(host_path);
-  if (ret < 0) {
-    return ret;
-  }
-
-  stat_darwin_to_linux(&d_st, l_st);
-
-  return 0;
-}
-
 DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
 {
   char *host_path = to_host_path(guest_to_host(path));
@@ -320,21 +303,14 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
   return 0;
 }
 
+DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
+{
+  return sys_newfstatat(LINUX_AT_FDCWD, path, st, 0);
+}
+
 DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
 {
-  char *host_path = to_host_path(guest_to_host(path));
-  struct l_newstat *l_st = guest_to_host(st);
-  struct stat d_st;
-
-  int ret = syswrap(lstat(host_path, &d_st));
-  free(host_path);
-  if (ret < 0) {
-    return ret;
-  }
-
-  stat_darwin_to_linux(&d_st, l_st);
-
-  return 0;
+  return sys_newfstatat(LINUX_AT_FDCWD, path, st, LINUX_AT_SYMLINK_NOFOLLOW);
 }
 
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode)
