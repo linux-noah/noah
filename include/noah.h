@@ -63,6 +63,22 @@ void set_initial_proc(struct proc *proc, char *root);
 
 #define LINUX_PATH_MAX 4096         /* including null */
 
+/* conversion */
+
+struct stat;
+struct l_newstat;
+struct statfs;
+struct termios;
+struct linux_termios;
+struct l_statfs;
+
+int linux_to_darwin_at_flags(int flags);
+int linux_to_darwin_o_flags(int l_flags);
+void stat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat);
+void statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs);
+void darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios);
+
+
 /* debug */
 
 #include "debug.h"
