@@ -59,21 +59,72 @@
 
 #include <mach-o/dyld.h>
 
+struct file {
+  struct file_operations *ops;
+  int fd;
+};
+
+struct file_operations {
+  int (*write)(struct file *f, const char *buf, size_t size);
+  int (*read)(struct file *f, char *buf, size_t size);
+};
+
+int
+darwinfs_write(struct file *file, const char *buf, size_t size)
+{
+  return syswrap(write(file->fd, buf, size));
+}
+
+int
+darwinfs_read(struct file *file, char *buf, size_t size)
+{
+  return syswrap(read(file->fd, buf, size));
+}
+
+struct file *
+vfs_aquire(int fd)
+{
+  static struct file_operations ops = {
+    .write = darwinfs_write,
+    .read = darwinfs_read,
+  };
+
+  struct file *file;
+  file = malloc(sizeof *file);
+  file->ops = &ops;
+  file->fd = fd;
+  return file;
+}
+
+void
+vfs_release(struct file *file)
+{
+  free(file);
+}
+
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
   copy_from_user(buf, buf_ptr, size);
-  return syswrap(write(fd, buf, size));
+  struct file *file = vfs_aquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r = file->ops->write(file, buf, size);
+  vfs_release(file);
+  return r;
 }
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
-  int n = read(fd, buf, size);
-  if (n < 0) {
-    return -errno;
+  struct file *file = vfs_aquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int n = file->ops->read(file, buf, size);
+  if (n > 0) {
+    copy_to_user(buf_ptr, buf, n);
   }
-  copy_to_user(buf_ptr, buf, n);
+  vfs_release(file);
   return n;
 }
 
