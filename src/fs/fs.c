@@ -70,6 +70,7 @@ struct file_operations {
   int (*read)(struct file *f, char *buf, size_t size);
   int (*close)(struct file *f);
   int (*stat)(struct file *f, struct l_newstat *stat);
+  int (*ioctl)(struct file *f, int cmd, uint64_t val0);
 };
 
 int
@@ -102,6 +103,30 @@ darwinfs_stat(struct file *file, struct l_newstat *l_st)
   return ret;
 }
 
+int
+darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
+{
+  int fd = file->fd;
+  printk("darwinfs ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  if (fd == 1 && cmd == LINUX_TCGETS) {
+    struct termios dios;
+    struct linux_termios lios;
+
+    int ret = syswrap(ioctl(fd, TIOCGETA, &dios));
+    if (ret < 0) {
+      return ret;
+    }
+    darwin_to_linux_termios(&dios, &lios);
+    *(struct linux_termios*)(guest_to_host(val0)) = lios;
+
+    return ret;
+  } else if (fd == 1 && cmd == LINUX_TIOCGWINSZ) {
+    return syswrap(ioctl(fd, TIOCGWINSZ, guest_to_host(val0)));
+  }
+
+  return -LINUX_EPERM;
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -110,6 +135,7 @@ vfs_acquire(int fd)
     .read = darwinfs_read,
     .close = darwinfs_close,
     .stat = darwinfs_stat,
+    .ioctl = darwinfs_ioctl,
   };
 
   struct file *file;
@@ -132,7 +158,13 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
   struct file *file = vfs_acquire(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r = file->ops->write(file, buf, size);
+  int r;
+  if (file->ops->write == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
+  }
+  r = file->ops->write(file, buf, size);
+ out:
   vfs_release(file);
   return r;
 }
@@ -170,6 +202,22 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
   }
   vfs_release(file);
   return n;
+}
+
+DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r;
+  if (file->ops->ioctl == NULL) {
+    r = -LINUX_ENOTTY;
+    goto out;
+  }
+  r = file->ops->ioctl(file, cmd, val0);
+ out:
+  vfs_release(file);
+  return r;
 }
 
 char*
@@ -437,28 +485,6 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
 {
   printk("getxattr is unimplemented\n");
   return -LINUX_ENOTSUP;
-}
-
-DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
-{
-  printk("ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
-  if (fd == 1 && cmd == LINUX_TCGETS) {
-    struct termios dios;
-    struct linux_termios lios;
-
-    int ret = syswrap(ioctl(fd, TIOCGETA, &dios));
-    if (ret < 0) {
-      return ret;
-    }
-    darwin_to_linux_termios(&dios, &lios);
-    *(struct linux_termios*)(guest_to_host(val0)) = lios;
-
-    return ret;
-  } else if (fd == 1 && cmd == LINUX_TIOCGWINSZ) {
-    return syswrap(ioctl(fd, TIOCGWINSZ, guest_to_host(val0)));
-  }
-
-  return -LINUX_EPERM;
 }
 
 DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
