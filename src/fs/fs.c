@@ -261,7 +261,7 @@ to_host_path(const char *path)
 }
 
 int
-do_open_at(int l_fd, const char *path, int l_flags, int mode)
+do_openat(int l_fd, const char *path, int l_flags, int mode)
 {
   int flags = linux_to_darwin_o_flags(l_flags);
   char *host_path = to_host_path(path);
@@ -278,7 +278,7 @@ do_open_at(int l_fd, const char *path, int l_flags, int mode)
 int
 do_open(const char *path, int l_flags, int mode)
 {
-  return do_open_at(LINUX_AT_FDCWD, path, l_flags, mode);
+  return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
 DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
@@ -286,21 +286,16 @@ DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
   return do_open(guest_to_host(path), flags, mode);
 }
 
-DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
+DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, flags)
 {
-  char *host_path = to_host_path(guest_to_host(path));
-  struct l_newstat *l_st = guest_to_host(st);
-  struct stat d_st;
-
-  int ret = syswrap(fstatat(dirfd, host_path, &d_st, linux_to_darwin_at_flags(flags)));
-  free(host_path);
-  if (ret < 0) {
-    return ret;
-  }
-
-  stat_darwin_to_linux(&d_st, l_st);
-
-  return 0;
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  int fd = do_openat(dirfd, path, flags, 0);
+  if (fd < 0)
+    return fd;
+  int r = sys_fstat(fd, st_ptr);
+  sys_close(fd);
+  return r;
 }
 
 DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)

@@ -47,7 +47,7 @@ DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, timevals, int,
   if (filename == 0) {
     fd = dirfd; // Linux allows filename to be NULL and treat dirfd as fd
   } else {
-    fd = do_open_at(dirfd, guest_to_host(filename), flags, LINUX_O_RDWR);
+    fd = do_openat(dirfd, guest_to_host(filename), flags, LINUX_O_RDWR);
   }
   int ret = syswrap(futimes(fd, times));
 
