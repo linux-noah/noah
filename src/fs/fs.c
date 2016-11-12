@@ -68,6 +68,8 @@ struct file {
 struct file_operations {
   int (*write)(struct file *f, const char *buf, size_t size);
   int (*read)(struct file *f, char *buf, size_t size);
+  int (*close)(struct file *f);
+  int (*stat)(struct file *f, struct l_newstat *stat);
 };
 
 int
@@ -82,12 +84,32 @@ darwinfs_read(struct file *file, char *buf, size_t size)
   return syswrap(read(file->fd, buf, size));
 }
 
+int
+darwinfs_close(struct file *file)
+{
+  return syswrap(close(file->fd));
+}
+
+int
+darwinfs_stat(struct file *file, struct l_newstat *l_st)
+{
+  struct stat st;
+  int ret = syswrap(fstat(file->fd, &st));
+  if (ret < 0) {
+    return ret;
+  }
+  stat_darwin_to_linux(&st, l_st);
+  return ret;
+}
+
 struct file *
 vfs_acquire(int fd)
 {
   static struct file_operations ops = {
     .write = darwinfs_write,
     .read = darwinfs_read,
+    .close = darwinfs_close,
+    .stat = darwinfs_stat,
   };
 
   struct file *file;
@@ -124,6 +146,27 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   int n = file->ops->read(file, buf, size);
   if (n > 0) {
     copy_to_user(buf_ptr, buf, n);
+  }
+  vfs_release(file);
+  return n;
+}
+
+DEFINE_SYSCALL(close, int, fd)
+{
+  /* FIXME: free fd slot */
+  struct file *file = vfs_acquire(fd);
+  int n = file->ops->close(file);
+  vfs_release(file);
+  return n;
+}
+
+DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
+{
+  struct file *file = vfs_acquire(fd);
+  struct l_newstat st;
+  int n = file->ops->stat(file, &st);
+  if (n >= 0) {
+    copy_to_user(st_ptr, &st, sizeof st);
   }
   vfs_release(file);
   return n;
@@ -167,11 +210,6 @@ DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
   return do_open(guest_to_host(path), flags, mode);
 }
 
-DEFINE_SYSCALL(close, int, fd)
-{
-  return syswrap(close(fd));
-}
-
 DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
 {
   char *host_path = to_host_path(guest_to_host(path));
@@ -200,20 +238,6 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path, gaddr_t, st, int, flags)
   if (ret < 0) {
     return ret;
   }
-
-  stat_darwin_to_linux(&d_st, l_st);
-
-  return 0;
-}
-
-DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st)
-{
-  struct l_newstat *l_st = guest_to_host(st);
-  struct stat d_st;
-
-  int ret = syswrap(fstat(fd, &d_st));
-  if (ret < 0)
-    return ret;
 
   stat_darwin_to_linux(&d_st, l_st);
 
