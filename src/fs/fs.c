@@ -534,15 +534,6 @@ DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
   return ret;
 }
 
-DEFINE_SYSCALL(unlink, gstr_t, path)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(unlink(host_path));
-
-  free(host_path);
-  return ret;
-}
-
 DEFINE_SYSCALL(unlinkat, int, fd, gstr_t, path, int, flags)
 {
   char *host_path = to_host_path(guest_to_host(path));
@@ -558,16 +549,9 @@ DEFINE_SYSCALL(unlinkat, int, fd, gstr_t, path, int, flags)
   return ret;
 }
 
-DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
+DEFINE_SYSCALL(unlink, gstr_t, path)
 {
-  char *host_oldpath = to_host_path(guest_to_host(oldpath));
-  char *host_newpath = to_host_path(guest_to_host(newpath));
-
-  int ret = syswrap(link(host_oldpath, host_newpath));
-
-  free(host_oldpath);
-  free(host_newpath);
-  return ret;
+  return sys_unlinkat(LINUX_AT_FDCWD, path, 0);
 }
 
 DEFINE_SYSCALL(linkat, int, olddirfd, gstr_t, oldpath, int, newdirfd, gstr_t, newpath, int, flags)
@@ -581,6 +565,11 @@ DEFINE_SYSCALL(linkat, int, olddirfd, gstr_t, oldpath, int, newdirfd, gstr_t, ne
   free(host_oldpath);
   free(host_newpath);
   return ret;
+}
+
+DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
+{
+  return sys_linkat(LINUX_AT_FDCWD, oldpath, LINUX_AT_FDCWD, newpath, 0);
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
