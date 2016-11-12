@@ -72,6 +72,7 @@ struct file_operations {
   int (*stat)(struct file *f, struct l_newstat *stat);
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
   int (*lseek)(struct file *f, l_off_t offset, int whence);
+  int (*getdents)(struct file *f, char *buf, uint count);
 };
 
 int
@@ -134,6 +135,40 @@ darwinfs_lseek(struct file *file, l_off_t offset, int whence)
   return syswrap(lseek(file->fd, offset, whence));
 }
 
+int
+darwinfs_getdents(struct file *file, char *direntp, unsigned count)
+{
+  long base;
+  char buf[count];
+  struct dirent *d;
+  int bpos;
+
+  struct l_dirent *l_d;
+  unsigned int l_bpos = 0;
+
+  int nread = syscall(SYS_getdirentries64, file->fd, buf, count, &base);
+  if (nread < 0) {
+    return -errno;
+  }
+  for (bpos = 0; bpos < nread; bpos += d->d_reclen) {
+    d = (struct dirent *) (buf + bpos);
+
+    size_t l_reclen = roundup(offsetof(struct l_dirent, d_name) + d->d_namlen + 2, 8);
+    assert(l_bpos + l_reclen <= count);
+
+    /* fill dirent buffer */
+    l_d = (struct l_dirent *) (direntp + l_bpos);
+    l_d->d_ino = d->d_ino;
+    l_d->d_reclen = l_reclen;
+    l_d->d_off = d->d_seekoff;
+    memcpy(l_d->d_name, d->d_name, d->d_namlen + 1);
+    (direntp + l_bpos)[l_d->d_reclen - 1] = d->d_type;
+
+    l_bpos += l_d->d_reclen;
+  }
+  return l_bpos;
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -144,6 +179,7 @@ vfs_acquire(int fd)
     .stat = darwinfs_stat,
     .ioctl = darwinfs_ioctl,
     .lseek = darwinfs_lseek,
+    .getdents = darwinfs_getdents,
   };
 
   struct file *file;
@@ -248,6 +284,18 @@ DEFINE_SYSCALL(lseek, int, fd, off_t, offset, int, whence)
   return r;
 }
 
+DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  char buf[count];
+  int r = file->ops->getdents(file, buf, count);
+  vfs_release(file);
+  copy_to_user(dirent_ptr, buf, count);
+  return r;
+}
+
 char*
 to_host_path(const char *path)
 {
@@ -335,40 +383,6 @@ DEFINE_SYSCALL(access, gstr_t, path, int, mode)
 DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path, int, mode)
 {
   return do_faccessat(dirfd, guest_to_host(path), mode);
-}
-
-DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
-{
-  long base;
-  char buf[count];
-  struct dirent *d;
-  int bpos;
-
-  struct l_dirent *l_d;
-  char *l_buf = guest_to_host(dirent_ptr);
-  unsigned int l_bpos = 0;
-
-  int nread = syscall(SYS_getdirentries64, fd, buf, count, &base);
-  if (nread < 0) {
-    return -errno;
-  }
-  for (bpos = 0; bpos < nread; bpos += d->d_reclen) {
-    d = (struct dirent *) (buf + bpos);
-
-    size_t l_reclen = roundup(offsetof(struct l_dirent, d_name) + d->d_namlen + 2, 8);
-    assert(l_bpos + l_reclen <= count);
-
-    /* fill dirent buffer */
-    l_d = (struct l_dirent *) (l_buf + l_bpos);
-    l_d->d_ino = d->d_ino;
-    l_d->d_reclen = l_reclen;
-    l_d->d_off = d->d_seekoff;
-    memcpy(l_d->d_name, d->d_name, d->d_namlen + 1);
-    (l_buf + l_bpos)[l_d->d_reclen - 1] = d->d_type;
-
-    l_bpos += l_d->d_reclen;
-  }
-  return l_bpos;
 }
 
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
