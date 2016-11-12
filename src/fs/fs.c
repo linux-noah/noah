@@ -338,7 +338,7 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, f
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(dirfd, path, flags, 0);
+  int fd = do_openat(dirfd, path, LINUX_O_RDONLY, 0); /* FIXME: ask for the fs directly */
   if (fd < 0)
     return fd;
   int r = sys_fstat(fd, st_ptr);
