@@ -301,13 +301,22 @@ struct fs {
 };
 
 struct fs_operations {
-  int (*symlink)(struct fs *fs, const char *target, const char *name);
+  int (*symlinkat)(struct fs *fs, const char *target, int dirfd, const char *name);
 };
 
 int
-darwinfs_symlink(struct fs *fs, const char *target, const char *name)
+darwinfs_get_dirfd(int dirfd)
 {
-  return syswrap(symlink(target, name));
+  if (dirfd == LINUX_AT_FDCWD)
+    return AT_FDCWD;
+  return dirfd;
+}
+
+int
+darwinfs_symlinkat(struct fs *fs, const char *target, int dirfd, const char *name)
+{
+  int fd = darwinfs_get_dirfd(dirfd);
+  return syswrap(symlinkat(target, fd, name));
 }
 
 #define LOOKUP_FOLLOW     0x0001
@@ -318,22 +327,34 @@ darwinfs_symlink(struct fs *fs, const char *target, const char *name)
 /* #define LOOKUP_REVAL      0x0020 */
 
 int
-resolve_path(const char *path, int flags, struct fs **fs, const char **subpath)
+vfs_grab_dir(int dir, const char *path, int flags, struct fs **fs, int *subdir, const char **subpath)
 {
   static struct fs_operations ops = {
-    .symlink = darwinfs_symlink,
+    .symlinkat = darwinfs_symlinkat,
   };
 
   static struct fs darwinfs = {
     .ops = &ops,
   };
 
+  if (flags & ~(LOOKUP_FOLLOW)) {
+    return -LINUX_EINVAL;
+  }
+
   *fs = &darwinfs;
+  *subdir = dir;
   *subpath = path;
   return 0;
 }
 
-DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
+int
+vfs_ungrab_dir(int dirfd)
+{
+  /* do nothing */
+  return 0;
+}
+
+DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
 {
   char path1[LINUX_PATH_MAX], path2[LINUX_PATH_MAX];
 
@@ -341,13 +362,21 @@ DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
   strncpy_from_user(path2, path2_ptr, sizeof path2);
 
   struct fs *fs;
+  int dir;
   const char *subpath;
 
-  int r = resolve_path(path2, LOOKUP_FOLLOW, &fs, &subpath);
+  int r = vfs_grab_dir(dirfd, path2, LOOKUP_FOLLOW, &fs, &dir, &subpath);
   if (r < 0) {
     return r;
   }
-  return fs->ops->symlink(fs, path1, subpath);
+  r = fs->ops->symlinkat(fs, path1, dir, subpath);
+  vfs_ungrab_dir(dir);
+  return r;
+}
+
+DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
+{
+  return sys_symlinkat(path1_ptr, LINUX_AT_FDCWD, path2_ptr);
 }
 
 char*
