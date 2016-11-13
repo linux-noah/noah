@@ -296,27 +296,22 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   return r;
 }
 
+struct dir {
+  int fd;
+};
+
 struct fs {
   struct fs_operations *ops;
 };
 
 struct fs_operations {
-  int (*symlinkat)(struct fs *fs, const char *target, int dirfd, const char *name);
+  int (*symlinkat)(struct fs *fs, const char *target, struct dir *dir, const char *name);
 };
 
 int
-darwinfs_get_dirfd(int dirfd)
+darwinfs_symlinkat(struct fs *fs, const char *target, struct dir *dir, const char *name)
 {
-  if (dirfd == LINUX_AT_FDCWD)
-    return AT_FDCWD;
-  return dirfd;
-}
-
-int
-darwinfs_symlinkat(struct fs *fs, const char *target, int dirfd, const char *name)
-{
-  int fd = darwinfs_get_dirfd(dirfd);
-  return syswrap(symlinkat(target, fd, name));
+  return syswrap(symlinkat(target, dir->fd, name));
 }
 
 #define LOOKUP_FOLLOW     0x0001
@@ -327,7 +322,7 @@ darwinfs_symlinkat(struct fs *fs, const char *target, int dirfd, const char *nam
 /* #define LOOKUP_REVAL      0x0020 */
 
 int
-vfs_grab_dir(int dir, const char *path, int flags, struct fs **fs, int *subdir, const char **subpath)
+vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, const char **subpath)
 {
   static struct fs_operations ops = {
     .symlinkat = darwinfs_symlinkat,
@@ -341,17 +336,21 @@ vfs_grab_dir(int dir, const char *path, int flags, struct fs **fs, int *subdir, 
     return -LINUX_EINVAL;
   }
 
+  *dir = malloc(sizeof *dir);
+  if (dirfd == LINUX_AT_FDCWD) {
+    (* dir)->fd = AT_FDCWD;
+  } else {
+    (* dir)->fd = dirfd;
+  }
   *fs = &darwinfs;
-  *subdir = dir;
   *subpath = path;
   return 0;
 }
 
-int
-vfs_ungrab_dir(int dirfd)
+void
+vfs_ungrab_dir(struct dir *dir)
 {
-  /* do nothing */
-  return 0;
+  free(dir);
 }
 
 DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
@@ -362,7 +361,7 @@ DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
   strncpy_from_user(path2, path2_ptr, sizeof path2);
 
   struct fs *fs;
-  int dir;
+  struct dir *dir;
   const char *subpath;
 
   int r = vfs_grab_dir(dirfd, path2, LOOKUP_FOLLOW, &fs, &dir, &subpath);
