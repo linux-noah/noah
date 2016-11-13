@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.7)
 
-project(noah)
+project(noah C)
 
-set(CMAKE_C_FLAGS "-std=gnu11")
-
+set(CMAKE_C_FLAGS "-g -std=gnu11")
+set(CMAKE_C_FLAGS_DEBUG "-DDEBUG_MODE=1 -O0")
+set(CMAKE_C_FLAGS_RELEASE "-O2")
+set(CMAKE_BUILD_TYPE Release)
 include_directories(include)
 
 add_executable(noah
@@ -26,5 +28,7 @@ add_executable(noah
   src/mm/mmap.c
   src/mm/malloc.c
   )
-
 target_link_libraries(noah pthread "-framework Hypervisor")
+
+install(FILES bin/noah DESTINATION bin)
+install(TARGETS noah DESTINATION libexec)
