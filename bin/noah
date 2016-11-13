@@ -5,6 +5,7 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename;
+use File::stat;
 use Cwd;
 
 our $VERSION = "0.3.0";
@@ -33,13 +34,24 @@ if (! -d $noahdir) {
 if (! defined $root) {
   $root = "$noahdir/tree";
   if (! -d $root) {
-    my $ans = prompt("Noah is installing the initial filesystem into ~/.noah/tree. Proceed? [Y/n]");
-    ($ans eq '' or $ans eq 'y' or $ans eq 'Y') or exit 1;
+    prompt_yn("Noah is installing the initial filesystem into ~/.noah/tree. Proceed? [Y/n]") or exit 1;
     system "sudo noahstrap -p archlinux $root";
   }
 }
 
 my $noah = "${prefix}/libexec/noah";
+
+if ($> != 0) {
+  my $st = stat $noah;
+  if ($st->uid != 0 || $st->mode & 04000 == 0) {
+    if (prompt_yn("Allow noah to run as root by default? [Y/n]")) {
+      system "sudo chown root:admin $noah";
+      system "sudo chmod u+s $noah";
+    } else {
+      print "* Running noah as normal user... This may cause unstable behavior of sudo executed from inside noah.\n";
+    }
+  }
+}
 
 my $init = "/bin/bash -i";
 if (@ARGV != 0) {
@@ -47,6 +59,12 @@ if (@ARGV != 0) {
 }
 
 system "${noah} -m $root $init";
+
+sub prompt_yn {
+  my ($query) = @_;
+  my $ans = prompt($query);
+  return ($ans eq '' or $ans eq 'y' or $ans eq 'Y');
+}
 
 sub prompt {
   my ($query) = @_; # take a prompt string as argument
