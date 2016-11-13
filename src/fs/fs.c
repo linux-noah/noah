@@ -296,6 +296,60 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   return r;
 }
 
+struct fs {
+  struct fs_operations *ops;
+};
+
+struct fs_operations {
+  int (*symlink)(struct fs *fs, const char *target, const char *name);
+};
+
+int
+darwinfs_symlink(struct fs *fs, const char *target, const char *name)
+{
+  return syswrap(symlink(target, name));
+}
+
+#define LOOKUP_FOLLOW     0x0001
+/* #define LOOKUP_DIRECTORY  0x0002 */
+/* #define LOOKUP_CONTINUE   0x0004 */
+/* #define LOOKUP_AUTOMOUNT  0x0008 */
+/* #define LOOKUP_PARENT     0x0010 */
+/* #define LOOKUP_REVAL      0x0020 */
+
+int
+resolve_path(const char *path, int flags, struct fs **fs, const char **subpath)
+{
+  static struct fs_operations ops = {
+    .symlink = darwinfs_symlink,
+  };
+
+  static struct fs darwinfs = {
+    .ops = &ops,
+  };
+
+  *fs = &darwinfs;
+  *subpath = path;
+  return 0;
+}
+
+DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
+{
+  char path1[LINUX_PATH_MAX], path2[LINUX_PATH_MAX];
+
+  strncpy_from_user(path1, path1_ptr, sizeof path1);
+  strncpy_from_user(path2, path2_ptr, sizeof path2);
+
+  struct fs *fs;
+  const char *subpath;
+
+  int r = resolve_path(path2, LOOKUP_FOLLOW, &fs, &subpath);
+  if (r < 0) {
+    return r;
+  }
+  return fs->ops->symlink(fs, path1, subpath);
+}
+
 char*
 to_host_path(const char *path)
 {
@@ -520,18 +574,6 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
     dst[i].iov_len = src[i].iov_len;
   }
   return syswrap(writev(fd, dst, iovcnt));
-}
-
-DEFINE_SYSCALL(symlink, gstr_t, path1, gstr_t, path2)
-{
-  char *host_path1 = to_host_path(guest_to_host(path1));
-  char *host_path2 = to_host_path(guest_to_host(path2));
-
-  int ret = syswrap(symlink(host_path1, host_path2));
-
-  free(host_path1);
-  free(host_path2);
-  return ret;
 }
 
 DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
