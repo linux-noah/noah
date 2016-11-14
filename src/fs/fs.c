@@ -309,6 +309,8 @@ struct fs_operations {
   int (*symlinkat)(struct fs *fs, const char *target, struct dir *dir, const char *name);
   int (*faccessat)(struct fs *fs, struct dir *dir, const char *path, int mode);
   int (*renameat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to);
+  int (*linkat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to, int flags);
+  int (*unlinkat)(struct fs *fs, struct dir *dir, const char *path, int flags);
 };
 
 int
@@ -336,6 +338,25 @@ darwinfs_renameat(struct fs *fs, struct dir *dir1, const char *from, struct dir 
   return syswrap(renameat(dir1->fd, from, dir2->fd, to));
 }
 
+int
+darwinfs_linkat(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to, int l_flags)
+{
+  int flags = linux_to_darwin_at_flags(l_flags);
+  return syswrap(linkat(dir1->fd, from, dir2->fd, to, flags));
+}
+
+int
+darwinfs_unlinkat(struct fs *fs, struct dir *dir, const char *path, int l_flags)
+{
+  int flags = linux_to_darwin_at_flags(l_flags);
+  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
+  if (l_flags & LINUX_AT_EACCESS) {
+    flags &= ~AT_EACCESS;
+    flags |= AT_REMOVEDIR;
+  }
+  return syswrap(unlinkat(dir->fd, path, flags));
+}
+
 #define LOOKUP_FOLLOW     0x0001
 /* #define LOOKUP_DIRECTORY  0x0002 */
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -351,6 +372,8 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     darwinfs_symlinkat,
     darwinfs_faccessat,
     darwinfs_renameat,
+    darwinfs_linkat,
+    darwinfs_unlinkat,
   };
 
   static struct fs darwinfs = {
@@ -539,6 +562,60 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath_ptr, gstr_t, newpath_ptr)
   return sys_renameat(LINUX_AT_FDCWD, oldpath_ptr, LINUX_AT_FDCWD, newpath_ptr);
 }
 
+DEFINE_SYSCALL(unlinkat, int, dirfd, gstr_t, path_ptr, int, flags)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+
+  int r;
+  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+    return r;
+  }
+  r = fs->ops->unlinkat(fs, dir, subpath, flags);
+  vfs_ungrab_dir(dir);
+  return r;
+}
+
+DEFINE_SYSCALL(unlink, gstr_t, path)
+{
+  return sys_unlinkat(LINUX_AT_FDCWD, path, 0);
+}
+
+DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newpath_ptr, int, flags)
+{
+  char oldpath[LINUX_PATH_MAX], newpath[LINUX_PATH_MAX];
+
+  strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
+  strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
+
+  struct fs *fs;
+  struct dir *olddir, *newdir;
+  char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
+
+  int r;
+  if ((r = vfs_grab_dir(oldfd, oldpath, LOOKUP_FOLLOW, &fs, &olddir, oldsubpath)) < 0) {
+    goto out1;
+  }
+  if ((r = vfs_grab_dir(newfd, newpath, LOOKUP_FOLLOW, &fs, &newdir, newsubpath)) < 0) {
+    goto out2;
+  }
+  r = fs->ops->linkat(fs, olddir, oldsubpath, newdir, newsubpath, flags);
+  vfs_ungrab_dir(newdir);
+ out2:
+  vfs_ungrab_dir(olddir);
+ out1:
+  return r;
+}
+
+DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
+{
+  return sys_linkat(LINUX_AT_FDCWD, oldpath, LINUX_AT_FDCWD, newpath, 0);
+}
+
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
   return syswrap(pipe(guest_to_host(fildes_ptr)));
@@ -671,44 +748,6 @@ DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
 
   free(host_path);
   return ret;
-}
-
-DEFINE_SYSCALL(unlinkat, int, fd, gstr_t, path, int, flags)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int dflags = linux_to_darwin_at_flags(flags);
-  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
-  if (flags & LINUX_AT_EACCESS) {
-    dflags &= ~AT_EACCESS;
-    dflags |= AT_REMOVEDIR;
-  }
-  int ret = syswrap(unlinkat(fd, host_path, dflags));
-
-  free(host_path);
-  return ret;
-}
-
-DEFINE_SYSCALL(unlink, gstr_t, path)
-{
-  return sys_unlinkat(LINUX_AT_FDCWD, path, 0);
-}
-
-DEFINE_SYSCALL(linkat, int, olddirfd, gstr_t, oldpath, int, newdirfd, gstr_t, newpath, int, flags)
-{
-  char *host_oldpath = to_host_path(guest_to_host(oldpath));
-  char *host_newpath = to_host_path(guest_to_host(newpath));
-  int dflags = linux_to_darwin_at_flags(flags);
-
-  int ret = syswrap(linkat(olddirfd, host_oldpath, newdirfd, host_newpath, dflags));
-
-  free(host_oldpath);
-  free(host_newpath);
-  return ret;
-}
-
-DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
-{
-  return sys_linkat(LINUX_AT_FDCWD, oldpath, LINUX_AT_FDCWD, newpath, 0);
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
