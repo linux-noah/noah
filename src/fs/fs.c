@@ -452,8 +452,8 @@ darwinfs_mkdir(struct fs *fs, struct dir *dir, const char *path, int mode)
   return syswrap(mkdirat(dir->fd, path, mode));
 }
 
-#define LOOKUP_FOLLOW     0x0001
-/* #define LOOKUP_DIRECTORY  0x0002 */
+#define LOOKUP_NOFOLLOW   0x0001
+#define LOOKUP_DIRECTORY  0x0002
 /* #define LOOKUP_CONTINUE   0x0004 */
 /* #define LOOKUP_AUTOMOUNT  0x0008 */
 /* #define LOOKUP_PARENT     0x0010 */
@@ -477,7 +477,7 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     .ops = &ops,
   };
 
-  if (flags & ~(LOOKUP_FOLLOW)) {
+  if (flags & ~(LOOKUP_NOFOLLOW | LOOKUP_DIRECTORY)) {
     return -LINUX_EINVAL;
   }
 
@@ -509,7 +509,15 @@ do_openat(int dirfd, const char *path, int flags, int mode)
   struct dir *dir;
   char subpath[LINUX_PATH_MAX];
 
-  int r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath);
+  int lkflag = 0;
+  if (flags & LINUX_O_NOFOLLOW) {
+    lkflag |= LOOKUP_NOFOLLOW;
+  }
+  if (flags & LINUX_O_DIRECTORY) {
+    lkflag |= LOOKUP_DIRECTORY;
+  }
+
+  int r = vfs_grab_dir(dirfd, path, lkflag, &fs, &dir, subpath);
   if (r < 0) {
     return r;
   }
@@ -547,7 +555,7 @@ DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
   struct dir *dir;
   char subpath[LINUX_PATH_MAX];
 
-  int r = vfs_grab_dir(dirfd, path2, LOOKUP_FOLLOW, &fs, &dir, subpath);
+  int r = vfs_grab_dir(dirfd, path2, 0, &fs, &dir, subpath);
   if (r < 0) {
     return r;
   }
@@ -569,7 +577,7 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, f
     return -LINUX_EINVAL;
   }
   int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
-  int fd = do_openat(dirfd, path, oflags, 0); /* TODO: ask for the fs directly */
+  int fd = do_openat(dirfd, path, oflags, 0);
   if (fd < 0)
     return fd;
   int r = sys_fstat(fd, st_ptr);
@@ -595,7 +603,7 @@ DEFINE_SYSCALL(fchownat, int, dirfd, gstr_t, path_ptr, l_uid_t, user, l_gid_t, g
     return -LINUX_EINVAL;
   }
   int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
-  int fd = do_openat(dirfd, path, oflags, 0); /* TODO: ask for the fs directly */
+  int fd = do_openat(dirfd, path, oflags, 0);
   if (fd < 0)
     return fd;
   int r = sys_fchown(fd, user, group);
@@ -617,7 +625,7 @@ DEFINE_SYSCALL(fchmodat, int, dirfd, gstr_t, path_ptr, l_mode_t, mode)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(dirfd, path, 0, 0); /* TODO: ask for the fs directly */
+  int fd = do_openat(dirfd, path, 0, 0);
   if (fd < 0)
     return fd;
   int r = sys_fchmod(fd, mode);
@@ -634,7 +642,7 @@ DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(LINUX_AT_FDCWD, path, 0, 0); /* TODO: ask for the fs directly */
+  int fd = do_openat(LINUX_AT_FDCWD, path, 0, 0);
   if (fd < 0)
     return fd;
   int r = sys_fstatfs(fd, buf_ptr);
@@ -661,7 +669,7 @@ do_faccessat(int dirfd, const char *path, int mode)
   struct dir *dir;
   char subpath[LINUX_PATH_MAX];
 
-  int r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath);
+  int r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath);
   if (r < 0) {
     return r;
   }
@@ -699,10 +707,10 @@ DEFINE_SYSCALL(renameat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, ne
   char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
 
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, LOOKUP_FOLLOW, &fs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldpath, 0, &fs, &olddir, oldsubpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, LOOKUP_FOLLOW, &fs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newpath, 0, &fs, &newdir, newsubpath)) < 0) {
     goto out2;
   }
   r = fs->ops->renameat(fs, olddir, oldsubpath, newdir, newsubpath);
@@ -728,7 +736,7 @@ DEFINE_SYSCALL(unlinkat, int, dirfd, gstr_t, path_ptr, int, flags)
   char subpath[LINUX_PATH_MAX];
 
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
     return r;
   }
   r = fs->ops->unlinkat(fs, dir, subpath, flags);
@@ -757,11 +765,20 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
   struct dir *olddir, *newdir;
   char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
 
+  if (flags & ~(LINUX_AT_EMPTY_PATH | LINUX_AT_SYMLINK_FOLLOW)) {
+    return -LINUX_EINVAL;
+  }
+  if (flags & LINUX_AT_EMPTY_PATH) {
+    return -LINUX_EINVAL;       /* TODO: not yet supported */
+  }
+
+  int lkflag = flags & LINUX_AT_SYMLINK_FOLLOW ? 0 : LOOKUP_NOFOLLOW;
+
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, LOOKUP_FOLLOW, &fs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldpath, lkflag, &fs, &olddir, oldsubpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, LOOKUP_FOLLOW, &fs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newpath, 0, &fs, &newdir, newsubpath)) < 0) {
     goto out2;
   }
   r = fs->ops->linkat(fs, olddir, oldsubpath, newdir, newsubpath, flags);
@@ -787,7 +804,7 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
   char subpath[LINUX_PATH_MAX];
 
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
     return r;
   }
   char buf[bufsize];
@@ -812,7 +829,7 @@ DEFINE_SYSCALL(mkdirat, int, dirfd, gstr_t, path_ptr, int, mode)
   char subpath[LINUX_PATH_MAX];
 
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
     return r;
   }
   r = fs->ops->mkdir(fs, dir, subpath, mode);
