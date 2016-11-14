@@ -269,7 +269,7 @@
   SYSCALL(265, linkat)                          \
   SYSCALL(266, symlinkat)                       \
   SYSCALL(267, readlinkat)                      \
-  SYSCALL(268, unimplemented)                   \
+  SYSCALL(268, fchmodat)                        \
   SYSCALL(269, faccessat)                       \
   SYSCALL(270, pselect6)                        \
   SYSCALL(271, unimplemented)                   \
