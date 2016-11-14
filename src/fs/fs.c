@@ -308,6 +308,7 @@ struct fs_operations {
   int (*openat)(struct fs *fs, struct dir *dir, const char *path, int flags, int mode); /* TODO: return struct file * instaed of file descripter */
   int (*symlinkat)(struct fs *fs, const char *target, struct dir *dir, const char *name);
   int (*faccessat)(struct fs *fs, struct dir *dir, const char *path, int mode);
+  int (*renameat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to);
 };
 
 int
@@ -329,6 +330,12 @@ darwinfs_faccessat(struct fs *fs, struct dir *dir, const char *path, int mode)
   return syswrap(faccessat(dir->fd, path, mode, 0));
 }
 
+int
+darwinfs_renameat(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to)
+{
+  return syswrap(renameat(dir1->fd, from, dir2->fd, to));
+}
+
 #define LOOKUP_FOLLOW     0x0001
 /* #define LOOKUP_DIRECTORY  0x0002 */
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -343,6 +350,7 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     darwinfs_openat,
     darwinfs_symlinkat,
     darwinfs_faccessat,
+    darwinfs_renameat,
   };
 
   static struct fs darwinfs = {
@@ -500,6 +508,37 @@ DEFINE_SYSCALL(access, gstr_t, path_ptr, int, mode)
   return sys_faccessat(LINUX_AT_FDCWD, path_ptr, mode);
 }
 
+DEFINE_SYSCALL(renameat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newpath_ptr)
+{
+  char oldpath[LINUX_PATH_MAX], newpath[LINUX_PATH_MAX];
+
+  strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
+  strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
+
+  struct fs *fs;
+  struct dir *olddir, *newdir;
+  char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
+
+  int r;
+  if ((r = vfs_grab_dir(oldfd, oldpath, LOOKUP_FOLLOW, &fs, &olddir, oldsubpath)) < 0) {
+    goto out1;
+  }
+  if ((r = vfs_grab_dir(newfd, newpath, LOOKUP_FOLLOW, &fs, &newdir, newsubpath)) < 0) {
+    goto out2;
+  }
+  r = fs->ops->renameat(fs, olddir, oldsubpath, newdir, newsubpath);
+  vfs_ungrab_dir(newdir);
+ out2:
+  vfs_ungrab_dir(olddir);
+ out1:
+  return r;
+}
+
+DEFINE_SYSCALL(rename, gstr_t, oldpath_ptr, gstr_t, newpath_ptr)
+{
+  return sys_renameat(LINUX_AT_FDCWD, oldpath_ptr, LINUX_AT_FDCWD, newpath_ptr);
+}
+
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
   return syswrap(pipe(guest_to_host(fildes_ptr)));
@@ -590,18 +629,6 @@ DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
   } else {
     return buf;
   }
-}
-
-DEFINE_SYSCALL(rename, gstr_t, oldpath, gstr_t, newpath)
-{
-  char *host_oldpath = to_host_path(guest_to_host(oldpath));
-  char *host_newpath = to_host_path(guest_to_host(newpath));
-
-  int ret = syswrap(rename(host_oldpath, host_newpath));
-  
-  free(host_oldpath);
-  free(host_newpath);
-  return ret;
 }
 
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf, size_t, count, off_t, pos)

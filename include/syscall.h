@@ -265,7 +265,7 @@
   SYSCALL(261, unimplemented)                   \
   SYSCALL(262, newfstatat)                      \
   SYSCALL(263, unlinkat)                        \
-  SYSCALL(264, unimplemented)                   \
+  SYSCALL(264, renameat)                        \
   SYSCALL(265, linkat)                          \
   SYSCALL(266, symlinkat)                       \
   SYSCALL(267, unimplemented)                   \
