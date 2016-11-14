@@ -447,6 +447,18 @@ DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
   return sys_newfstatat(LINUX_AT_FDCWD, path, st, LINUX_AT_SYMLINK_NOFOLLOW);
 }
 
+char*
+to_host_path(const char *path)
+{
+  if (path[0] == '/') {
+    int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
+    char *mnt_path = malloc(len + 1);
+    snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
+    return mnt_path;
+  }
+  return strdup(path);
+}
+
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode)
 {
   char *host_path = to_host_path(l_path);
