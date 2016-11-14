@@ -650,18 +650,6 @@ DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
   return r;
 }
 
-char*
-to_host_path(const char *path)
-{
-  if (path[0] == '/') {
-    int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
-    char *mnt_path = malloc(len + 1);
-    snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
-    return mnt_path;
-  }
-  return strdup(path);
-}
-
 int
 do_faccessat(int dirfd, const char *path, int mode)
 {
@@ -1041,10 +1029,10 @@ DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
   return syswrap(poll(guest_to_host(fds), nfds, timeout));
 }
 
-DEFINE_SYSCALL(chroot, gstr_t, path)
+DEFINE_SYSCALL(chroot, gstr_t, path_ptr)
 {
-  char l_path[PATH_MAX];
-  int len = strncpy_from_user(l_path, path, PATH_MAX);
+  char path[PATH_MAX];
+  int len = strncpy_from_user(path, path_ptr, sizeof path);
   if (len == PATH_MAX) {
     return -LINUX_ENAMETOOLONG;
   }
@@ -1057,15 +1045,9 @@ DEFINE_SYSCALL(chroot, gstr_t, path)
     return -LINUX_EPERM;
   }
 
-  char *host_path = to_host_path(l_path);
-
-  int error = syswrap(access(host_path, X_OK | R_OK));
-  if (error < 0) {
-    free(host_path);
-    return error;
+  /* for pacman */
+  if (! (path[0] == '/' && path[1] == '\0')) {
+    return -LINUX_EACCES;
   }
-
-  free(proc.root);
-  proc.root = host_path;
   return 0;
 }
