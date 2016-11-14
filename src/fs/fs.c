@@ -330,6 +330,7 @@ struct fs_operations {
   int (*linkat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to, int flags);
   int (*unlinkat)(struct fs *fs, struct dir *dir, const char *path, int flags);
   int (*readlinkat)(struct fs *fs, struct dir *dir, const char *path, char *buf, int bufsize);
+  int (*mkdir)(struct fs *fs, struct dir *dir, const char *path, int mode);
 };
 
 int
@@ -382,6 +383,12 @@ darwinfs_readlinkat(struct fs *fs, struct dir *dir, const char *path, char *buf,
   return syswrap(readlinkat(dir->fd, path, buf, bufsize));
 }
 
+int
+darwinfs_mkdir(struct fs *fs, struct dir *dir, const char *path, int mode)
+{
+  return syswrap(mkdirat(dir->fd, path, mode));
+}
+
 #define LOOKUP_FOLLOW     0x0001
 /* #define LOOKUP_DIRECTORY  0x0002 */
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -400,6 +407,7 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     darwinfs_linkat,
     darwinfs_unlinkat,
     darwinfs_readlinkat,
+    darwinfs_mkdir,
   };
 
   static struct fs darwinfs = {
@@ -667,6 +675,29 @@ DEFINE_SYSCALL(readlink, gstr_t, path_ptr, gaddr_t, buf_ptr, int, bufsize)
   return sys_readlinkat(LINUX_AT_FDCWD, path_ptr, buf_ptr, bufsize);
 }
 
+DEFINE_SYSCALL(mkdirat, int, dirfd, gstr_t, path_ptr, int, mode)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+
+  int r;
+  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+    return r;
+  }
+  r = fs->ops->mkdir(fs, dir, subpath, mode);
+  vfs_ungrab_dir(dir);
+  return r;
+}
+
+DEFINE_SYSCALL(mkdir, gstr_t, path_ptr, int, mode)
+{
+  return sys_mkdirat(LINUX_AT_FDCWD, path_ptr, mode);
+}
+
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
   return syswrap(pipe(guest_to_host(fildes_ptr)));
@@ -865,14 +896,6 @@ DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
   char *host_path = to_host_path(guest_to_host(path));
   int ret = syswrap(lchown(guest_to_host(path), uid, gid));
 
-  free(host_path);
-  return ret;
-}
-
-DEFINE_SYSCALL(mkdir, gstr_t, path, int, mode)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(mkdir(host_path, mode));
   free(host_path);
   return ret;
 }

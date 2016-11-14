@@ -259,7 +259,7 @@
   SYSCALL(255, unimplemented)                   \
   SYSCALL(256, unimplemented)                   \
   SYSCALL(257, openat)                          \
-  SYSCALL(258, unimplemented)                   \
+  SYSCALL(258, mkdirat)                         \
   SYSCALL(259, unimplemented)                   \
   SYSCALL(260, unimplemented)                   \
   SYSCALL(261, unimplemented)                   \
