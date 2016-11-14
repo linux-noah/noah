@@ -268,7 +268,7 @@
   SYSCALL(264, renameat)                        \
   SYSCALL(265, linkat)                          \
   SYSCALL(266, symlinkat)                       \
-  SYSCALL(267, unimplemented)                   \
+  SYSCALL(267, readlinkat)                      \
   SYSCALL(268, unimplemented)                   \
   SYSCALL(269, faccessat)                       \
   SYSCALL(270, pselect6)                        \

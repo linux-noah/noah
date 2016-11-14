@@ -329,6 +329,7 @@ struct fs_operations {
   int (*renameat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to);
   int (*linkat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to, int flags);
   int (*unlinkat)(struct fs *fs, struct dir *dir, const char *path, int flags);
+  int (*readlinkat)(struct fs *fs, struct dir *dir, const char *path, char *buf, int bufsize);
 };
 
 int
@@ -375,6 +376,12 @@ darwinfs_unlinkat(struct fs *fs, struct dir *dir, const char *path, int l_flags)
   return syswrap(unlinkat(dir->fd, path, flags));
 }
 
+int
+darwinfs_readlinkat(struct fs *fs, struct dir *dir, const char *path, char *buf, int bufsize)
+{
+  return syswrap(readlinkat(dir->fd, path, buf, bufsize));
+}
+
 #define LOOKUP_FOLLOW     0x0001
 /* #define LOOKUP_DIRECTORY  0x0002 */
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -392,6 +399,7 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     darwinfs_renameat,
     darwinfs_linkat,
     darwinfs_unlinkat,
+    darwinfs_readlinkat,
   };
 
   static struct fs darwinfs = {
@@ -634,6 +642,31 @@ DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
   return sys_linkat(LINUX_AT_FDCWD, oldpath, LINUX_AT_FDCWD, newpath, 0);
 }
 
+DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, bufsize)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+
+  int r;
+  if ((r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath)) < 0) {
+    return r;
+  }
+  char buf[bufsize];
+  r = fs->ops->readlinkat(fs, dir, subpath, buf, bufsize);
+  vfs_ungrab_dir(dir);
+  copy_to_user(buf_ptr, buf, bufsize);
+  return r;
+}
+
+DEFINE_SYSCALL(readlink, gstr_t, path_ptr, gaddr_t, buf_ptr, int, bufsize)
+{
+  return sys_readlinkat(LINUX_AT_FDCWD, path_ptr, buf_ptr, bufsize);
+}
+
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
   return syswrap(pipe(guest_to_host(fildes_ptr)));
@@ -752,15 +785,6 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
     dst[i].iov_len = src[i].iov_len;
   }
   return syswrap(writev(fd, dst, iovcnt));
-}
-
-DEFINE_SYSCALL(readlink, gstr_t, path, gaddr_t, buf, int, bufsize)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(readlink(host_path, guest_to_host(buf), bufsize));
-
-  free(host_path);
-  return ret;
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
