@@ -702,6 +702,11 @@ DEFINE_SYSCALL(unlink, gstr_t, path)
   return sys_unlinkat(LINUX_AT_FDCWD, path, 0);
 }
 
+DEFINE_SYSCALL(rmdir, gstr_t, path)
+{
+  return sys_unlinkat(LINUX_AT_FDCWD, path, LINUX_AT_REMOVEDIR);
+}
+
 DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newpath_ptr, int, flags)
 {
   char oldpath[LINUX_PATH_MAX], newpath[LINUX_PATH_MAX];
@@ -944,15 +949,6 @@ DEFINE_SYSCALL(chdir, gstr_t, path)
 DEFINE_SYSCALL(fchdir, int, fd)
 {
   return syswrap(fchdir(fd));
-}
-
-DEFINE_SYSCALL(rmdir, gstr_t, path)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(rmdir(host_path));
-
-  free(host_path);
-  return ret;
 }
 
 DEFINE_SYSCALL(umask, int, mask)
