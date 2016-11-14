@@ -30,7 +30,7 @@ add_executable(noah
   )
 target_link_libraries(noah pthread "-framework Hypervisor")
 
-install(FILES bin/noah DESTINATION bin)
+install(PROGRAMS bin/noah DESTINATION bin)
 install(TARGETS noah DESTINATION libexec)
 
 enable_testing()
