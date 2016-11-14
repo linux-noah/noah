@@ -1,6 +1,7 @@
 *.o
 *.dylib
 *.dSYM/
+build/
 libexec/noah
 !mnt/**/*.o
 GPATH
