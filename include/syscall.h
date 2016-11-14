@@ -139,7 +139,7 @@
   SYSCALL(135, unimplemented)                   \
   SYSCALL(136, unimplemented)                   \
   SYSCALL(137, statfs)                          \
-  SYSCALL(138, unimplemented)                   \
+  SYSCALL(138, fstatfs)                         \
   SYSCALL(139, unimplemented)                   \
   SYSCALL(140, unimplemented)                   \
   SYSCALL(141, unimplemented)                   \

@@ -76,6 +76,7 @@ struct file_operations {
   int (*lseek)(struct file *f, l_off_t offset, int whence);
   int (*getdents)(struct file *f, char *buf, uint count);
   int (*fcntl)(struct file *f, unsigned int cmd, unsigned long arg);
+  int (*fstatfs)(struct file *f, struct l_statfs *buf);
 };
 
 int
@@ -190,6 +191,17 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
   return syswrap(fcntl(file->fd, cmd, arg));
 }
 
+int
+darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
+{
+  struct statfs st;
+  int r = syswrap(fstatfs(file->fd, &st));
+  if (r >= 0) {
+    statfs_darwin_to_linux(&st, buf);
+  }
+  return r;
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -204,6 +216,7 @@ vfs_acquire(int fd)
     darwinfs_lseek,
     darwinfs_getdents,
     darwinfs_fcntl,
+    darwinfs_fstatfs,
   };
 
   struct file *file;
@@ -348,6 +361,20 @@ DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
   int r = file->ops->fcntl(file, cmd, arg);
   vfs_release(file);
   return r;
+}
+
+DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  struct l_statfs st;
+  int n = file->ops->fstatfs(file, &st);
+  if (n >= 0) {
+    copy_to_user(buf_ptr, &st, sizeof st);
+  }
+  vfs_release(file);
+  return n;
 }
 
 struct dir {
@@ -601,6 +628,18 @@ DEFINE_SYSCALL(fchmodat, int, dirfd, gstr_t, path_ptr, l_mode_t, mode)
 DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 {
   return sys_fchmodat(LINUX_AT_FDCWD, path, mode);
+}
+
+DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  int fd = do_openat(LINUX_AT_FDCWD, path, 0, 0); /* TODO: ask for the fs directly */
+  if (fd < 0)
+    return fd;
+  int r = sys_fstatfs(fd, buf_ptr);
+  sys_close(fd);
+  return r;
 }
 
 char*
@@ -954,18 +993,6 @@ DEFINE_SYSCALL(fchdir, int, fd)
 DEFINE_SYSCALL(umask, int, mask)
 {
   return syswrap(umask(mask));
-}
-
-DEFINE_SYSCALL(statfs, gstr_t, path, gaddr_t, buf)
-{
-  struct statfs h_buf;
-  char *host_path = to_host_path(guest_to_host(path));
-
-  int ret = syswrap(statfs(host_path, &h_buf));
-  statfs_darwin_to_linux(&h_buf, guest_to_host(buf));
-
-  free(host_path);
-  return ret;
 }
 
 DEFINE_SYSCALL(chroot, gstr_t, path)
