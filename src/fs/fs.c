@@ -307,6 +307,7 @@ struct fs {
 struct fs_operations {
   int (*openat)(struct fs *fs, struct dir *dir, const char *path, int flags, int mode); /* TODO: return struct file * instaed of file descripter */
   int (*symlinkat)(struct fs *fs, const char *target, struct dir *dir, const char *name);
+  int (*faccessat)(struct fs *fs, struct dir *dir, const char *path, int mode);
 };
 
 int
@@ -322,6 +323,12 @@ darwinfs_symlinkat(struct fs *fs, const char *target, struct dir *dir, const cha
   return syswrap(symlinkat(target, dir->fd, name));
 }
 
+int
+darwinfs_faccessat(struct fs *fs, struct dir *dir, const char *path, int mode)
+{
+  return syswrap(faccessat(dir->fd, path, mode, 0));
+}
+
 #define LOOKUP_FOLLOW     0x0001
 /* #define LOOKUP_DIRECTORY  0x0002 */
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -335,6 +342,7 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
   static struct fs_operations ops = {
     .openat = darwinfs_openat,
     .symlinkat = darwinfs_symlinkat,
+    .faccessat = darwinfs_faccessat,
   };
 
   static struct fs darwinfs = {
@@ -459,33 +467,37 @@ to_host_path(const char *path)
   return strdup(path);
 }
 
-int do_faccessat(int l_dirfd, const char *l_path, int l_mode)
+int
+do_faccessat(int dirfd, const char *path, int mode)
 {
-  char *host_path = to_host_path(l_path);
-  if (l_dirfd == LINUX_AT_FDCWD) {
-    l_dirfd = AT_FDCWD;
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+
+  int r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath);
+  if (r < 0) {
+    return r;
   }
-
-  int ret = syswrap(faccessat(l_dirfd, host_path, l_mode, 0));
-  free(host_path);
-
-  return ret;
+  r = fs->ops->faccessat(fs, dir, subpath, mode);
+  vfs_ungrab_dir(dir);
+  return r;
 }
 
-int do_access(const char *path, int l_mode)
+int do_access(const char *path, int mode)
 {
-  return do_faccessat(LINUX_AT_FDCWD, path, l_mode);
+  return do_faccessat(LINUX_AT_FDCWD, path, mode);
 }
 
-DEFINE_SYSCALL(access, gstr_t, path, int, mode)
+DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path_ptr, int, mode)
 {
-  return do_access(guest_to_host(path), mode);
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  return do_faccessat(dirfd, path, mode);
 }
 
-// Linux implementation of faccessat actually does not have "flags"
-DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path, int, mode)
+DEFINE_SYSCALL(access, gstr_t, path_ptr, int, mode)
 {
-  return do_faccessat(dirfd, guest_to_host(path), mode);
+  return sys_faccessat(LINUX_AT_FDCWD, path_ptr, mode);
 }
 
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
