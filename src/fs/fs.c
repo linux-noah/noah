@@ -73,6 +73,7 @@ struct file_operations {
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
   int (*lseek)(struct file *f, l_off_t offset, int whence);
   int (*getdents)(struct file *f, char *buf, uint count);
+  int (*fcntl)(struct file *f, unsigned int cmd, unsigned long arg);
 };
 
 int
@@ -169,6 +170,12 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
   return l_bpos;
 }
 
+int
+darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+  return syswrap(fcntl(file->fd, cmd, arg));
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -180,6 +187,7 @@ vfs_acquire(int fd)
     darwinfs_ioctl,
     darwinfs_lseek,
     darwinfs_getdents,
+    darwinfs_fcntl,
   };
 
   struct file *file;
@@ -293,6 +301,16 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   int r = file->ops->getdents(file, buf, count);
   vfs_release(file);
   copy_to_user(dirent_ptr, buf, count);
+  return r;
+}
+
+DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r = file->ops->fcntl(file, cmd, arg);
+  vfs_release(file);
   return r;
 }
 
@@ -717,11 +735,6 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
 {
   printk("getxattr is unimplemented\n");
   return -LINUX_ENOTSUP;
-}
-
-DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
-{
-  return syswrap(fcntl(fd, cmd, arg));
 }
 
 struct l_iovec {
