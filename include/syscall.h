@@ -261,7 +261,7 @@
   SYSCALL(257, openat)                          \
   SYSCALL(258, mkdirat)                         \
   SYSCALL(259, unimplemented)                   \
-  SYSCALL(260, unimplemented)                   \
+  SYSCALL(260, fchownat)                        \
   SYSCALL(261, unimplemented)                   \
   SYSCALL(262, newfstatat)                      \
   SYSCALL(263, unlinkat)                        \

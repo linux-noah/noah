@@ -70,6 +70,7 @@ struct file_operations {
   int (*read)(struct file *f, char *buf, size_t size);
   int (*close)(struct file *f);
   int (*stat)(struct file *f, struct l_newstat *stat);
+  int (*fchown)(struct file *f, l_uid_t uid, l_gid_t gid);
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
   int (*lseek)(struct file *f, l_off_t offset, int whence);
   int (*getdents)(struct file *f, char *buf, uint count);
@@ -104,6 +105,12 @@ darwinfs_stat(struct file *file, struct l_newstat *l_st)
   }
   stat_darwin_to_linux(&st, l_st);
   return ret;
+}
+
+int
+darwinfs_fchown(struct file *file, l_uid_t uid, l_gid_t gid)
+{
+  return syswrap(fchown(file->fd, uid, gid));
 }
 
 int
@@ -184,6 +191,7 @@ vfs_acquire(int fd)
     darwinfs_read,
     darwinfs_close,
     darwinfs_stat,
+    darwinfs_fchown,
     darwinfs_ioctl,
     darwinfs_lseek,
     darwinfs_getdents,
@@ -262,6 +270,16 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
   if (n >= 0) {
     copy_to_user(st_ptr, &st, sizeof st);
   }
+  vfs_release(file);
+  return n;
+}
+
+DEFINE_SYSCALL(fchown, int, fd, l_uid_t, uid, l_gid_t, gid)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int n = file->ops->fchown(file, uid, gid);
   vfs_release(file);
   return n;
 }
@@ -522,6 +540,32 @@ DEFINE_SYSCALL(stat, gstr_t, path, gaddr_t, st)
 DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
 {
   return sys_newfstatat(LINUX_AT_FDCWD, path, st, LINUX_AT_SYMLINK_NOFOLLOW);
+}
+
+DEFINE_SYSCALL(fchownat, int, dirfd, gstr_t, path_ptr, l_uid_t, user, l_gid_t, group, int, flags)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
+    return -LINUX_EINVAL;
+  }
+  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
+  int fd = do_openat(dirfd, path, oflags, 0); /* TODO: ask for the fs directly */
+  if (fd < 0)
+    return fd;
+  int r = sys_fchown(fd, user, group);
+  sys_close(fd);
+  return r;
+}
+
+DEFINE_SYSCALL(chown, gstr_t, path, int, uid, int, gid)
+{
+  return sys_fchownat(LINUX_AT_FDCWD, path, uid, gid, 0);
+}
+
+DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
+{
+  return sys_fchownat(LINUX_AT_FDCWD, path, uid, gid, LINUX_AT_SYMLINK_NOFOLLOW);
 }
 
 char*
@@ -879,29 +923,6 @@ DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 DEFINE_SYSCALL(fchmod, int, fd, int, mode)
 {
   return syswrap(fchmod(fd, mode));
-}
-
-DEFINE_SYSCALL(fchown, int, fildes, int, uid, int, gid)
-{
-  return syswrap(fchown(fildes, uid, gid));
-}
-
-DEFINE_SYSCALL(chown, gstr_t, path, int, uid, int, gid)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(chown(guest_to_host(path), uid, gid));
-
-  free(host_path);
-  return ret;
-}
-
-DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(lchown(guest_to_host(path), uid, gid));
-
-  free(host_path);
-  return ret;
 }
 
 DEFINE_SYSCALL(rmdir, gstr_t, path)
