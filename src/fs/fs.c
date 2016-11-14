@@ -842,6 +842,64 @@ DEFINE_SYSCALL(mkdir, gstr_t, path_ptr, int, mode)
   return sys_mkdirat(LINUX_AT_FDCWD, path_ptr, mode);
 }
 
+int
+vfs_getcwd(char *buf, size_t size)
+{
+  char *ptr = getcwd(buf, size);
+  if (! ptr) {
+    return -darwin_to_linux_errno(errno);
+  }
+  return 0;
+}
+
+int
+vfs_fchdir(int fd)
+{
+  return syswrap(fchdir(fd));
+}
+
+int
+vfs_umask(int mask)
+{
+  return syswrap(umask(mask));
+}
+
+DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
+{
+  char buf[size];
+  int r;
+  if ((r = vfs_getcwd(buf, size)) < 0) {
+    return r;
+  }
+  return buf_ptr;
+}
+
+DEFINE_SYSCALL(fchdir, int, fd)
+{
+  return vfs_fchdir(fd);
+}
+
+DEFINE_SYSCALL(chdir, gstr_t, path_ptr)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  int fd = do_openat(LINUX_AT_FDCWD, path, LINUX_O_DIRECTORY, 0);
+  if (fd < 0)
+    return fd;
+  int r = sys_fchdir(fd);
+  sys_close(fd);
+  return r;
+}
+
+DEFINE_SYSCALL(umask, int, mask)
+{
+  return vfs_umask(mask);
+}
+
+
+/* TODO: functions below are not yet ported to the new vfs archtecture. */
+
+
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
   return syswrap(pipe(guest_to_host(fildes_ptr)));
@@ -924,16 +982,6 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
   return ret;
 }
 
-DEFINE_SYSCALL(getcwd, gaddr_t, buf, unsigned long, size)
-{
-  int ret = syswrap((int)getcwd(guest_to_host(buf), size));
-  if (ret < 0) {
-    return ret;
-  } else {
-    return buf;
-  }
-}
-
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf, size_t, count, off_t, pos)
 {
   return syswrap(pread(fd, guest_to_host(buf), count, pos));
@@ -991,25 +1039,6 @@ DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t
 DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
 {
   return syswrap(poll(guest_to_host(fds), nfds, timeout));
-}
-
-DEFINE_SYSCALL(chdir, gstr_t, path)
-{
-  char *host_path = to_host_path(guest_to_host(path));
-  int ret = syswrap(chdir(host_path));
-
-  free(host_path);
-  return ret;
-}
-
-DEFINE_SYSCALL(fchdir, int, fd)
-{
-  return syswrap(fchdir(fd));
-}
-
-DEFINE_SYSCALL(umask, int, mask)
-{
-  return syswrap(umask(mask));
 }
 
 DEFINE_SYSCALL(chroot, gstr_t, path)
