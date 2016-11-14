@@ -502,7 +502,11 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, f
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(dirfd, path, 0, 0); /* TODO: ask for the fs directly */
+  if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
+    return -LINUX_EINVAL;
+  }
+  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
+  int fd = do_openat(dirfd, path, oflags, 0); /* TODO: ask for the fs directly */
   if (fd < 0)
     return fd;
   int r = sys_fstat(fd, st_ptr);
