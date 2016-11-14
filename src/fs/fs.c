@@ -343,7 +343,11 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     (* dir)->fd = dirfd;
   }
   *fs = &darwinfs;
-  *subpath = path;
+  if (path[0] == '/') {
+    sprintf(subpath, "%s/%s", proc.root, path);
+  } else {
+    strcpy(subpath, path);
+  }
   return 0;
 }
 
