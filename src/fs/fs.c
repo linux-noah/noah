@@ -322,7 +322,7 @@ darwinfs_symlinkat(struct fs *fs, const char *target, struct dir *dir, const cha
 /* #define LOOKUP_REVAL      0x0020 */
 
 int
-vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, const char **subpath)
+vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, char *subpath)
 {
   static struct fs_operations ops = {
     .symlinkat = darwinfs_symlinkat,
@@ -362,9 +362,9 @@ DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
 
   struct fs *fs;
   struct dir *dir;
-  const char *subpath;
+  char subpath[LINUX_PATH_MAX];
 
-  int r = vfs_grab_dir(dirfd, path2, LOOKUP_FOLLOW, &fs, &dir, &subpath);
+  int r = vfs_grab_dir(dirfd, path2, LOOKUP_FOLLOW, &fs, &dir, subpath);
   if (r < 0) {
     return r;
   }
