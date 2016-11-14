@@ -258,7 +258,7 @@
   SYSCALL(254, unimplemented)                   \
   SYSCALL(255, unimplemented)                   \
   SYSCALL(256, unimplemented)                   \
-  SYSCALL(257, unimplemented)                   \
+  SYSCALL(257, openat)                          \
   SYSCALL(258, unimplemented)                   \
   SYSCALL(259, unimplemented)                   \
   SYSCALL(260, unimplemented)                   \

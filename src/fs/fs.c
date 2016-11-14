@@ -305,8 +305,16 @@ struct fs {
 };
 
 struct fs_operations {
+  int (*openat)(struct fs *fs, struct dir *dir, const char *path, int flags, int mode); /* TODO: return struct file * instaed of file descripter */
   int (*symlinkat)(struct fs *fs, const char *target, struct dir *dir, const char *name);
 };
+
+int
+darwinfs_openat(struct fs *fs, struct dir *dir, const char *path, int l_flags, int mode)
+{
+  int flags = linux_to_darwin_o_flags(l_flags);
+  return syswrap(openat(dir->fd, path, flags, mode));
+}
 
 int
 darwinfs_symlinkat(struct fs *fs, const char *target, struct dir *dir, const char *name)
@@ -325,6 +333,7 @@ int
 vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, char *subpath)
 {
   static struct fs_operations ops = {
+    .openat = darwinfs_openat,
     .symlinkat = darwinfs_symlinkat,
   };
 
@@ -357,6 +366,40 @@ vfs_ungrab_dir(struct dir *dir)
   free(dir);
 }
 
+int
+do_openat(int dirfd, const char *path, int flags, int mode)
+{
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+
+  int r = vfs_grab_dir(dirfd, path, LOOKUP_FOLLOW, &fs, &dir, subpath);
+  if (r < 0) {
+    return r;
+  }
+  r = fs->ops->openat(fs, dir, subpath, flags, mode);
+  vfs_ungrab_dir(dir);
+  return r;
+}
+
+int
+do_open(const char *path, int l_flags, int mode)
+{
+  return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
+}
+
+DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)
+{
+  char path[LINUX_PATH_MAX];
+  strncpy_from_user(path, path_ptr, sizeof path);
+  return do_openat(dirfd, path, flags, mode);
+}
+
+DEFINE_SYSCALL(open, gstr_t, path_ptr, int, flags, int, mode)
+{
+  return sys_openat(LINUX_AT_FDCWD, path_ptr, flags, mode);
+}
+
 DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
 {
   char path1[LINUX_PATH_MAX], path2[LINUX_PATH_MAX];
@@ -380,44 +423,6 @@ DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
 DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
 {
   return sys_symlinkat(path1_ptr, LINUX_AT_FDCWD, path2_ptr);
-}
-
-char*
-to_host_path(const char *path)
-{
-  if (path[0] == '/') {
-    int len = snprintf(NULL, 0, "%s/%s", proc.root, path);
-    char *mnt_path = malloc(len + 1);
-    snprintf(mnt_path, len + 1, "%s/%s", proc.root, path);
-    return mnt_path;
-  }
-  return strdup(path);
-}
-
-int
-do_openat(int l_fd, const char *path, int l_flags, int mode)
-{
-  int flags = linux_to_darwin_o_flags(l_flags);
-  char *host_path = to_host_path(path);
-  if (l_fd == LINUX_AT_FDCWD) {
-    l_fd = AT_FDCWD;
-  }
-
-  int ret = syswrap(openat(l_fd, host_path, flags, mode));
-
-  free(host_path);
-  return ret;
-}
-
-int
-do_open(const char *path, int l_flags, int mode)
-{
-  return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
-}
-
-DEFINE_SYSCALL(open, gstr_t, path, int, flags, int, mode)
-{
-  return do_open(guest_to_host(path), flags, mode);
 }
 
 DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, flags)
