@@ -173,13 +173,13 @@ struct file *
 vfs_acquire(int fd)
 {
   static struct file_operations ops = {
-    .write = darwinfs_write,
-    .read = darwinfs_read,
-    .close = darwinfs_close,
-    .stat = darwinfs_stat,
-    .ioctl = darwinfs_ioctl,
-    .lseek = darwinfs_lseek,
-    .getdents = darwinfs_getdents,
+    darwinfs_write,
+    darwinfs_read,
+    darwinfs_close,
+    darwinfs_stat,
+    darwinfs_ioctl,
+    darwinfs_lseek,
+    darwinfs_getdents,
   };
 
   struct file *file;
@@ -340,9 +340,9 @@ int
 vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, char *subpath)
 {
   static struct fs_operations ops = {
-    .openat = darwinfs_openat,
-    .symlinkat = darwinfs_symlinkat,
-    .faccessat = darwinfs_faccessat,
+    darwinfs_openat,
+    darwinfs_symlinkat,
+    darwinfs_faccessat,
   };
 
   static struct fs darwinfs = {
