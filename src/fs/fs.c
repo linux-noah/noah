@@ -690,18 +690,22 @@ DEFINE_SYSCALL(renameat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, ne
   strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
   strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
 
-  struct fs *fs;
+  struct fs *oldfs, *newfs;
   struct dir *olddir, *newdir;
   char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
 
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, 0, &fs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldpath, 0, &oldfs, &olddir, oldsubpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, 0, &fs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newpath, 0, &newfs, &newdir, newsubpath)) < 0) {
     goto out2;
   }
-  r = fs->ops->renameat(fs, olddir, oldsubpath, newdir, newsubpath);
+  if (oldfs != newfs) {
+    r = -LINUX_EXDEV;
+    goto out2;
+  }
+  r = newfs->ops->renameat(newfs, olddir, oldsubpath, newdir, newsubpath);
   vfs_ungrab_dir(newdir);
  out2:
   vfs_ungrab_dir(olddir);
@@ -749,7 +753,7 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
   strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
   strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
 
-  struct fs *fs;
+  struct fs *oldfs, *newfs;
   struct dir *olddir, *newdir;
   char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
 
@@ -763,13 +767,17 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
   int lkflag = flags & LINUX_AT_SYMLINK_FOLLOW ? 0 : LOOKUP_NOFOLLOW;
 
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, lkflag, &fs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldpath, lkflag, &oldfs, &olddir, oldsubpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, 0, &fs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newpath, 0, &newfs, &newdir, newsubpath)) < 0) {
     goto out2;
   }
-  r = fs->ops->linkat(fs, olddir, oldsubpath, newdir, newsubpath, flags);
+  if (oldfs != newfs) {
+    r = -LINUX_EXDEV;
+    goto out2;
+  }
+  r = newfs->ops->linkat(newfs, olddir, oldsubpath, newdir, newsubpath, flags);
   vfs_ungrab_dir(newdir);
  out2:
   vfs_ungrab_dir(olddir);
