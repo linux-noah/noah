@@ -1,3 +1,3 @@
 add_test(NAME all
-  COMMAND make -C ${PROJECT_SOURCE_DIR}/test -f test.mk
+  COMMAND make -C ${PROJECT_SOURCE_DIR}/test -f test.mk NOAH=$<TARGET_FILE:noah>
   WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/test)

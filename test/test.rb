@@ -18,6 +18,7 @@ def main
     ARGV.shift
     @verbose = true
   end
+  @noah = ARGV.shift
   targets = ARGV.empty? ? nil : ARGV
   puts <<-"EOS"
 
@@ -46,7 +47,7 @@ def test_assertion(targets = nil)
   Dir.glob(__dir__ + "/test_assertion/build/*").each do |target|
     next if targets && !targets.include?(File.basename(target))
     puts_testname(target)
-    out, err, status = Open3.capture3("#{__dir__.shellescape}/../libexec/noah #{relative(target).shellescape}")
+    out, err, status = Open3.capture3("#{@noah} #{relative(target).shellescape}")
     
     nr_tests_match = /1->([0-9]+)/.match(out.lines[0])
     if nr_tests_match
@@ -82,7 +83,7 @@ def test_stdout(targets = nil)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
     target_arg = File.exists?(testdata_base + ".arg") ? File.read(testdata_base + ".arg") : ""
     expected = File.read(testdata_base + ".expected")
-    out, err, status = Open3.capture3("#{__dir__.shellescape}/../libexec/noah #{relative(target).shellescape} #{target_arg} < #{target_stdin}")
+    out, err, status = Open3.capture3("#{@noah} #{relative(target).shellescape} #{target_arg} < #{target_stdin}")
 
     if out == expected
       @stdout[:pass] += 1
@@ -107,7 +108,7 @@ def test_shell(targets = nil)
     puts_testname(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
-    _, err, status = Open3.capture3("NOAH=#{__dir__.shellescape}/../libexec/noah TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
+    _, err, status = Open3.capture3("NOAH=#{@noah} TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
 
     if status.success?
       @shell[:pass] += 1
