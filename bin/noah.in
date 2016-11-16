@@ -4,13 +4,10 @@ use strict;
 use warnings;
 use Getopt::Long;
 use Pod::Usage;
-use File::Basename;
 use File::stat;
 use Cwd;
 
-our $VERSION = "0.3.0";
-
-my $prefix = dirname(Cwd::abs_path($0)) . "/..";
+our $VERSION = "@PROJECT_VERSION@";
 
 my ($root);
 
@@ -39,11 +36,11 @@ if (! defined $root) {
   }
 }
 
-my $noah = "${prefix}/libexec/noah";
+my $noah = "@CMAKE_INSTALL_PREFIX@/libexec/noah";
 
 if ($> != 0) {
   my $st = stat $noah;
-  if ($st->uid != 0 || $st->mode & 04000 == 0) {
+  if ($st->uid != 0 || ($st->mode & 04000) == 0) {
     if (prompt_yn("Allow noah to run as root by default? [Y/n]")) {
       system "sudo chown root:admin $noah";
       system "sudo chmod u+s $noah";

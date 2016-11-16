@@ -2,9 +2,10 @@
 *.dylib
 *.dSYM/
 build/
-libexec/noah
 !mnt/**/*.o
 GPATH
 GRTAGS
 GTAGS
 tags
+bin/noah
+include/version.h

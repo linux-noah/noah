@@ -4,18 +4,8 @@ VERSION=$1
 
 # commit & push
 
-VERNUMS=(${VERSION//./ })
-VERSION_MAJOR=${VERNUMS[0]}
-VERSION_MINOR=${VERNUMS[1]}
-VERSION_PATCH=${VERNUMS[2]}
-
-FILE=`pwd`/`git rev-parse --show-cdup`/include/noah.h
-sed -i "" "s/\\(define NOAH_MAJOR_VERSION\\).*/\\1 \"$VERSION_MAJOR\"/" $FILE
-sed -i "" "s/\\(define NOAH_MINOR_VERSION\\).*/\\1 \"$VERSION_MINOR\"/" $FILE
-sed -i "" "s/\\(define NOAH_PATCH_VERSION\\).*/\\1 \"$VERSION_PATCH\"/" $FILE
-git add $FILE
-FILE=`pwd`/`git rev-parse --show-cdup`/bin/noah
-sed -i "" "s/our \$VERSION.*/our \$VERSION = \"$VERSION\";/" $FILE
+FILE=`pwd`/`git rev-parse --show-cdup`/CMakeLists.txt
+sed -i "" "s/project(noah VERSION .*)/project(noah VERSION $VERSION)/" $FILE
 git add $FILE
 
 while true; do

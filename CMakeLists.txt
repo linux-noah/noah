@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.7)
 
-project(noah C)
+project(noah VERSION 0.3.0)
+
+configure_file(bin/noah.in ${PROJECT_SOURCE_DIR}/bin/noah @ONLY)
+configure_file(include/version.h.in ${PROJECT_SOURCE_DIR}/include/version.h)
 
 set(CMAKE_C_FLAGS "-g -Wall -Wextra -Wno-unused-parameter -std=gnu11")
 set(CMAKE_C_FLAGS_DEBUG "-DDEBUG_MODE=1 -O0")
