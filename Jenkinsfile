@@ -4,7 +4,8 @@ node {
     sh "git clean -fx"
 
     stage "Build Noah"
-    sh "make libexec/noah"
+    sh "cmake ."
+    sh "make"
 
     stage "User Program Test"
     sh "make test"
