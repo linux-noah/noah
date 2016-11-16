@@ -8,5 +8,5 @@ node {
     sh "make"
 
     stage "User Program Test"
-    sh "make test"
+    sh "make test ARGS=-V"
 }
