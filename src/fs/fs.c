@@ -381,6 +381,12 @@ struct dir {
   int fd;
 };
 
+struct path {
+  struct fs *fs;
+  struct dir *dir;
+  char subpath[LINUX_PATH_MAX];
+};
+
 struct fs {
   struct fs_operations *ops;
 };
@@ -460,7 +466,7 @@ darwinfs_mkdir(struct fs *fs, struct dir *dir, const char *path, int mode)
 /* #define LOOKUP_REVAL      0x0020 */
 
 int
-vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir **dir, char *subpath)
+vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
 {
   static struct fs_operations ops = {
     darwinfs_openat,
@@ -481,34 +487,30 @@ vfs_grab_dir(int dirfd, const char *path, int flags, struct fs **fs, struct dir 
     return -LINUX_EINVAL;
   }
 
-  *dir = malloc(sizeof *dir);
+  path->dir = malloc(sizeof(struct dir));
   if (dirfd == LINUX_AT_FDCWD) {
-    (* dir)->fd = AT_FDCWD;
+    path->dir->fd = AT_FDCWD;
   } else {
-    (* dir)->fd = dirfd;
+    path->dir->fd = dirfd;
   }
-  *fs = &darwinfs;
-  if (path[0] == '/') {
-    sprintf(subpath, "%s/%s", proc.root, path);
+  path->fs = &darwinfs;
+  if (name[0] == '/') {
+    sprintf(path->subpath, "%s/%s", proc.root, name);
   } else {
-    strcpy(subpath, path);
+    strcpy(path->subpath, name);
   }
   return 0;
 }
 
 void
-vfs_ungrab_dir(struct dir *dir)
+vfs_ungrab_dir(struct path *path)
 {
-  free(dir);
+  free(path->dir);
 }
 
 int
-do_openat(int dirfd, const char *path, int flags, int mode)
+do_openat(int dirfd, const char *name, int flags, int mode)
 {
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
   int lkflag = 0;
   if (flags & LINUX_O_NOFOLLOW) {
     lkflag |= LOOKUP_NOFOLLOW;
@@ -517,12 +519,13 @@ do_openat(int dirfd, const char *path, int flags, int mode)
     lkflag |= LOOKUP_DIRECTORY;
   }
 
-  int r = vfs_grab_dir(dirfd, path, lkflag, &fs, &dir, subpath);
+  struct path path;
+  int r = vfs_grab_dir(dirfd, name, lkflag, &path);
   if (r < 0) {
     return r;
   }
-  r = fs->ops->openat(fs, dir, subpath, flags, mode);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->openat(path.fs, path.dir, path.subpath, flags, mode);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -551,16 +554,13 @@ DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
   strncpy_from_user(path1, path1_ptr, sizeof path1);
   strncpy_from_user(path2, path2_ptr, sizeof path2);
 
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
-  int r = vfs_grab_dir(dirfd, path2, 0, &fs, &dir, subpath);
+  struct path path;
+  int r = vfs_grab_dir(dirfd, path2, 0, &path);
   if (r < 0) {
     return r;
   }
-  r = fs->ops->symlinkat(fs, path1, dir, subpath);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->symlinkat(path.fs, path1, path.dir, path.subpath);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -651,18 +651,15 @@ DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
 }
 
 int
-do_faccessat(int dirfd, const char *path, int mode)
+do_faccessat(int dirfd, const char *name, int mode)
 {
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
-  int r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath);
+  struct path path;
+  int r = vfs_grab_dir(dirfd, name, 0, &path);
   if (r < 0) {
     return r;
   }
-  r = fs->ops->faccessat(fs, dir, subpath, mode);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->faccessat(path.fs, path.dir, path.subpath, mode);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -685,30 +682,27 @@ DEFINE_SYSCALL(access, gstr_t, path_ptr, int, mode)
 
 DEFINE_SYSCALL(renameat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newpath_ptr)
 {
-  char oldpath[LINUX_PATH_MAX], newpath[LINUX_PATH_MAX];
+  char oldname[LINUX_PATH_MAX], newname[LINUX_PATH_MAX];
 
-  strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
-  strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
+  strncpy_from_user(oldname, oldpath_ptr, sizeof oldname);
+  strncpy_from_user(newname, newpath_ptr, sizeof newname);
 
-  struct fs *oldfs, *newfs;
-  struct dir *olddir, *newdir;
-  char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
-
+  struct path oldpath, newpath;
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, 0, &oldfs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldname, 0, &oldpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, 0, &newfs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newname, 0, &newpath)) < 0) {
     goto out2;
   }
-  if (oldfs != newfs) {
+  if (oldpath.fs != newpath.fs) {
     r = -LINUX_EXDEV;
     goto out2;
   }
-  r = newfs->ops->renameat(newfs, olddir, oldsubpath, newdir, newsubpath);
-  vfs_ungrab_dir(newdir);
+  r = newpath.fs->ops->renameat(newpath.fs, oldpath.dir, oldpath.subpath, newpath.dir, newpath.subpath);
+  vfs_ungrab_dir(&newpath);
  out2:
-  vfs_ungrab_dir(olddir);
+  vfs_ungrab_dir(&oldpath);
  out1:
   return r;
 }
@@ -720,19 +714,16 @@ DEFINE_SYSCALL(rename, gstr_t, oldpath_ptr, gstr_t, newpath_ptr)
 
 DEFINE_SYSCALL(unlinkat, int, dirfd, gstr_t, path_ptr, int, flags)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  char name[LINUX_PATH_MAX];
+  strncpy_from_user(name, path_ptr, sizeof name);
 
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
+  struct path path;
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
     return r;
   }
-  r = fs->ops->unlinkat(fs, dir, subpath, flags);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->unlinkat(path.fs, path.dir, path.subpath, flags);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -748,14 +739,10 @@ DEFINE_SYSCALL(rmdir, gstr_t, path)
 
 DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newpath_ptr, int, flags)
 {
-  char oldpath[LINUX_PATH_MAX], newpath[LINUX_PATH_MAX];
+  char oldname[LINUX_PATH_MAX], newname[LINUX_PATH_MAX];
 
-  strncpy_from_user(oldpath, oldpath_ptr, sizeof oldpath);
-  strncpy_from_user(newpath, newpath_ptr, sizeof newpath);
-
-  struct fs *oldfs, *newfs;
-  struct dir *olddir, *newdir;
-  char oldsubpath[LINUX_PATH_MAX], newsubpath[LINUX_PATH_MAX];
+  strncpy_from_user(oldname, oldpath_ptr, sizeof oldname);
+  strncpy_from_user(newname, newpath_ptr, sizeof newname);
 
   if (flags & ~(LINUX_AT_EMPTY_PATH | LINUX_AT_SYMLINK_FOLLOW)) {
     return -LINUX_EINVAL;
@@ -766,21 +753,22 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
 
   int lkflag = flags & LINUX_AT_SYMLINK_FOLLOW ? 0 : LOOKUP_NOFOLLOW;
 
+  struct path oldpath, newpath;
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldpath, lkflag, &oldfs, &olddir, oldsubpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldname, lkflag, &oldpath)) < 0) {
     goto out1;
   }
-  if ((r = vfs_grab_dir(newfd, newpath, 0, &newfs, &newdir, newsubpath)) < 0) {
+  if ((r = vfs_grab_dir(newfd, newname, 0, &newpath)) < 0) {
     goto out2;
   }
-  if (oldfs != newfs) {
+  if (oldpath.fs != newpath.fs) {
     r = -LINUX_EXDEV;
     goto out2;
   }
-  r = newfs->ops->linkat(newfs, olddir, oldsubpath, newdir, newsubpath, flags);
-  vfs_ungrab_dir(newdir);
+  r = newpath.fs->ops->linkat(newpath.fs, oldpath.dir, oldpath.subpath, newpath.dir, newpath.subpath, flags);
+  vfs_ungrab_dir(&newpath);
  out2:
-  vfs_ungrab_dir(olddir);
+  vfs_ungrab_dir(&oldpath);
  out1:
   return r;
 }
@@ -792,20 +780,17 @@ DEFINE_SYSCALL(link, gstr_t, oldpath, gstr_t, newpath)
 
 DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, bufsize)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  char name[LINUX_PATH_MAX];
+  strncpy_from_user(name, path_ptr, sizeof name);
 
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
+  struct path path;
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
     return r;
   }
   char buf[bufsize];
-  r = fs->ops->readlinkat(fs, dir, subpath, buf, bufsize);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->readlinkat(path.fs, path.dir, path.subpath, buf, bufsize);
+  vfs_ungrab_dir(&path);
   copy_to_user(buf_ptr, buf, bufsize);
   return r;
 }
@@ -817,19 +802,16 @@ DEFINE_SYSCALL(readlink, gstr_t, path_ptr, gaddr_t, buf_ptr, int, bufsize)
 
 DEFINE_SYSCALL(mkdirat, int, dirfd, gstr_t, path_ptr, int, mode)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  char name[LINUX_PATH_MAX];
+  strncpy_from_user(name, path_ptr, sizeof name);
 
-  struct fs *fs;
-  struct dir *dir;
-  char subpath[LINUX_PATH_MAX];
-
+  struct path path;
   int r;
-  if ((r = vfs_grab_dir(dirfd, path, 0, &fs, &dir, subpath)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
     return r;
   }
-  r = fs->ops->mkdir(fs, dir, subpath, mode);
-  vfs_ungrab_dir(dir);
+  r = path.fs->ops->mkdir(path.fs, path.dir, path.subpath, mode);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
