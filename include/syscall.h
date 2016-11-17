@@ -128,7 +128,7 @@
   SYSCALL(124, unimplemented)                   \
   SYSCALL(125, capget)                          \
   SYSCALL(126, unimplemented)                   \
-  SYSCALL(127, unimplemented)                   \
+  SYSCALL(127, rt_sigpending)                   \
   SYSCALL(128, unimplemented)                   \
   SYSCALL(129, unimplemented)                   \
   SYSCALL(130, unimplemented)                   \

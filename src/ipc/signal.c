@@ -16,3 +16,8 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, sigset_t *, nset, sigset_t *, oset, siz
 {
   return 0;
 }
+
+DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
+{
+  return 0;
+}
