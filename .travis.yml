@@ -7,4 +7,4 @@ before_install:
 script:
   - cmake .
   - make
-  - make test
+  - make test ARGS=-V
