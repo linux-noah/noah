@@ -9,10 +9,11 @@ use Cwd;
 
 our $VERSION = "@PROJECT_VERSION@";
 
-my ($root);
+my ($root, $strace);
 
 GetOptions(
-  'root' => \$root,
+  'root=s' => \$root,
+  'strace=s' => \$strace,
   'h|help' => sub {
     pod2usage(1);
   },
@@ -55,7 +56,12 @@ if (@ARGV != 0) {
   $init = "@ARGV";
 }
 
-system "${noah} -m $root $init";
+my $opts = "";
+if (defined $strace) {
+  $opts .= "--strace $strace ";
+}
+
+system "${noah} -m $root $opts $init";
 
 sub prompt_yn {
   my ($query) = @_;
