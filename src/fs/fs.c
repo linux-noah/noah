@@ -845,10 +845,12 @@ vfs_umask(int mask)
 DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
 {
   char buf[size];
+  memset(buf, 0, sizeof buf);
   int r;
   if ((r = vfs_getcwd(buf, size)) < 0) {
     return r;
   }
+  copy_to_user(buf_ptr, buf, size);
   return buf_ptr;
 }
 
