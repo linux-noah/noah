@@ -1,0 +1,7 @@
+sudo: false
+os: osx
+osx_image: xcode8.1
+script:
+  - cmake .
+  - make
+  - make test
