@@ -1,6 +1,9 @@
 sudo: false
 os: osx
 osx_image: xcode8.1
+before_install:
+  - brew update
+  - brew install cmake
 script:
   - cmake .
   - make
