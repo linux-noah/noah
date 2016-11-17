@@ -38,7 +38,7 @@
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, nanosleep)                        \
   SYSCALL(36, unimplemented)                    \
-  SYSCALL(37, unimplemented)                    \
+  SYSCALL(37, alarm)                            \
   SYSCALL(38, unimplemented)                    \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \

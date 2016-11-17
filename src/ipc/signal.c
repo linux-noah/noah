@@ -6,6 +6,13 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <assert.h>
+
+DEFINE_SYSCALL(alarm, unsigned int, seconds)
+{
+  assert(seconds == 0);
+  return 0;
+}
 
 DEFINE_SYSCALL(rt_sigaction, int, sig, const struct sigaction *, act, struct sigaction *, oact, size_t, size)
 {
