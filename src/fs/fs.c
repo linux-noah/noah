@@ -126,22 +126,46 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
 {
   int fd = file->fd;
   printk("darwinfs ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
-  if (fd == 1 && cmd == LINUX_TCGETS) {
+  int r;
+  if (cmd == LINUX_TCGETS) {
     struct termios dios;
     struct linux_termios lios;
 
-    int ret = syswrap(ioctl(fd, TIOCGETA, &dios));
-    if (ret < 0) {
-      return ret;
+    if (fd != 1) {
+      goto fail;                /* FIXME: workaround for bash's strange behavior */
+    }
+
+    if ((r = syswrap(tcgetattr(fd, &dios))) < 0) {
+      return r;
     }
     darwin_to_linux_termios(&dios, &lios);
-    *(struct linux_termios*)(guest_to_host(val0)) = lios;
-
-    return ret;
-  } else if (fd == 1 && cmd == LINUX_TIOCGWINSZ) {
-    return syswrap(ioctl(fd, TIOCGWINSZ, guest_to_host(val0)));
+    copy_to_user(val0, &lios, sizeof lios);
+    return r;
+  } else if (cmd == LINUX_TIOCGPGRP) {
+    l_pid_t pgrp;
+    if ((r = syswrap(ioctl(fd, TIOCGPGRP, &pgrp))) < 0) {
+      return r;
+    }
+    copy_to_user(val0, &pgrp, sizeof pgrp);
+    return r;
+  } else if (cmd == LINUX_TIOCGWINSZ) {
+    struct winsize ws;
+    if ((r = syswrap(ioctl(fd, TIOCGWINSZ, &ws))) < 0) {
+      return r;
+    }
+    struct linux_winsize lws;
+    darwin_to_linux_winsize(&ws, &lws);
+    copy_to_user(val0, &lws, sizeof lws);
+    return r;
+  } else if (cmd == LINUX_TIOCSWINSZ) {
+    struct linux_winsize lws;
+    struct winsize ws;
+    copy_from_user(&lws, val0, sizeof lws);
+    linux_to_darwin_winsize(&ws, &lws);
+    return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
 
+ fail:
   return -LINUX_EPERM;
 }
 

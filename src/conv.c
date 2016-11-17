@@ -286,3 +286,21 @@ darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios)
 	}
 	lios->c_line = 0;
 }
+
+void
+darwin_to_linux_winsize(struct winsize *ws, struct linux_winsize *lws)
+{
+  lws->ws_row = ws->ws_row;
+  lws->ws_col = ws->ws_col;
+  lws->ws_xpixel = ws->ws_xpixel;
+  lws->ws_ypixel = ws->ws_ypixel;
+}
+
+void
+linux_to_darwin_winsize(struct winsize *ws, struct linux_winsize *lws)
+{
+  ws->ws_row = lws->ws_row;
+  ws->ws_col = lws->ws_col;
+  ws->ws_xpixel = lws->ws_xpixel;
+  ws->ws_ypixel = lws->ws_ypixel;
+}
