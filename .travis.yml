@@ -5,6 +5,8 @@ before_install:
   - brew update
   - brew install cmake
 script:
-  - cmake .
+  - mkdir build
+  - cd build
+  - cmake ..
   - make
   - make test ARGS=-V
