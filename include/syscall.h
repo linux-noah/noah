@@ -116,16 +116,16 @@
   SYSCALL(112, unimplemented)                   \
   SYSCALL(113, unimplemented)                   \
   SYSCALL(114, unimplemented)                   \
-  SYSCALL(115, unimplemented)                   \
-  SYSCALL(116, unimplemented)                   \
-  SYSCALL(117, unimplemented)                   \
-  SYSCALL(118, unimplemented)                   \
-  SYSCALL(119, unimplemented)                   \
-  SYSCALL(120, unimplemented)                   \
-  SYSCALL(121, unimplemented)                   \
+  SYSCALL(115, getgroups)                       \
+  SYSCALL(116, setgroups)                       \
+  SYSCALL(117, setresuid)                       \
+  SYSCALL(118, getresuid)                       \
+  SYSCALL(119, setresgid)                       \
+  SYSCALL(120, getresgid)                       \
+  SYSCALL(121, getpgid)                         \
   SYSCALL(122, unimplemented)                   \
   SYSCALL(123, unimplemented)                   \
-  SYSCALL(124, unimplemented)                   \
+  SYSCALL(124, getsid)                          \
   SYSCALL(125, capget)                          \
   SYSCALL(126, unimplemented)                   \
   SYSCALL(127, rt_sigpending)                   \

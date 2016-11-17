@@ -406,9 +406,14 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   close(fd);
 
+  drop_privilege();
+
   if (4 <= st.st_size && memcmp(data, ELFMAG, 4) == 0) {
     if ((err = load_elf((Elf64_Ehdr *) data, argc, argv, envp)) < 0)
       return err;
+    if (st.st_mode & 04000) {
+      elevate_privilege();
+    }
   }
   else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
     if ((err = load_script(data, st.st_size, argc, argv, envp)) < 0)

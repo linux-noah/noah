@@ -82,6 +82,52 @@ DEFINE_SYSCALL(getpgrp)
   return syswrap(getpgrp());
 }
 
+DEFINE_SYSCALL(getpgid, l_pid_t, pid)
+{
+  return syswrap(getpgid(pid));
+}
+
+DEFINE_SYSCALL(getsid, l_pid_t, pid)
+{
+  return syswrap(getsid(pid));
+}
+
+DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist)
+{
+  return syswrap(getgroups(gidsetsize, guest_to_host(grouplist)));
+}
+
+DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist)
+{
+  return syswrap(setgroups(gidsetsize, guest_to_host(grouplist)));
+}
+
+DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
+{
+  return syswrap(setreuid(ruid, euid));
+}
+
+DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
+{
+  *(int *)guest_to_host(ruid) = getuid();
+  *(int *)guest_to_host(euid) = geteuid();
+  *(int *)guest_to_host(suid) = getuid();
+  return 0;
+}
+
+DEFINE_SYSCALL(setresgid, l_gid_t, rgid, l_gid_t, egid, l_gid_t, sgid)
+{
+  return syswrap(setregid(rgid, egid));
+}
+
+DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
+{
+  *(int *)guest_to_host(rgid) = getgid();
+  *(int *)guest_to_host(egid) = getegid();
+  *(int *)guest_to_host(sgid) = getgid();
+  return 0;
+}
+
 DEFINE_SYSCALL(gettid)
 {
   uint64_t tid;
