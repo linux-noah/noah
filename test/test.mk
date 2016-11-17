@@ -6,7 +6,6 @@ TEST_UPROGS := \
 LINUX_BUILD_SERV := idylls.jp
 
 test: $(TEST_UPROGS)
-	./test.rb $(NOAH)
 
 test_assertion/build/%: test_assertion/%.c include/*.h
 	$(MAKE_TEST_UPROGS)
