@@ -98,7 +98,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
   assert(IS_ELF(*ehdr));
 
-  if (ehdr->e_type != ET_EXEC) {
+  if (ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN) {
     fprintf(stderr, "not an executable file");
     return -LINUX_ENOEXEC;
   }
