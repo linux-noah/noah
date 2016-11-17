@@ -494,7 +494,9 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     path->dir->fd = dirfd;
   }
   path->fs = &darwinfs;
-  if (name[0] == '/') {
+  if (strncmp(name, "/Users", sizeof "/Users" - 1) == 0 || strncmp(name, "/Volumes", sizeof "/Volumes" - 1) == 0) {
+    strcpy(path->subpath, name);
+  } else if (name[0] == '/') {
     sprintf(path->subpath, "%s/%s", proc.root, name);
   } else {
     strcpy(path->subpath, name);
@@ -823,7 +825,7 @@ DEFINE_SYSCALL(mkdir, gstr_t, path_ptr, int, mode)
 int
 vfs_getcwd(char *buf, size_t size)
 {
-  char *ptr = getcwd(buf, size);
+  char *ptr = getcwd(buf, size); /* FIXME: path translation */
   if (! ptr) {
     return -darwin_to_linux_errno(errno);
   }
