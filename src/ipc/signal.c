@@ -28,3 +28,8 @@ DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
 {
   return 0;
 }
+
+DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
+{
+  return 0;
+}

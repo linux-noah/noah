@@ -132,7 +132,7 @@
   SYSCALL(128, unimplemented)                   \
   SYSCALL(129, unimplemented)                   \
   SYSCALL(130, unimplemented)                   \
-  SYSCALL(131, unimplemented)                   \
+  SYSCALL(131, sigaltstack)                     \
   SYSCALL(132, unimplemented)                   \
   SYSCALL(133, unimplemented)                   \
   SYSCALL(134, unimplemented)                   \
