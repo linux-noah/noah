@@ -128,7 +128,9 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
   int fd = file->fd;
   printk("darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
   int r;
-  if (cmd == LINUX_TCGETS) {
+
+  switch (cmd) {
+  case LINUX_TCGETS: {
     struct termios dios;
     struct linux_termios lios;
 
@@ -138,33 +140,38 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     darwin_to_linux_termios(&dios, &lios);
     copy_to_user(val0, &lios, sizeof lios);
     return r;
-  } else if (cmd == LINUX_TCSETS) {
+  }
+  case LINUX_TCSETS: {
     struct termios dios;
     struct linux_termios lios;
     copy_from_user(&lios, val0, sizeof lios);
     linux_to_darwin_termios(&lios, &dios);
     return syswrap(tcsetattr(fd, TCSANOW, &dios));
-  } else if (cmd == LINUX_TCSETSW) {
+  }
+  case LINUX_TCSETSW: {
     struct termios dios;
     struct linux_termios lios;
     copy_from_user(&lios, val0, sizeof lios);
     linux_to_darwin_termios(&lios, &dios);
     return syswrap(tcsetattr(fd, TCSADRAIN, &dios));
-  } else if (cmd == LINUX_TIOCGPGRP) {
+  }
+  case LINUX_TIOCGPGRP: {
     l_pid_t pgrp;
     if ((r = syswrap(ioctl(fd, TIOCGPGRP, &pgrp))) < 0) {
       return r;
     }
     copy_to_user(val0, &pgrp, sizeof pgrp);
     return r;
-  /* } else if (cmd == LINUX_TIOCSPGRP) { */
+  }
+  /* case LINUX_TIOCSPGRP: { */
   /*   l_pid_t pgrp; */
   /*   copy_from_user(&pgrp, val0, sizeof pgrp); */
   /*   if ((r = syswrap(ioctl(fd, TIOCSPGRP, &pgrp))) < 0) { */
   /*     return r; */
   /*   } */
   /*   return 0; */
-  } else if (cmd == LINUX_TIOCGWINSZ) {
+  /* } */
+  case LINUX_TIOCGWINSZ: {
     struct winsize ws;
     if ((r = syswrap(ioctl(fd, TIOCGWINSZ, &ws))) < 0) {
       return r;
@@ -173,15 +180,17 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     darwin_to_linux_winsize(&ws, &lws);
     copy_to_user(val0, &lws, sizeof lws);
     return r;
-  } else if (cmd == LINUX_TIOCSWINSZ) {
+  }
+  case LINUX_TIOCSWINSZ: {
     struct linux_winsize lws;
     struct winsize ws;
     copy_from_user(&lws, val0, sizeof lws);
     linux_to_darwin_winsize(&ws, &lws);
     return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
-
-  return -LINUX_EPERM;
+  default:
+    return -LINUX_EPERM;
+  }
 }
 
 int
