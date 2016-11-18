@@ -915,7 +915,13 @@ DEFINE_SYSCALL(umask, int, mask)
 
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
-  return syswrap(pipe(guest_to_host(fildes_ptr)));
+  int fd[2];
+  int r = syswrap(pipe(fd));
+  if (r < 0) {
+    return r;
+  }
+  copy_to_user(fildes_ptr, fd, sizeof fd);
+  return 0;
 }
 
 DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
