@@ -14,12 +14,12 @@ DEFINE_SYSCALL(alarm, unsigned int, seconds)
   return 0;
 }
 
-DEFINE_SYSCALL(rt_sigaction, int, sig, const struct sigaction *, act, struct sigaction *, oact, size_t, size)
+DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size)
 {
   return 0;
 }
 
-DEFINE_SYSCALL(rt_sigprocmask, int, how, sigset_t *, nset, sigset_t *, oset, size_t, size)
+DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, size)
 {
   return 0;
 }
