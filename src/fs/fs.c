@@ -126,7 +126,6 @@ int
 darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
 {
   int fd = file->fd;
-  printk("darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
   int r;
 
   switch (cmd) {
@@ -200,6 +199,7 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     return syswrap(tcflush(fd, sel));
   }
   default:
+    printk("unhandled darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
     return -LINUX_EPERM;
   }
 }
