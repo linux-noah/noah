@@ -605,6 +605,11 @@ DEFINE_SYSCALL(open, gstr_t, path_ptr, int, flags, int, mode)
   return sys_openat(LINUX_AT_FDCWD, path_ptr, flags, mode);
 }
 
+DEFINE_SYSCALL(creat, gstr_t, path_ptr, int, mode)
+{
+  return sys_open(path_ptr, LINUX_O_CREAT | LINUX_O_TRUNC | LINUX_O_WRONLY, mode);
+}
+
 DEFINE_SYSCALL(symlinkat, gstr_t, path1_ptr, int, dirfd, gstr_t, path2_ptr)
 {
   char path1[LINUX_PATH_MAX], path2[LINUX_PATH_MAX];

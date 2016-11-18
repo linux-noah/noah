@@ -86,7 +86,7 @@
   SYSCALL(82, rename)                           \
   SYSCALL(83, mkdir)                            \
   SYSCALL(84, rmdir)                            \
-  SYSCALL(85, unimplemented)                    \
+  SYSCALL(85, creat)                            \
   SYSCALL(86, link)                             \
   SYSCALL(87, unlink)                           \
   SYSCALL(88, symlink)                          \
