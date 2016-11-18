@@ -125,7 +125,7 @@ int
 darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
 {
   int fd = file->fd;
-  printk("darwinfs ioctl (fd = %08x, cmd = %d)\n", fd, cmd);
+  printf("darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
   int r;
   if (cmd == LINUX_TCGETS) {
     struct termios dios;
@@ -141,6 +141,18 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     darwin_to_linux_termios(&dios, &lios);
     copy_to_user(val0, &lios, sizeof lios);
     return r;
+  } else if (cmd == LINUX_TCSETS) {
+    struct termios dios;
+    struct linux_termios lios;
+    copy_from_user(&lios, val0, sizeof lios);
+    linux_to_darwin_termios(&lios, &dios);
+    return syswrap(tcsetattr(fd, TCSANOW, &dios));
+  } else if (cmd == LINUX_TCSETSW) {
+    struct termios dios;
+    struct linux_termios lios;
+    copy_from_user(&lios, val0, sizeof lios);
+    linux_to_darwin_termios(&lios, &dios);
+    return syswrap(tcsetattr(fd, TCSADRAIN, &dios));
   } else if (cmd == LINUX_TIOCGPGRP) {
     l_pid_t pgrp;
     if ((r = syswrap(ioctl(fd, TIOCGPGRP, &pgrp))) < 0) {
