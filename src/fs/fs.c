@@ -125,7 +125,7 @@ int
 darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
 {
   int fd = file->fd;
-  printf("darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
+  printk("darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
   int r;
   if (cmd == LINUX_TCGETS) {
     struct termios dios;
