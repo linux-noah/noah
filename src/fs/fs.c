@@ -148,6 +148,13 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     }
     copy_to_user(val0, &pgrp, sizeof pgrp);
     return r;
+  /* } else if (cmd == LINUX_TIOCSPGRP) { */
+  /*   l_pid_t pgrp; */
+  /*   copy_from_user(&pgrp, val0, sizeof pgrp); */
+  /*   if ((r = syswrap(ioctl(fd, TIOCSPGRP, &pgrp))) < 0) { */
+  /*     return r; */
+  /*   } */
+  /*   return 0; */
   } else if (cmd == LINUX_TIOCGWINSZ) {
     struct winsize ws;
     if ((r = syswrap(ioctl(fd, TIOCGWINSZ, &ws))) < 0) {
