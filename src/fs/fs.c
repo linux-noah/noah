@@ -188,6 +188,17 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     linux_to_darwin_winsize(&ws, &lws);
     return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
+  case LINUX_TCFLSH: {
+    int sel;
+    switch (val0) {
+    case LINUX_TCIFLUSH: sel = TCIFLUSH; break;
+    case LINUX_TCOFLUSH: sel = TCOFLUSH; break;
+    case LINUX_TCIOFLUSH: sel = TCIOFLUSH; break;
+    default:
+      return -LINUX_EINVAL;
+    }
+    return syswrap(tcflush(fd, sel));
+  }
   default:
     return -LINUX_EPERM;
   }
@@ -504,7 +515,7 @@ darwinfs_unlinkat(struct fs *fs, struct dir *dir, const char *path, int l_flags)
 {
   int flags = linux_to_darwin_at_flags(l_flags);
   /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
-  if (l_flags & LINUX_AT_EACCESS) {
+  if (flags & AT_EACCESS) {
     flags &= ~AT_EACCESS;
     flags |= AT_REMOVEDIR;
   }
