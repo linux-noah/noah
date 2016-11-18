@@ -132,10 +132,6 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     struct termios dios;
     struct linux_termios lios;
 
-    if (fd != 1) {
-      goto fail;                /* FIXME: workaround for bash's strange behavior */
-    }
-
     if ((r = syswrap(tcgetattr(fd, &dios))) < 0) {
       return r;
     }
@@ -185,7 +181,6 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
 
- fail:
   return -LINUX_EPERM;
 }
 
