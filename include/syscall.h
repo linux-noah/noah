@@ -48,7 +48,7 @@
   SYSCALL(44, sendto)                           \
   SYSCALL(45, recvfrom)                         \
   SYSCALL(46, sendmsg)                          \
-  SYSCALL(47, unimplemented)                    \
+  SYSCALL(47, recvmsg)                          \
   SYSCALL(48, shutdown)                         \
   SYSCALL(49, bind)                             \
   SYSCALL(50, listen)                           \

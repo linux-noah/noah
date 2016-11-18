@@ -293,7 +293,7 @@ do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
 
 DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg, int, flags)
 {
-  return do_sendmsg(sockfd, (struct l_msghdr*)msg, flags);
+  return do_sendmsg(sockfd, (struct l_msghdr*)guest_to_host(msg), flags);
 }
 
 DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec, unsigned int, vlen, unsigned int, flags)
@@ -313,6 +313,35 @@ DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec, unsigned int, vlen, unsig
   }
 
   return i;
+}
+
+DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
+{
+  struct l_msghdr lmsg;
+  copy_from_user(&lmsg, msg_ptr, sizeof lmsg);
+  struct msghdr dmsg;
+  dmsg.msg_namelen = lmsg.msg_namelen;
+  dmsg.msg_name = lmsg.msg_name == 0 ? 0 : guest_to_host(lmsg.msg_name);
+  struct l_iovec liov[lmsg.msg_iovlen];
+  copy_from_user(liov, lmsg.msg_iov, sizeof liov);
+  struct iovec diov[lmsg.msg_iovlen];
+  for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
+    diov[i].iov_base = guest_to_host(liov[i].iov_base);
+    diov[i].iov_len = liov[i].iov_len;
+  }
+  dmsg.msg_iov = diov;
+  dmsg.msg_iovlen = lmsg.msg_iovlen;
+  dmsg.msg_control = guest_to_host(lmsg.msg_control);
+  dmsg.msg_controllen = lmsg.msg_controllen;
+  dmsg.msg_flags = linux_to_darwin_msg_flags(lmsg.msg_flags);
+  int r = syswrap(recvmsg(sockfd, &dmsg, flags));
+  if (r < 0) {
+    return r;
+  }
+  lmsg.msg_namelen = dmsg.msg_namelen;
+  lmsg.msg_controllen = dmsg.msg_controllen;
+  copy_to_user(msg_ptr, &lmsg, sizeof lmsg);
+  return r;
 }
 
 DEFINE_SYSCALL(listen, int, socket, int, backlog)
