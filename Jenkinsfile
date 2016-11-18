@@ -4,9 +4,12 @@ node {
     sh "git clean -fx"
 
     stage "Build Noah"
-    sh "cmake ."
-    sh "make"
+    sh '''mkdir build
+      cd build
+      cmake ..
+      make'''
 
     stage "User Program Test"
-    sh "make test ARGS=-V"
+    sh '''cd build
+      make test ARGS=-V'''
 }
