@@ -369,3 +369,8 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
 
   return ret;
 }
+
+DEFINE_SYSCALL(socketpair, int, family, int, type, int, protocol, gaddr_t, usockvec_ptr)
+{
+  return syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, guest_to_host(usockvec_ptr)));
+}

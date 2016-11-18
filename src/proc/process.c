@@ -288,3 +288,13 @@ DEFINE_SYSCALL(getrusage, int, who, gaddr_t, rusage)
 
   return 0;
 }
+
+DEFINE_SYSCALL(getpriority, int, which, int, who)
+{
+  return syswrap(getpriority(which, who));
+}
+
+DEFINE_SYSCALL(setpriority, int, which, int, who, int, niceval)
+{
+  return syswrap(setpriority(which, who, niceval));
+}

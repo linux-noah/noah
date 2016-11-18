@@ -54,7 +54,7 @@
   SYSCALL(50, listen)                           \
   SYSCALL(51, getsockname)                      \
   SYSCALL(52, getpeername)                      \
-  SYSCALL(53, unimplemented)                    \
+  SYSCALL(53, socketpair)                       \
   SYSCALL(54, setsockopt)                       \
   SYSCALL(55, getsockopt)                       \
   SYSCALL(56, clone)                            \
@@ -141,8 +141,8 @@
   SYSCALL(137, statfs)                          \
   SYSCALL(138, fstatfs)                         \
   SYSCALL(139, unimplemented)                   \
-  SYSCALL(140, unimplemented)                   \
-  SYSCALL(141, unimplemented)                   \
+  SYSCALL(140, getpriority)                     \
+  SYSCALL(141, setpriority)                     \
   SYSCALL(142, unimplemented)                   \
   SYSCALL(143, unimplemented)                   \
   SYSCALL(144, unimplemented)                   \
