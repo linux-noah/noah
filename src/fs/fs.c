@@ -518,7 +518,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     path->dir->fd = dirfd;
   }
   path->fs = &darwinfs;
-  if (strncmp(name, "/Users", sizeof "/Users" - 1) == 0 || strncmp(name, "/Volumes", sizeof "/Volumes" - 1) == 0) {
+  if (strncmp(name, "/Users", sizeof "/Users" - 1) == 0 || strncmp(name, "/Volumes", sizeof "/Volumes" - 1) == 0 || strncmp(name, "/dev", sizeof "/dev" - 1) == 0) {
     strcpy(path->subpath, name);
   } else if (name[0] == '/') {
     sprintf(path->subpath, "%s/%s", proc.root, name);
