@@ -36,9 +36,8 @@ int
 linux_to_darwin_at_flags(int flags)
 {
   int ret = 0;
-  if (flags & LINUX_AT_FDCWD) {
-    ret |= AT_FDCWD;
-    flags &= ~LINUX_AT_FDCWD;
+  if (flags == LINUX_AT_FDCWD) {
+    return AT_FDCWD;
   }
   if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
     ret |= AT_SYMLINK_NOFOLLOW;
