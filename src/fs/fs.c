@@ -77,6 +77,7 @@ struct file_operations {
   int (*getdents)(struct file *f, char *buf, uint count);
   int (*fcntl)(struct file *f, unsigned int cmd, unsigned long arg);
   int (*fstatfs)(struct file *f, struct l_statfs *buf);
+  int (*fsync)(struct file *f);
 };
 
 int
@@ -245,6 +246,12 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
   return r;
 }
 
+int
+darwinfs_fsync(struct file *file)
+{
+  return syswrap(fsync(file->fd));
+}
+
 struct file *
 vfs_acquire(int fd)
 {
@@ -260,6 +267,7 @@ vfs_acquire(int fd)
     darwinfs_getdents,
     darwinfs_fcntl,
     darwinfs_fstatfs,
+    darwinfs_fsync,
   };
 
   struct file *file;
@@ -418,6 +426,16 @@ DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
   }
   vfs_release(file);
   return n;
+}
+
+DEFINE_SYSCALL(fsync, int, fd)
+{
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r = file->ops->fsync(file);
+  vfs_release(file);
+  return r;
 }
 
 struct dir {
