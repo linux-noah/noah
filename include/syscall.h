@@ -63,7 +63,7 @@
   SYSCALL(59, execve)                           \
   SYSCALL(60, exit)                             \
   SYSCALL(61, wait4)                            \
-  SYSCALL(62, unimplemented)                    \
+  SYSCALL(62, kill)                             \
   SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                    \
   SYSCALL(65, unimplemented)                    \

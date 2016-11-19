@@ -1,4 +1,5 @@
 #include "common.h"
+#include "linux/signal.h"
 
 #include "noah.h"
 
@@ -32,4 +33,9 @@ DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
 DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
 {
   return 0;
+}
+
+DEFINE_SYSCALL(kill, l_pid_t, pid, int, sig)
+{
+  return syswrap(kill(pid, linux_to_darwin_signal(sig)));
 }

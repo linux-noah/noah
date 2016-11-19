@@ -8,6 +8,7 @@
 #include "linux/errno.h"
 #include "linux/ioctl.h"
 #include "linux/termios.h"
+#include "linux/signal.h"
 
 #include <unistd.h>
 #include <sys/stat.h>
@@ -31,6 +32,7 @@
 #include <dirent.h>
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 int
 linux_to_darwin_at_flags(int flags)
@@ -428,3 +430,26 @@ linux_to_darwin_winsize(struct winsize *ws, struct linux_winsize *lws)
   ws->ws_xpixel = lws->ws_xpixel;
   ws->ws_ypixel = lws->ws_ypixel;
 }
+
+int
+linux_to_darwin_signal(int signum)
+{
+  if (signum < LINUX_SIGRTMIN) {
+    // FIXME
+    return signum;
+  } else {
+    return 0;
+  }
+}
+
+int
+darwin_to_linux_signal(int signum)
+{
+  if (signum < LINUX_SIGRTMIN) {
+    // FIXME
+    return signum;
+  } else {
+    return 0;
+  }
+}
+

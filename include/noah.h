@@ -78,6 +78,8 @@ void darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios);
 void linux_to_darwin_termios(struct linux_termios *lios, struct termios *bios);
 void darwin_to_linux_winsize(struct winsize *ws, struct linux_winsize *lws);
 void linux_to_darwin_winsize(struct winsize *ws, struct linux_winsize *lws);
+int linux_to_darwin_signal(int signum);
+int darwin_to_linux_signal(int signum);
 
 
 /* debug */
