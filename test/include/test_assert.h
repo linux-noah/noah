@@ -14,6 +14,8 @@
   }\
 } while(0)
 
+#define assert_false(val) assert_true(!(val))
+
 #define nr_tests(num) do \
 { \
   write(1, "1->" #num "\n", sizeof("1->" #num "\n") - 1); \

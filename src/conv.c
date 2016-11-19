@@ -453,3 +453,30 @@ darwin_to_linux_signal(int signum)
   }
 }
 
+void
+linux_to_darwin_sigset(l_sigset_t *lset, sigset_t *dset)
+{
+  sigemptyset(dset);
+  for (int i = 1; i <= LINUX_SIGRTMAX; i++) {
+    if (LINUX_SIGISMEMBER(lset, i)) {
+      int num = linux_to_darwin_signal(i);
+      if (num) {
+        sigaddset(dset, num);
+      }
+    }
+  }
+}
+
+void
+darwin_to_linux_sigset(sigset_t *dset, l_sigset_t *lset)
+{
+  LINUX_SIGEMPTYSET(lset);
+  for (int i = 1; i <= LINUX_SIGRTMIN; i++) {
+    if (sigismember(dset, i)) {
+      int num = darwin_to_linux_signal(i);
+      if (num) {
+        LINUX_SIGADDSET(lset, num);
+      }
+    }
+  }
+}

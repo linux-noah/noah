@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Yuichi Nishiwaki
+ * Copyright (c) 2016 Yuichi Nishiwaki, Takaya Saeki
  * Copyright (c) 2015 Dmitry Chagin
  * All rights reserved.
  *
@@ -31,6 +31,7 @@
 #define NOAH_LINUX_SIGNAL_H
 
 #include "linux/common.h"
+#include <signal.h>
 
 /* signaling */
 #define	LINUX_SIGHUP		1
@@ -85,6 +86,14 @@
 typedef struct {
   uint64_t	__mask;
 } l_sigset_t;
+
+void linux_to_darwin_sigset(l_sigset_t *, sigset_t *);
+void darwin_to_linux_sigset(sigset_t *, l_sigset_t *);
+
+/* primitives to manipulate sigset_t */
+#define	LINUX_SIGEMPTYSET(setp)		((setp)->__mask = 0)
+#define	LINUX_SIGISMEMBER(setp, sig)	(1UL & ((setp)->__mask >> ((sig) - 1)))
+#define	LINUX_SIGADDSET(setp, sig)	(setp)->__mask |= 1UL << ((sig) - 1)
 
 /* sigprocmask actions */
 #define	LINUX_SIG_BLOCK		0
