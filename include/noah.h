@@ -57,7 +57,7 @@ _Thread_local extern struct task task;
 void set_initial_proc(struct proc *proc, char *root);
 
 #define LINUX_RELEASE "4.6.4"
-#define LINUX_VERSION "#1 SMP PREEMPT Mon Jul 11 19:12:32 CEST 2016" /* FIXME */
+#define LINUX_VERSION "✋(´・ω・｀) やあ "
 
 #define LINUX_PATH_MAX 4096         /* including null */
 
