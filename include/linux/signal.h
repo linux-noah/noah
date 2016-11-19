@@ -94,6 +94,11 @@ void darwin_to_linux_sigset(sigset_t *, l_sigset_t *);
 #define	LINUX_SIGEMPTYSET(setp)		((setp)->__mask = 0)
 #define	LINUX_SIGISMEMBER(setp, sig)	(1UL & ((setp)->__mask >> ((sig) - 1)))
 #define	LINUX_SIGADDSET(setp, sig)	(setp)->__mask |= 1UL << ((sig) - 1)
+#define	LINUX_SIGDELSET(setp, sig)	(setp)->__mask |= 1UL << ((sig) - 1)
+
+#define	LINUX_SIGSET_BLOCK(setp, masksetp)	((setp)->__mask |= ((masksetp)->__mask))
+#define	LINUX_SIGSET_UNBLOCK(setp, masksetp)	((setp)->__mask &= ~((masksetp)->__mask))
+#define	LINUX_SIGSET_REPLACE(setp, masksetp)	((setp)->__mask = (masksetp)->__mask)
 
 /* sigprocmask actions */
 #define	LINUX_SIG_BLOCK		0

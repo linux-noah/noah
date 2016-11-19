@@ -37,8 +37,11 @@ void main_loop();
 
 /* task related data */
 
+#include "linux/signal.h"
+
 struct task {
   gaddr_t set_child_tid, clear_child_tid;
+  l_sigset_t sigmask;
 };
 
 struct proc {
