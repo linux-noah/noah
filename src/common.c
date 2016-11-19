@@ -12,6 +12,9 @@ size_t
 copy_from_user(void *to, gaddr_t src_ptr, size_t n)
 {
   const void *src = guest_to_host(src_ptr);
+  if (src == NULL) {
+    return n;
+  }
   memcpy(to, src, n);
   return 0;
 }
@@ -38,6 +41,9 @@ size_t
 copy_to_user(gaddr_t to_ptr, const void *src, size_t n)
 {
   void *to = guest_to_host(to_ptr);
+  if (src == NULL) {
+    return n;
+  }
   memcpy(to, src, n);
   return 0;
 }
