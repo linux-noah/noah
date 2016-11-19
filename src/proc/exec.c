@@ -419,6 +419,10 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     if ((err = load_script(data, st.st_size, argc, argv, envp)) < 0)
       return err;
   }
+  else if (4 <= st.st_size && memcmp(data, "\xcf\xfa\xed\xfe", 4) == 0) {
+    /* Mach-O */
+    return syswrap(execve(elf_path, argv, envp));
+  }
   else {
     return -LINUX_ENOEXEC;                  /* unsupported file type */
   }
@@ -444,7 +448,8 @@ static int count_strings(gaddr_t v, int max)
 DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int err;
-  const char *elf_path = guest_to_host(gelf_path);
+  char elf_path[LINUX_PATH_MAX];
+  strncpy_from_user(elf_path, gelf_path, sizeof elf_path);
 
   if ((err = count_strings(gargv, LINUX_MAX_ARG_STRINGS)) < 0) {
     return err;
