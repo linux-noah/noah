@@ -39,7 +39,6 @@ void main_loop();
 
 struct task {
   gaddr_t set_child_tid, clear_child_tid;
-  struct task_group *tgrp;
 };
 
 struct proc {
