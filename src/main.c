@@ -139,6 +139,11 @@ main_loop()
       break;
     }
 
+    case VMX_REASON_IRQ: {
+      printk("external interruption\n");
+      break;
+    }
+
     default:
       printk("other reason: %llu\n", exit_reason);
     }

@@ -328,9 +328,10 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
     goto out;
   }
   r = file->ops->read(file, buf, size);
-  if (r > 0) {
-    copy_to_user(buf_ptr, buf, r);
+  if (r < 0) {
+    goto out;
   }
+  copy_to_user(buf_ptr, buf, r);
  out:
   vfs_release(file);
   return r;
@@ -873,8 +874,12 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
   }
   char buf[bufsize];
   r = path.fs->ops->readlinkat(path.fs, path.dir, path.subpath, buf, bufsize);
-  vfs_ungrab_dir(&path);
+  if (r < 0) {
+    goto out;
+  }
   copy_to_user(buf_ptr, buf, bufsize);
+ out:
+  vfs_ungrab_dir(&path);
   return r;
 }
 
