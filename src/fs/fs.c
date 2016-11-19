@@ -213,35 +213,36 @@ darwinfs_lseek(struct file *file, l_off_t offset, int whence)
 int
 darwinfs_getdents(struct file *file, char *direntp, unsigned count)
 {
-  long base;
-  char buf[count];
-  struct dirent *d;
-  int bpos;
+  int fd = dup(file->fd);
+  DIR *dir = fdopendir(fd);
 
-  struct l_dirent *l_d;
-  unsigned int l_bpos = 0;
-
-  int nread = syswrap(syscall(SYS_getdirentries64, file->fd, buf, count, &base));
-  if (nread < 0) {
-    return nread;
+  if (dir == NULL) {
+    return -darwin_to_linux_errno(errno);
   }
-  for (bpos = 0; bpos < nread; bpos += d->d_reclen) {
-    d = (struct dirent *) (buf + bpos);
-
-    size_t l_reclen = roundup(offsetof(struct l_dirent, d_name) + d->d_namlen + 2, 8);
-    assert(l_bpos + l_reclen <= count);
-
+  struct dirent *dent;
+  size_t pos = 0;
+  errno = 0;
+  while ((dent = readdir(dir)) != NULL) {
+    size_t reclen = roundup(offsetof(struct l_dirent, d_name) + dent->d_namlen + 2, 8);
+    if (pos + reclen > count) {
+      goto end;
+    }
     /* fill dirent buffer */
-    l_d = (struct l_dirent *) (direntp + l_bpos);
-    l_d->d_ino = d->d_ino;
-    l_d->d_reclen = l_reclen;
-    l_d->d_off = d->d_seekoff;
-    memcpy(l_d->d_name, d->d_name, d->d_namlen + 1);
-    (direntp + l_bpos)[l_d->d_reclen - 1] = d->d_type;
+    struct l_dirent *dp = (struct l_dirent *) (direntp + pos);
+    dp->d_reclen = reclen;
+    dp->d_ino = dent->d_ino;
+    dp->d_off = dent->d_seekoff;
+    memcpy(dp->d_name, dent->d_name, dent->d_namlen + 1);
+    ((char *) dp)[reclen - 1] = dent->d_type;
 
-    l_bpos += l_d->d_reclen;
+    pos += reclen;
   }
-  return l_bpos;
+  if (errno) {
+    return -darwin_to_linux_errno(errno);
+  }
+ end:
+  closedir(dir);
+  return pos;
 }
 
 int
