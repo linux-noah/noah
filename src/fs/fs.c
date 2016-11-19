@@ -221,9 +221,9 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
   struct l_dirent *l_d;
   unsigned int l_bpos = 0;
 
-  int nread = syscall(SYS_getdirentries64, file->fd, buf, count, &base);
+  int nread = syswrap(syscall(SYS_getdirentries64, file->fd, buf, count, &base));
   if (nread < 0) {
-    return -errno;
+    return nread;
   }
   for (bpos = 0; bpos < nread; bpos += d->d_reclen) {
     d = (struct dirent *) (buf + bpos);
@@ -415,8 +415,12 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
     return -LINUX_EBADF;
   char buf[count];
   int r = file->ops->getdents(file, buf, count);
-  vfs_release(file);
+  if (r < 0) {
+    goto out;
+  }
   copy_to_user(dirent_ptr, buf, count);
+ out:
+  vfs_release(file);
   return r;
 }
 
