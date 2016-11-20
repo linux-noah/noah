@@ -137,20 +137,26 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
       return r;
     }
     darwin_to_linux_termios(&dios, &lios);
-    copy_to_user(val0, &lios, sizeof lios);
+    if (copy_to_user(val0, &lios, sizeof lios)) {
+      return -LINUX_EFAULT;
+    }
     return r;
   }
   case LINUX_TCSETS: {
     struct termios dios;
     struct linux_termios lios;
-    copy_from_user(&lios, val0, sizeof lios);
+    if (copy_from_user(&lios, val0, sizeof lios)) {
+      return -LINUX_EFAULT;
+    }
     linux_to_darwin_termios(&lios, &dios);
     return syswrap(tcsetattr(fd, TCSANOW, &dios));
   }
   case LINUX_TCSETSW: {
     struct termios dios;
     struct linux_termios lios;
-    copy_from_user(&lios, val0, sizeof lios);
+    if (copy_from_user(&lios, val0, sizeof lios)) {
+      return -LINUX_EFAULT;
+    }
     linux_to_darwin_termios(&lios, &dios);
     return syswrap(tcsetattr(fd, TCSADRAIN, &dios));
   }
@@ -159,12 +165,16 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     if ((r = syswrap(ioctl(fd, TIOCGPGRP, &pgrp))) < 0) {
       return r;
     }
-    copy_to_user(val0, &pgrp, sizeof pgrp);
+    if (copy_to_user(val0, &pgrp, sizeof pgrp)) {
+      return -LINUX_EFAULT;
+    }
     return r;
   }
   /* case LINUX_TIOCSPGRP: { */
   /*   l_pid_t pgrp; */
-  /*   copy_from_user(&pgrp, val0, sizeof pgrp); */
+  /*   if (copy_from_user(&pgrp, val0, sizeof pgrp)) { */
+  /*     return -LINUX_EFAULT; */
+  /*   } */
   /*   if ((r = syswrap(ioctl(fd, TIOCSPGRP, &pgrp))) < 0) { */
   /*     return r; */
   /*   } */
@@ -177,13 +187,17 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     }
     struct linux_winsize lws;
     darwin_to_linux_winsize(&ws, &lws);
-    copy_to_user(val0, &lws, sizeof lws);
+    if (copy_to_user(val0, &lws, sizeof lws)) {
+      return -LINUX_EFAULT;
+    }
     return r;
   }
   case LINUX_TIOCSWINSZ: {
     struct linux_winsize lws;
     struct winsize ws;
-    copy_from_user(&lws, val0, sizeof lws);
+    if (copy_from_user(&lws, val0, sizeof lws)) {
+      return -LINUX_EFAULT;
+    }
     linux_to_darwin_winsize(&ws, &lws);
     return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
@@ -302,7 +316,9 @@ vfs_release(struct file *file)
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
-  copy_from_user(buf, buf_ptr, size);
+  if (copy_from_user(buf, buf_ptr, size)) {
+    return -LINUX_EFAULT;
+  }
   struct file *file = vfs_acquire(fd);
   if (file == NULL)
     return -LINUX_EBADF;
@@ -332,7 +348,10 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   if (r < 0) {
     goto out;
   }
-  copy_to_user(buf_ptr, buf, r);
+  if (copy_to_user(buf_ptr, buf, r)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
  out:
   vfs_release(file);
   return r;
@@ -357,8 +376,12 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
   struct l_newstat st;
   int n = file->ops->stat(file, &st);
   if (n >= 0) {
-    copy_to_user(st_ptr, &st, sizeof st);
+    if (copy_to_user(st_ptr, &st, sizeof st)) {
+      n = -LINUX_EFAULT;
+      goto out;
+    }
   }
+ out:
   vfs_release(file);
   return n;
 }
@@ -419,7 +442,10 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   if (r < 0) {
     goto out;
   }
-  copy_to_user(dirent_ptr, buf, count);
+  if (copy_to_user(dirent_ptr, buf, count)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
  out:
   vfs_release(file);
   return r;
@@ -443,8 +469,12 @@ DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
   struct l_statfs st;
   int n = file->ops->fstatfs(file, &st);
   if (n >= 0) {
-    copy_to_user(buf_ptr, &st, sizeof st);
+    if (copy_to_user(buf_ptr, &st, sizeof st)) {
+      n = -LINUX_EFAULT;
+      goto out;
+    }
   }
+ out:
   vfs_release(file);
   return n;
 }
@@ -882,7 +912,10 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
   if (r < 0) {
     goto out;
   }
-  copy_to_user(buf_ptr, buf, bufsize);
+  if (copy_to_user(buf_ptr, buf, bufsize)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
  out:
   vfs_ungrab_dir(&path);
   return r;
@@ -943,7 +976,9 @@ DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
   if ((r = vfs_getcwd(buf, size)) < 0) {
     return r;
   }
-  copy_to_user(buf_ptr, buf, size);
+  if (copy_to_user(buf_ptr, buf, size)) {
+    return -LINUX_EFAULT;
+  }
   return buf_ptr;
 }
 
@@ -980,7 +1015,9 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
   if (r < 0) {
     return r;
   }
-  copy_to_user(fildes_ptr, fd, sizeof fd);
+  if (copy_to_user(fildes_ptr, fd, sizeof fd)) {
+    return -LINUX_EFAULT;
+  }
   return 0;
 }
 
@@ -1022,7 +1059,9 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
     }
   }
 
-  copy_to_user(fildes_ptr, fildes, sizeof(fildes));
+  if (copy_to_user(fildes_ptr, fildes, sizeof(fildes))) {
+    return -LINUX_EFAULT;
+  }
 
   return 0;
 

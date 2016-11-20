@@ -318,12 +318,16 @@ DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec, unsigned int, vlen, unsig
 DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
 {
   struct l_msghdr lmsg;
-  copy_from_user(&lmsg, msg_ptr, sizeof lmsg);
+  if (copy_from_user(&lmsg, msg_ptr, sizeof lmsg)) {
+    return -LINUX_EFAULT;
+  }
   struct msghdr dmsg;
   dmsg.msg_namelen = lmsg.msg_namelen;
   dmsg.msg_name = lmsg.msg_name == 0 ? 0 : guest_to_host(lmsg.msg_name);
   struct l_iovec liov[lmsg.msg_iovlen];
-  copy_from_user(liov, lmsg.msg_iov, sizeof liov);
+  if (copy_from_user(liov, lmsg.msg_iov, sizeof liov)) {
+    return -LINUX_EFAULT;
+  }
   struct iovec diov[lmsg.msg_iovlen];
   for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
     diov[i].iov_base = guest_to_host(liov[i].iov_base);
@@ -340,7 +344,9 @@ DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
   }
   lmsg.msg_namelen = dmsg.msg_namelen;
   lmsg.msg_controllen = dmsg.msg_controllen;
-  copy_to_user(msg_ptr, &lmsg, sizeof lmsg);
+  if (copy_to_user(msg_ptr, &lmsg, sizeof lmsg)) {
+    return -LINUX_EFAULT;
+  }
   return r;
 }
 
