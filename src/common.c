@@ -7,25 +7,20 @@
 #include <stdio.h>
 #include "linux/errno.h"
 
-// FIXME: VM space memory of data may not be contiguous in host user space
 size_t
 copy_from_user(void *to, gaddr_t src_ptr, size_t n)
 {
-  const void *src = guest_to_host(src_ptr);
-  if (src == NULL) {
-    return n;
-  }
-  if ((char *) src + n - 1 != guest_to_host(src_ptr + n - 1)) {
-    while (n > 0) {
-      size_t size = MIN(rounddown(src_ptr + 4096, 4096) - src_ptr, n);
-      memcpy(to, guest_to_host(src_ptr), size);
-      to = (char *) to + size;
-      src_ptr += size;
-      n -= size;
+  while (n > 0) {
+    const void *src = guest_to_host(src_ptr);
+    if (src == NULL) {
+      return n;
     }
-    return 0;
+    size_t size = MIN(rounddown(src_ptr + 4096, 4096) - src_ptr, n);
+    memcpy(to, src, size);
+    to = (char *) to + size;
+    src_ptr += size;
+    n -= size;
   }
-  memcpy(to, src, n);
   return 0;
 }
 
@@ -50,21 +45,17 @@ strnsize_user(gaddr_t src_ptr, size_t n)
 size_t
 copy_to_user(gaddr_t to_ptr, const void *src, size_t n)
 {
-  void *to = guest_to_host(to_ptr);
-  if (src == NULL) {
-    return n;
-  }
-  if ((char *) to + n - 1 != guest_to_host(to_ptr + n - 1)) {
-    while (n > 0) {
-      size_t size = MIN(rounddown(to_ptr + 4096, 4096) - to_ptr, n);
-      memcpy(guest_to_host(to_ptr), src, size);
-      to_ptr += size;
-      src = (char *) src + size;
-      n -= size;
+  while (n > 0) {
+    void *to = guest_to_host(to_ptr);
+    if (to == NULL) {
+      return n;
     }
-    return 0;
+    size_t size = MIN(rounddown(to_ptr + 4096, 4096) - to_ptr, n);
+    memcpy(to, src, size);
+    to_ptr += size;
+    src = (char *) src + size;
+    n -= size;
   }
-  memcpy(to, src, n);
   return 0;
 }
 
