@@ -67,6 +67,15 @@ int
 linux_to_darwin_o_flags(int l_flags)
 {
   int ret = 0;
+  if (l_flags & LINUX_O_PATH) {
+    if (l_flags & LINUX_O_CLOEXEC)
+      ret |= O_CLOEXEC;
+    if (l_flags & LINUX_O_NOFOLLOW)
+      ret |= O_SYMLINK;
+    if (l_flags & LINUX_O_DIRECTORY)
+      ret |= O_DIRECTORY;
+    return ret;
+  }
   switch (l_flags & LINUX_O_ACCMODE) {
   case LINUX_O_WRONLY:
     ret |= O_WRONLY;

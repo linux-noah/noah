@@ -609,7 +609,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
   if (strncmp(name, "/Users", sizeof "/Users" - 1) == 0 || strncmp(name, "/Volumes", sizeof "/Volumes" - 1) == 0 || strncmp(name, "/dev", sizeof "/dev" - 1) == 0) {
     strcpy(path->subpath, name);
   } else if (name[0] == '/') {
-    sprintf(path->subpath, "%s/%s", proc.root, name);
+    sprintf(path->subpath, "%s%s", proc.root, name);
   } else {
     strcpy(path->subpath, name);
   }
@@ -695,7 +695,7 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, f
   if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
     return -LINUX_EINVAL;
   }
-  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
+  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LINUX_O_PATH | LINUX_O_NOFOLLOW : 0;
   int fd = do_openat(dirfd, path, oflags, 0);
   if (fd < 0)
     return fd;
@@ -721,7 +721,7 @@ DEFINE_SYSCALL(fchownat, int, dirfd, gstr_t, path_ptr, l_uid_t, user, l_gid_t, g
   if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
     return -LINUX_EINVAL;
   }
-  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? O_NOFOLLOW : 0;
+  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LINUX_O_PATH | LINUX_O_NOFOLLOW : 0;
   int fd = do_openat(dirfd, path, oflags, 0);
   if (fd < 0)
     return fd;
@@ -863,11 +863,8 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
   strncpy_from_user(oldname, oldpath_ptr, sizeof oldname);
   strncpy_from_user(newname, newpath_ptr, sizeof newname);
 
-  if (flags & ~(LINUX_AT_EMPTY_PATH | LINUX_AT_SYMLINK_FOLLOW)) {
+  if (flags & ~LINUX_AT_SYMLINK_FOLLOW) {
     return -LINUX_EINVAL;
-  }
-  if (flags & LINUX_AT_EMPTY_PATH) {
-    return -LINUX_EINVAL;       /* TODO: not yet supported */
   }
 
   int lkflag = flags & LINUX_AT_SYMLINK_FOLLOW ? 0 : LOOKUP_NOFOLLOW;
