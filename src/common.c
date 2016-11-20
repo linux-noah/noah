@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 #include "linux/errno.h"
 
 size_t
@@ -24,22 +25,48 @@ copy_from_user(void *to, gaddr_t src_ptr, size_t n)
   return 0;
 }
 
+// On success, returns the length of the string (not including the trailing NUL).
+// If access to userspace fails, returns -EFAULT
 ssize_t
 strncpy_from_user(void *to, gaddr_t src_ptr, size_t n)
 {
-  const void *src = guest_to_host(src_ptr);
-  char *end = stpncpy(to, src, n);
-  return end - (char *) to;
+  size_t len = strnlen_user(src_ptr, n);
+  if (len == 0) {
+    return -LINUX_EFAULT;
+  } else if (n < len) {
+    if (copy_from_user(to, src_ptr, n)) {
+      return -LINUX_EFAULT;
+    }
+    return n;
+  }
+  if (copy_from_user(to, src_ptr, len)) {
+    return -LINUX_EFAULT;
+  }
+  return len - 1;
 }
 
-// Get the size of a user string INCLUDING trailing NULL in the same manner as Linux kernel's strnlen_user
-// Check retruen value <= n to make sure that the str is not too long
+// Get the size of a user string INCLUDING trailing NULL
+// On exception, it returns 0. For too long strings, returns a number greater than n.
 ssize_t
-strnsize_user(gaddr_t src_ptr, size_t n)
+strnlen_user(gaddr_t src_ptr, size_t n)
 {
-  const void *src = guest_to_host(src_ptr);
-  size_t ret = strnlen(src, n) + 1;
-  return ret;
+  int len = 0;
+  while ((ssize_t) n > 0) {
+    const void *str = guest_to_host(src_ptr);
+    if (str == NULL) {
+      return 0;
+    }
+    size_t size = MIN(rounddown(src_ptr + 4096, 4096) - src_ptr, n);
+    size_t i = strnlen(str, size);
+    if (i < size) {
+      return len + i + 1;
+    }
+    assert(i == size);
+    len += size;
+    src_ptr += size;
+    n -= size;
+  }
+  return len + 1;
 }
 
 size_t

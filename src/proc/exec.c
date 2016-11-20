@@ -473,7 +473,7 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     int max_c = maxs[i];
 
     for (int j = 0; j < max_c; j++) {
-      int size = strnsize_user(gvec[j], LINUX_MAX_ARG_STRLEN);
+      int size = strnlen_user(gvec[j], LINUX_MAX_ARG_STRLEN);
       if (size > LINUX_MAX_ARG_STRLEN) {
         return -LINUX_E2BIG;
       }
