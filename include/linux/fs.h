@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2016 Yuichi Nishiwaki
  * Copyright (c) 2007 Roman Divacky
  * All rights reserved.
  *
@@ -201,7 +202,19 @@ struct l_statfs {
   l_long	f_ffree;
   l_fsid_t	f_fsid;
   l_long	f_namelen;
+  l_long	f_flags;
   l_long	f_spare[6];
 };
+
+#define LINUX_ST_RDONLY       0x0001
+#define LINUX_ST_NOSUID       0x0002
+#define LINUX_ST_NODEV        0x0004
+#define LINUX_ST_NOEXEC       0x0008
+#define LINUX_ST_SYNCHRONOUS  0x0010
+#define LINUX_ST_VALID        0x0020
+#define LINUX_ST_MANDLOCK     0x0040
+#define LINUX_ST_NOATIME      0x0400
+#define LINUX_ST_NODIRATIME   0x0800
+#define LINUX_ST_RELATIME     0x1000
 
 #endif	/* !_LINUX_FILE_H_ */

@@ -270,9 +270,9 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
 {
   struct statfs st;
   int r = syswrap(fstatfs(file->fd, &st));
-  if (r >= 0) {
-    statfs_darwin_to_linux(&st, buf);
-  }
+  if (r < 0)
+    return r;
+  statfs_darwin_to_linux(&st, buf);
   return r;
 }
 
@@ -375,11 +375,11 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
     return -LINUX_EBADF;
   struct l_newstat st;
   int n = file->ops->stat(file, &st);
-  if (n >= 0) {
-    if (copy_to_user(st_ptr, &st, sizeof st)) {
-      n = -LINUX_EFAULT;
-      goto out;
-    }
+  if (n < 0)
+    goto out;
+  if (copy_to_user(st_ptr, &st, sizeof st)) {
+    n = -LINUX_EFAULT;
+    goto out;
   }
  out:
   vfs_release(file);
@@ -468,11 +468,11 @@ DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
     return -LINUX_EBADF;
   struct l_statfs st;
   int n = file->ops->fstatfs(file, &st);
-  if (n >= 0) {
-    if (copy_to_user(buf_ptr, &st, sizeof st)) {
-      n = -LINUX_EFAULT;
-      goto out;
-    }
+  if (n < 0)
+    goto out;
+  if (copy_to_user(buf_ptr, &st, sizeof st)) {
+    n = -LINUX_EFAULT;
+    goto out;
   }
  out:
   vfs_release(file);

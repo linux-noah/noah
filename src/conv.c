@@ -139,22 +139,30 @@ void
 statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs)
 {
 #define HFS_SUPER_MAGIC 0x4244
-  if (!statfs && !l_statfs) {
-    return;
-  }
-
   l_statfs->f_type = HFS_SUPER_MAGIC;
-  l_statfs->f_bsize = statfs->f_bsize;
-  l_statfs->f_type = statfs->f_type;
   l_statfs->f_bsize = statfs->f_bsize;
   l_statfs->f_blocks = statfs->f_blocks;
   l_statfs->f_bfree = statfs->f_bfree;
   l_statfs->f_bavail = statfs->f_bavail;
-  l_statfs->f_files = statfs->f_files;
   l_statfs->f_ffree = statfs->f_ffree;
+  l_statfs->f_files = statfs->f_files;
   l_statfs->f_fsid.val[0] = statfs->f_fsid.val[0];
   l_statfs->f_fsid.val[1] = statfs->f_fsid.val[1];
   l_statfs->f_namelen = NAME_MAX;
+
+  l_statfs->f_flags = LINUX_ST_VALID;
+  if (statfs->f_flags & MNT_RDONLY)
+    l_statfs->f_flags |= LINUX_ST_RDONLY;
+  if (statfs->f_flags & MNT_NOSUID)
+    l_statfs->f_flags |= LINUX_ST_NOSUID;
+  if (statfs->f_flags & MNT_NODEV)
+    l_statfs->f_flags |= LINUX_ST_NODEV;
+  if (statfs->f_flags & MNT_NOEXEC)
+    l_statfs->f_flags |= LINUX_ST_NOEXEC;
+  if (statfs->f_flags & MNT_SYNCHRONOUS)
+    l_statfs->f_flags |= LINUX_ST_SYNCHRONOUS;
+
+  /* TODO: ST_MANDLOCK, ST_NOATIME, ST_NODIRATIME, ST_RELATIME */
 }
 
 static struct speedtab {
