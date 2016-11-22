@@ -29,6 +29,7 @@ ssize_t strnlen_user(gaddr_t gaddr, size_t n);
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 int do_open(const char *path, int flags, int mode);
 int do_openat(int fd, const char *path, int flags, int mode);
+int do_close(int fd);
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
 int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);

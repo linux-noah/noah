@@ -357,7 +357,8 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   return r;
 }
 
-DEFINE_SYSCALL(close, int, fd)
+int
+do_close(int fd)
 {
   /* FIXME: free fd slot */
   struct file *file = vfs_acquire(fd);
@@ -366,6 +367,11 @@ DEFINE_SYSCALL(close, int, fd)
   int n = file->ops->close(file);
   vfs_release(file);
   return n;
+}
+
+DEFINE_SYSCALL(close, int, fd)
+{
+  return do_close(fd);
 }
 
 DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
@@ -700,7 +706,7 @@ DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, f
   if (fd < 0)
     return fd;
   int r = sys_fstat(fd, st_ptr);
-  sys_close(fd);
+  do_close(fd);
   return r;
 }
 
@@ -726,7 +732,7 @@ DEFINE_SYSCALL(fchownat, int, dirfd, gstr_t, path_ptr, l_uid_t, user, l_gid_t, g
   if (fd < 0)
     return fd;
   int r = sys_fchown(fd, user, group);
-  sys_close(fd);
+  do_close(fd);
   return r;
 }
 
@@ -748,7 +754,7 @@ DEFINE_SYSCALL(fchmodat, int, dirfd, gstr_t, path_ptr, l_mode_t, mode)
   if (fd < 0)
     return fd;
   int r = sys_fchmod(fd, mode);
-  sys_close(fd);
+  do_close(fd);
   return r;
 }
 
@@ -765,7 +771,7 @@ DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
   if (fd < 0)
     return fd;
   int r = sys_fstatfs(fd, buf_ptr);
-  sys_close(fd);
+  do_close(fd);
   return r;
 }
 
@@ -992,7 +998,7 @@ DEFINE_SYSCALL(chdir, gstr_t, path_ptr)
   if (fd < 0)
     return fd;
   int r = sys_fchdir(fd);
-  sys_close(fd);
+  do_close(fd);
   return r;
 }
 

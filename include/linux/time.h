@@ -30,9 +30,22 @@
 #ifndef _NOAH_TIME_H
 #define _NOAH_TIME_H
 
+#define LINUX_UTIME_NOW			0x3FFFFFFF
+#define LINUX_UTIME_OMIT		0x3FFFFFFE
+
 struct l_timespec {
   l_time_t tv_sec;
   l_long   tv_nsec;
+};
+
+struct l_timeval {
+  l_time_t      tv_sec;
+  l_suseconds_t tv_usec;
+};
+
+struct l_timezone {
+  int tz_minuteswest;
+  int tz_dsttime;
 };
 
 typedef uint32_t l_clockid_t;
