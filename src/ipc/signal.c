@@ -35,14 +35,15 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   switch (how) {
     case LINUX_SIG_BLOCK:
       dhow = SIG_BLOCK;
-      LINUX_SIGSET_BLOCK(&task.sigmask, &lset);
+      LINUX_SIGSET_ADD(&task.sigmask, &lset);
       break;
     case LINUX_SIG_UNBLOCK:
       dhow = SIG_UNBLOCK;
+      LINUX_SIGSET_DEL(&task.sigmask, &lset);
       break;
     case LINUX_SIG_SETMASK:
       dhow = SIG_SETMASK;
-      LINUX_SIGSET_REPLACE(&task.sigmask, &lset);
+      LINUX_SIGSET_SET(&task.sigmask, &lset);
       break;
     default:
       return -LINUX_EINVAL;
