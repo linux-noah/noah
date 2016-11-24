@@ -321,32 +321,49 @@ DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
   if (copy_from_user(&lmsg, msg_ptr, sizeof lmsg)) {
     return -LINUX_EFAULT;
   }
-  struct msghdr dmsg;
-  dmsg.msg_namelen = lmsg.msg_namelen;
-  dmsg.msg_name = lmsg.msg_name == 0 ? 0 : guest_to_host(lmsg.msg_name);
+  char msg_name[lmsg.msg_name == 0 ? 0 : lmsg.msg_namelen];
   struct l_iovec liov[lmsg.msg_iovlen];
   if (copy_from_user(liov, lmsg.msg_iov, sizeof liov)) {
     return -LINUX_EFAULT;
   }
-  struct iovec diov[lmsg.msg_iovlen];
+  struct iovec msg_iov[lmsg.msg_iovlen];
+  size_t iov_total_len = 0;
   for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
-    diov[i].iov_base = guest_to_host(liov[i].iov_base);
-    diov[i].iov_len = liov[i].iov_len;
+    iov_total_len += liov[i].iov_len;
   }
-  dmsg.msg_iov = diov;
+  char iov_buf[iov_total_len], *iov_buf_ptr = iov_buf;
+  for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
+    msg_iov[i].iov_base = iov_buf_ptr;
+    msg_iov[i].iov_len = liov[i].iov_len;
+    iov_buf_ptr += liov[i].iov_len;
+  }
+  char msg_control[lmsg.msg_controllen];
+  struct msghdr dmsg;
+  dmsg.msg_namelen = lmsg.msg_namelen;
+  dmsg.msg_name = lmsg.msg_name == 0 ? 0 : msg_name;
+  dmsg.msg_iov = msg_iov;
   dmsg.msg_iovlen = lmsg.msg_iovlen;
-  dmsg.msg_control = guest_to_host(lmsg.msg_control);
+  dmsg.msg_control = msg_control;
   dmsg.msg_controllen = lmsg.msg_controllen;
   dmsg.msg_flags = linux_to_darwin_msg_flags(lmsg.msg_flags);
   int r = syswrap(recvmsg(sockfd, &dmsg, flags));
   if (r < 0) {
     return r;
   }
-  lmsg.msg_namelen = dmsg.msg_namelen;
-  lmsg.msg_controllen = dmsg.msg_controllen;
-  if (copy_to_user(msg_ptr, &lmsg, sizeof lmsg)) {
-    return -LINUX_EFAULT;
+  if (lmsg.msg_name != 0) {
+    if (copy_to_user(lmsg.msg_name, dmsg.msg_name, dmsg.msg_namelen))
+      return -LINUX_EFAULT;
   }
+  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_namelen), &dmsg.msg_namelen, sizeof dmsg.msg_namelen))
+    return -LINUX_EFAULT;
+  for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
+    if (copy_to_user(liov[i].iov_base, dmsg.msg_iov[i].iov_base, liov[i].iov_len))
+      return -LINUX_EFAULT;
+  }
+  if (copy_to_user(lmsg.msg_control, dmsg.msg_control, lmsg.msg_controllen))
+    return -LINUX_EFAULT;
+  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_controllen), &dmsg.msg_controllen, sizeof dmsg.msg_controllen))
+    return -LINUX_EFAULT;
   return r;
 }
 

@@ -13,7 +13,7 @@
 #include "linux/misc.h"
 #include "linux/signal.h"
 
-void
+static void
 init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
 {
   task.set_child_tid = task.clear_child_tid = 0;
@@ -25,7 +25,11 @@ init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
   }
 
   if (task.set_child_tid != 0) {
-    *(int *) guest_to_host(task.set_child_tid) = getpid();
+    int pid = getpid();
+    if (copy_to_user(task.set_child_tid, &pid, sizeof pid)) {
+      printk("fixme");
+      assert(false);
+    }
   }
 
   if (clone_flags & LINUX_CLONE_SETTLS) {
@@ -54,7 +58,9 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
     init_task(clone_flags, child_tid, tls);
   } else {
     if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
-      *(int *) guest_to_host(parent_tid) = ret;
+      if (copy_to_user(parent_tid, &ret, sizeof ret)) {
+        return -LINUX_EFAULT;
+      }
     }
   }
 

@@ -92,14 +92,23 @@ DEFINE_SYSCALL(getsid, l_pid_t, pid)
   return syswrap(getsid(pid));
 }
 
-DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist)
+DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
-  return syswrap(getgroups(gidsetsize, guest_to_host(grouplist)));
+  gid_t gl[gidsetsize];
+  int r = syswrap(getgroups(gidsetsize, gl));
+  if (r < 0)
+    return r;
+  if (copy_to_user(grouplist_ptr, gl, sizeof gl))
+    return -LINUX_EFAULT;
+  return r;
 }
 
-DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist)
+DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
-  return syswrap(setgroups(gidsetsize, guest_to_host(grouplist)));
+  gid_t gl[gidsetsize];
+  if (copy_from_user(gl, grouplist_ptr, sizeof gl))
+    return -LINUX_EFAULT;
+  return syswrap(setgroups(gidsetsize, gl));
 }
 
 DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
@@ -109,9 +118,19 @@ DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
 
 DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
 {
-  *(int *)guest_to_host(ruid) = getuid();
-  *(int *)guest_to_host(euid) = geteuid();
-  *(int *)guest_to_host(suid) = getuid();
+  int n;
+  n = getuid();
+  if (copy_to_user(ruid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = geteuid();
+  if (copy_to_user(euid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = getuid();
+  if (copy_to_user(suid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
   return 0;
 }
 
@@ -122,9 +141,19 @@ DEFINE_SYSCALL(setresgid, l_gid_t, rgid, l_gid_t, egid, l_gid_t, sgid)
 
 DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
 {
-  *(int *)guest_to_host(rgid) = getgid();
-  *(int *)guest_to_host(egid) = getegid();
-  *(int *)guest_to_host(sgid) = getgid();
+  int n;
+  n = getgid();
+  if (copy_to_user(rgid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = getegid();
+  if (copy_to_user(egid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = getgid();
+  if (copy_to_user(sgid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
   return 0;
 }
 
@@ -137,7 +166,7 @@ DEFINE_SYSCALL(gettid)
 
 DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
 {
-  struct rlimit *l_rl = guest_to_host(rl_ptr);
+  struct rlimit rl;
 
   int resource = 0;
   switch (l_resource) {
@@ -153,7 +182,15 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   case LINUX_RLIMIT_AS: resource = RLIMIT_AS; break;
   }
 
-  return syswrap(getrlimit(resource, l_rl));
+  int r = syswrap(getrlimit(resource, &rl));
+  if (r < 0)
+    return r;
+
+  struct l_rlimit l_rl = { rl.rlim_cur, rl.rlim_max };
+  if (copy_to_user(rl_ptr, &l_rl, sizeof l_rl))
+    return -LINUX_EFAULT;
+
+  return r;
 }
 
 DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
@@ -164,7 +201,9 @@ DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 DEFINE_SYSCALL(exit, int, reason)
 {
   if (task.clear_child_tid) {
-    *(int*)guest_to_host(task.clear_child_tid) = 0;
+    long zero = 0;
+    if (copy_to_user(task.clear_child_tid, &zero, sizeof task.clear_child_tid))
+      return -LINUX_EFAULT;
     do_futex_wake(task.clear_child_tid, 1);
   }
   vmm_destroy_vcpu();
@@ -181,7 +220,9 @@ DEFINE_SYSCALL(exit, int, reason)
 DEFINE_SYSCALL(exit_group, int, reason)
 {
   if (task.clear_child_tid) {
-    *(int*)guest_to_host(task.clear_child_tid) = 0;
+    long zero = 0;
+    if (copy_to_user(task.clear_child_tid, &zero, sizeof task.clear_child_tid))
+      return -LINUX_EFAULT;
     do_futex_wake(task.clear_child_tid, 1);
   }
   _exit(reason);
@@ -202,21 +243,26 @@ struct utsname {
   char domainname[65];
 };
 
-DEFINE_SYSCALL(uname, gaddr_t, buf)
+DEFINE_SYSCALL(uname, gaddr_t, buf_ptr)
 {
-  struct utsname *_buf = guest_to_host(buf);
+  struct utsname buf;
 
-  strncpy(_buf->sysname, "Linux", sizeof _buf->sysname - 1);
-  strncpy(_buf->release, LINUX_RELEASE, sizeof _buf->release - 1);
-  strncpy(_buf->version, LINUX_VERSION, sizeof _buf->version - 1);
-  strncpy(_buf->machine, "x86_64", sizeof _buf->machine - 1);
-  strncpy(_buf->domainname, "GNU/Linux", sizeof _buf->domainname - 1);
+  if (copy_from_user(&buf, buf_ptr, sizeof buf))
+    return -LINUX_EFAULT;
 
-  return syswrap(gethostname(_buf->nodename, sizeof _buf->nodename - 1) < 0);
+  strncpy(buf.sysname, "Linux", sizeof buf.sysname - 1);
+  strncpy(buf.release, LINUX_RELEASE, sizeof buf.release - 1);
+  strncpy(buf.version, LINUX_VERSION, sizeof buf.version - 1);
+  strncpy(buf.machine, "x86_64", sizeof buf.machine - 1);
+  strncpy(buf.domainname, "GNU/Linux", sizeof buf.domainname - 1);
+
+  return syswrap(gethostname(buf.nodename, sizeof buf.nodename - 1));
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
+  uint64_t t;
+
   switch (code) {
   case LINUX_ARCH_SET_GS:
     vmm_write_vmcs(VMCS_GUEST_GS_BASE, addr);
@@ -225,10 +271,14 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
     vmm_write_vmcs(VMCS_GUEST_FS_BASE, addr);
     return 0;
   case LINUX_ARCH_GET_FS:
-    vmm_read_vmcs(VMCS_GUEST_FS_BASE, guest_to_host(addr));
+    vmm_read_vmcs(VMCS_GUEST_FS_BASE, &t);
+    if (copy_to_user(addr, &t, sizeof t))
+      return -LINUX_EFAULT;
     return 0;
   case LINUX_ARCH_GET_GS:
-    vmm_read_vmcs(VMCS_GUEST_GS_BASE, guest_to_host(addr));
+    vmm_read_vmcs(VMCS_GUEST_GS_BASE, &t);
+    if (copy_to_user(addr, &t, sizeof t))
+      return -LINUX_EFAULT;
     return 0;
   default:
     return -LINUX_EINVAL;
@@ -246,12 +296,15 @@ DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
   return 0;
 }
 
-DEFINE_SYSCALL(wait4, int, pid, gaddr_t, gstatus, int, options, gaddr_t, grusage)
+DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusage_ptr)
 {
-  int *status = (int*)guest_to_host(gstatus);
-  struct rusage *rusage = (struct rusage*)guest_to_host(grusage);
-
-  return syswrap(wait4(pid, status, options, rusage));
+  int *status;
+  if (copy_from_user(&status, status_ptr, sizeof status))
+    return -LINUX_EFAULT;
+  struct rusage rusage;
+  if (copy_from_user(&rusage, rusage_ptr, sizeof rusage))
+    return -LINUX_EFAULT;
+  return syswrap(wait4(pid, status, options, &rusage));
 }
 
 static void
@@ -277,15 +330,20 @@ darwin_to_linux_rusage(struct rusage *ru, struct l_rusage *lru)
   lru->ru_nivcsw = ru->ru_nivcsw;
 }
 
-DEFINE_SYSCALL(getrusage, int, who, gaddr_t, rusage)
+DEFINE_SYSCALL(getrusage, int, who, gaddr_t, rusage_ptr)
 {
   struct rusage h_rusage;
-  if (getrusage(who, &h_rusage) < 0) {
-    return -errno;
+  int r;
+  if ((r = syswrap(getrusage(who, &h_rusage))) < 0) {
+    return r;
   }
 
-  darwin_to_linux_rusage(&h_rusage, guest_to_host(rusage));
+  struct l_rusage l_rusage;
+  darwin_to_linux_rusage(&h_rusage, &l_rusage);
 
+  if (copy_to_user(rusage_ptr, &l_rusage, sizeof l_rusage)) {
+    return -LINUX_EFAULT;
+  }
   return 0;
 }
 

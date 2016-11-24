@@ -78,7 +78,7 @@ load_elf_interp(const char *path, ulong load_addr)
 
     do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
-    memcpy(guest_to_host(vaddr) + offset, data + p[i].p_offset, p[i].p_filesz);
+    copy_to_user(vaddr + offset, data + p[i].p_offset, p[i].p_filesz);
 
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
   }
@@ -129,7 +129,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
     do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
-    memcpy(guest_to_host(vaddr) + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
+    copy_to_user(vaddr + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
     if (! load_base_set) {
       load_base = p[i].p_vaddr - p[i].p_offset;
@@ -225,17 +225,13 @@ push(const void *data, size_t n)
   uint64_t size = roundup(n, 8);
   uint64_t rsp;
 
+  assert(data != 0);
+
   vmm_read_register(HV_X86_RSP, &rsp);
   rsp -= size;
   vmm_write_register(HV_X86_RSP, rsp);
 
-  char *stackmem = guest_to_host(rsp);
-
-  if (data != 0) {
-    memcpy(stackmem, data, n);
-  } else {
-    memset(stackmem, 0, n);
-  }
+  copy_to_user(rsp, data, n);
 
   return rsp;
 }
@@ -243,6 +239,8 @@ push(const void *data, size_t n)
 void
 init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
 {
+  static const uint64_t zero = 0;
+
   do_mmap(STACK_TOP - STACK_SIZE, STACK_SIZE, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
   vmm_write_register(HV_X86_RSP, STACK_TOP);
@@ -297,7 +295,7 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
 
   push(aux, sizeof aux);
 
-  push(0, sizeof(uint64_t));
+  push(&zero, sizeof zero);
 
   uint64_t ptr = env_end;
   for (char **e = renvp - 1; e >= envp; --e) {
@@ -306,7 +304,7 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
     assert(strcmp(buf + (ptr - args_start), *e) == 0);
   }
 
-  push(0, sizeof(uint64_t));
+  push(&zero, sizeof zero);
 
   ptr = args_end;
   for (int i = argc - 1; i >= 0; --i) {
