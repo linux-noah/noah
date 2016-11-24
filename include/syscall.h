@@ -102,7 +102,7 @@
   SYSCALL(98, getrusage)                        \
   SYSCALL(99, sysinfo)                          \
   SYSCALL(100, unimplemented)                   \
-  SYSCALL(101, unimplemented)                   \
+  SYSCALL(101, ptrace)                          \
   SYSCALL(102, getuid)                          \
   SYSCALL(103, unimplemented)                   \
   SYSCALL(104, getgid)                          \
