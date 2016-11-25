@@ -117,6 +117,9 @@ typedef struct {
   l_sigset_t	lsa_mask;
 } l_sigaction_t;
 
+void linux_to_darwin_sigaction(l_sigaction_t *, struct sigaction *, void *);
+void darwin_to_linux_sigaction(struct sigaction *, l_sigaction_t *, gaddr_t);
+
 typedef struct {
   l_uintptr_t	ss_sp;
   l_int		ss_flags;

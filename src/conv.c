@@ -520,3 +520,50 @@ darwin_to_linux_sigset(sigset_t *dset, l_sigset_t *lset)
     }
   }
 }
+
+void
+linux_to_darwin_sigaction(l_sigaction_t *lsa, struct sigaction *dsa, void *handler)
+{
+
+	linux_to_darwin_sigset(&lsa->lsa_mask, &dsa->sa_mask);
+	dsa->sa_handler = handler;
+	dsa->sa_flags = 0;
+	if (lsa->lsa_flags & LINUX_SA_NOCLDSTOP)
+		dsa->sa_flags |= SA_NOCLDSTOP;
+	if (lsa->lsa_flags & LINUX_SA_NOCLDWAIT)
+		dsa->sa_flags |= SA_NOCLDWAIT;
+	if (lsa->lsa_flags & LINUX_SA_SIGINFO)
+		dsa->sa_flags |= SA_SIGINFO;
+	if (lsa->lsa_flags & LINUX_SA_ONSTACK)
+		dsa->sa_flags |= SA_ONSTACK;
+	if (lsa->lsa_flags & LINUX_SA_RESTART)
+		dsa->sa_flags |= SA_RESTART;
+	if (lsa->lsa_flags & LINUX_SA_ONESHOT)
+		dsa->sa_flags |= SA_RESETHAND;
+	if (lsa->lsa_flags & LINUX_SA_NOMASK)
+		dsa->sa_flags |= SA_NODEFER;
+}
+
+void
+darwin_to_linux_sigaction(struct sigaction *dsa, l_sigaction_t *lsa, gaddr_t handler)
+{
+
+	darwin_to_linux_sigset(&dsa->sa_mask, &lsa->lsa_mask);
+	lsa->lsa_handler = handler;
+	lsa->lsa_restorer = 0;		/* unsupported */
+	lsa->lsa_flags = 0;
+	if (dsa->sa_flags & SA_NOCLDSTOP)
+		lsa->lsa_flags |= LINUX_SA_NOCLDSTOP;
+	if (dsa->sa_flags & SA_NOCLDWAIT)
+		lsa->lsa_flags |= LINUX_SA_NOCLDWAIT;
+	if (dsa->sa_flags & SA_SIGINFO)
+		lsa->lsa_flags |= LINUX_SA_SIGINFO;
+	if (dsa->sa_flags & SA_ONSTACK)
+		lsa->lsa_flags |= LINUX_SA_ONSTACK;
+	if (dsa->sa_flags & SA_RESTART)
+		lsa->lsa_flags |= LINUX_SA_RESTART;
+	if (dsa->sa_flags & SA_RESETHAND)
+		lsa->lsa_flags |= LINUX_SA_ONESHOT;
+	if (dsa->sa_flags & SA_NODEFER)
+		lsa->lsa_flags |= LINUX_SA_NOMASK;
+}
