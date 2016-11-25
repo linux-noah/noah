@@ -31,6 +31,7 @@
 #define NOAH_LINUX_SIGNAL_H
 
 #include "linux/common.h"
+#include "types.h"
 #include <signal.h>
 
 /* signaling */
@@ -71,6 +72,8 @@
 #define	LINUX_SIGRTMIN		32
 #define	LINUX_SIGRTMAX		64
 
+#define LINUX_NSIG              64
+
 /* sigaction flags */
 #define	LINUX_SA_NOCLDSTOP	0x00000001
 #define	LINUX_SA_NOCLDWAIT	0x00000002
@@ -100,6 +103,8 @@ void darwin_to_linux_sigset(sigset_t *, l_sigset_t *);
 #define	LINUX_SIGSET_DEL(setp, masksetp)	((setp)->__mask &= ~((masksetp)->__mask))
 #define	LINUX_SIGSET_SET(setp, masksetp)	((setp)->__mask = (masksetp)->__mask)
 
+#define LINUX_SIGSET_TO_UI64(setp)      (setp->__mask)
+
 /* sigprocmask actions */
 #define	LINUX_SIG_BLOCK		0
 #define	LINUX_SIG_UNBLOCK	1
@@ -108,7 +113,7 @@ void darwin_to_linux_sigset(sigset_t *, l_sigset_t *);
 /* sigaltstack */
 #define	LINUX_MINSIGSTKSZ	2048
 
-typedef void	(*l_handler_t)(l_int);
+typedef gaddr_t	l_handler_t;
 
 typedef struct {
   l_handler_t	lsa_handler;
