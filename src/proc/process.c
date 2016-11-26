@@ -304,13 +304,25 @@ DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
 
 DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusage_ptr)
 {
-  int *status;
-  if (copy_from_user(&status, status_ptr, sizeof status))
-    return -LINUX_EFAULT;
+  int status;
   struct rusage rusage;
-  if (copy_from_user(&rusage, rusage_ptr, sizeof rusage))
+
+  int err = syswrap(wait4(pid, &status, options, &rusage));
+  if (err < 0) {
+    return err;
+  }
+
+  if (rusage_ptr != 0) {
+    if (copy_to_user(rusage_ptr, &rusage, sizeof rusage)) {
+      return -LINUX_EFAULT;
+    }
+  }
+
+  if (copy_to_user(status_ptr, &status, sizeof status)) {
     return -LINUX_EFAULT;
-  return syswrap(wait4(pid, status, options, &rusage));
+  }
+
+  return 0;
 }
 
 static void
