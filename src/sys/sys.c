@@ -14,10 +14,6 @@ DEFINE_SYSCALL(sysinfo, gaddr_t, info_ptr)
   struct l_sysinfo info;
   size_t len;
 
-  if (copy_from_user(&info, info_ptr, sizeof info)) {
-    return -LINUX_EFAULT;
-  }
-
   struct timeval boottime;
   len = sizeof boottime;
   if (sysctlbyname("kern.boottime", &boottime, &len, NULL, 0) < 0) exit(1);
@@ -55,6 +51,10 @@ DEFINE_SYSCALL(sysinfo, gaddr_t, info_ptr)
   info.freehigh = 0;
 
   info.mem_unit = 1;
+
+  if (copy_to_user(info_ptr, &info, sizeof info)) {
+    return -LINUX_EFAULT;
+  }
 
   return 0;
 }
