@@ -41,12 +41,14 @@ void main_loop();
 #include "linux/signal.h"
 
 struct task {
+  struct list_head tasks; /* Threads in the current proc */
   gaddr_t set_child_tid, clear_child_tid;
   l_sigset_t sigmask;
 };
 
 struct proc {
   int nr_tasks;
+  struct list_head tasks;
   pthread_rwlock_t lock;
   struct mm *mm;
   char *root; /* FS root */

@@ -29,6 +29,8 @@ set_initial_proc(struct proc *proc, char *root)
     .mm = malloc(sizeof(struct mm)),
     .root = root,
   };
+  INIT_LIST_HEAD(&proc->tasks);
+  list_add(&task.tasks, &proc->tasks);
   init_mm(proc->mm);
 }
 
@@ -223,6 +225,7 @@ DEFINE_SYSCALL(exit, int, reason)
     _exit(reason);
   } else {
     proc.nr_tasks--;
+    list_del(&task.tasks);
     pthread_rwlock_unlock(&proc.lock);
     pthread_exit(&reason);
   }
