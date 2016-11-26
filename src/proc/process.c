@@ -247,16 +247,22 @@ DEFINE_SYSCALL(uname, gaddr_t, buf_ptr)
 {
   struct utsname buf;
 
-  if (copy_from_user(&buf, buf_ptr, sizeof buf))
-    return -LINUX_EFAULT;
-
   strncpy(buf.sysname, "Linux", sizeof buf.sysname - 1);
   strncpy(buf.release, LINUX_RELEASE, sizeof buf.release - 1);
   strncpy(buf.version, LINUX_VERSION, sizeof buf.version - 1);
   strncpy(buf.machine, "x86_64", sizeof buf.machine - 1);
   strncpy(buf.domainname, "GNU/Linux", sizeof buf.domainname - 1);
 
-  return syswrap(gethostname(buf.nodename, sizeof buf.nodename - 1));
+  int err = syswrap(gethostname(buf.nodename, sizeof buf.nodename - 1));
+  if (err < 0) {
+    return err;
+  }
+
+  if (copy_to_user(buf_ptr, &buf, sizeof(struct utsname))) {
+    return -LINUX_EFAULT;
+  }
+
+  return 0;
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
