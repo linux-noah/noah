@@ -307,9 +307,9 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusa
   int status;
   struct rusage rusage;
 
-  int err = syswrap(wait4(pid, &status, options, &rusage));
-  if (err < 0) {
-    return err;
+  int ret = syswrap(wait4(pid, &status, options, &rusage));
+  if (ret < 0) {
+    return ret;
   }
 
   if (rusage_ptr != 0) {
@@ -322,7 +322,7 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusa
     return -LINUX_EFAULT;
   }
 
-  return 0;
+  return ret;
 }
 
 static void
