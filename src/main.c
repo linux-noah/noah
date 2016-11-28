@@ -15,6 +15,18 @@
 
 #include <mach-o/dyld.h>
 
+static bool
+is_syscall(int instlen, uint64_t rip)
+{
+  static const ushort OP_SYSCALL = 0x050f;
+  if (instlen != 2)
+    return false;
+  ushort op;
+  if (copy_from_user(&op, rip, sizeof op))
+    return false;
+  return op == OP_SYSCALL;
+}
+
 void
 main_loop()
 {
@@ -55,9 +67,7 @@ main_loop()
       vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &exit_qual);
       printk("exit qualification = 0x%llx\n", exit_qual);
 
-      // FIXME
-      // Exception
-      if (instlen != 2 || *(unsigned char*)guest_to_host(rip) != 0x0f || *(unsigned char*)guest_to_host(rip + 1) != 0x05) {
+      if (! is_syscall(instlen, rip)) {
         if (exit_qual != 0) { // Page Fault
           fprintf(stderr, "page fault: %llx\n", exit_qual);
           exit(1);
@@ -68,9 +78,6 @@ main_loop()
         vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         continue;
       }
-
-      // Syscall
-      printk("!!MAYBE A SYSENTER!!\n");
 
       vmm_read_register(HV_X86_RAX, &rax);
 
