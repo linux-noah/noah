@@ -4,7 +4,7 @@ node {
     sh "git clean -fx"
 
     stage "Build Noah"
-    sh '''mkdir build
+    sh '''mkdir -p build
       cd build
       cmake ..
       make'''
