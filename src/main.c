@@ -57,8 +57,7 @@ main_loop()
 
       // FIXME
       // Exception
-      const ushort syscall_op = 0x0f05;
-      if (instlen != 2 && (*(ushort*)guest_to_host(rip)) != syscall_op) {
+      if (instlen != 2 || *(unsigned char*)guest_to_host(rip) != 0x0f || *(unsigned char*)guest_to_host(rip + 1) != 0x05) {
         if (exit_qual != 0) { // Page Fault
           fprintf(stderr, "page fault: %llx\n", exit_qual);
           exit(1);
