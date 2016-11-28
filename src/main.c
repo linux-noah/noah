@@ -167,18 +167,6 @@ init_vkernel()
   init_regs();
 }
 
-static void
-default_mnt(char *path)
-{
-  uint32_t bufsize;
-  _NSGetExecutablePath(NULL, &bufsize);
-  char abs_self[bufsize];
-  _NSGetExecutablePath(abs_self, &bufsize);
-  realpath(abs_self, path);
-  char *dir = dirname(path);
-  sprintf(path, "%s/../mnt", dir);
-}
-
 void
 drop_privilege(void)
 {
@@ -223,9 +211,11 @@ main(int argc, char *argv[], char **envp)
         perror("Invalid --mnt flag: ");
         exit(1);
       }
-      argv[optind - 1] = root;
       break;
     }
+  }
+  if (root[0] == 0) {
+    exit(1);
   }
 
   argc -= optind;
@@ -238,9 +228,6 @@ main(int argc, char *argv[], char **envp)
   vmm_create();
   init_vkernel();
 
-  if (root[0] == 0) {
-    default_mnt(root);
-  }
   set_initial_proc(&proc, strdup(root));
 
   int err;
