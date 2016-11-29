@@ -1,4 +1,5 @@
 node {
+  try {
     stage "Clone Repository"
     checkout scm
     sh "git clean -fx"
@@ -12,4 +13,9 @@ node {
     stage "User Program Test"
     sh '''cd build
       make test ARGS=-V'''
+  } catch (e) {
+    currentBuild.result = "FAILED"
+    slackSend message: "FAILED: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' (${env.BUILD_URL})"
+    throw e
+  }
 }
