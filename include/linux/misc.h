@@ -40,8 +40,6 @@ typedef struct {
   l_suseconds_t	tv_usec;
 } l_timeval;
 
-#define	l_fd_set	fd_set
-
 /*
  * Miscellaneous
  */

@@ -1103,9 +1103,17 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
   return ret;
 }
 
-DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf, size_t, count, off_t, pos)
+DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)
 {
-  return syswrap(pread(fd, guest_to_host(buf), count, pos));
+  char buf[count];
+  int r = syswrap(pread(fd, buf, count, pos));
+  if (r < 0) {
+    return r;
+  }
+  if (copy_to_user(buf_ptr, buf, r)) {
+    return -LINUX_EFAULT;
+  }
+  return r;
 }
 
 DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, size_t, size)
@@ -1119,16 +1127,31 @@ struct l_iovec {
   size_t iov_len;
 };
 
-DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov, int, iovcnt)
+DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov_ptr, int, iovcnt)
 {
-  struct l_iovec *src = guest_to_host(iov);
-  struct iovec dst[iovcnt];
+  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
 
+  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
+    return -LINUX_EFAULT;
+
+  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
   for (int i = 0; i < iovcnt; ++i) {
-    dst[i].iov_base = guest_to_host(src[i].iov_base);
-    dst[i].iov_len = src[i].iov_len;
+    iov[i].iov_base = alloca(liov[i].iov_len);
+    iov[i].iov_len = liov[i].iov_len;
   }
-  return syswrap(writev(fd, dst, iovcnt));
+  int r = syswrap(writev(fd, iov, iovcnt));
+  if (r < 0)
+    return r;
+  size_t size = r;
+  for (int i = 0; i < iovcnt; ++i) {
+    size_t s = MIN(size, iov[i].iov_len);
+    if (copy_to_user(liov[i].iov_base, iov[i].iov_base, s))
+      return -LINUX_EFAULT;
+    size -= s;
+    if (size == 0)
+      break;
+  }
+  return r;
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
@@ -1136,30 +1159,126 @@ DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
   return -1;
 }
 
-DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, errorfds, gaddr_t, timeout)
+DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, gaddr_t, errorfds_ptr, gaddr_t, timeout_ptr)
 {
   // Darwin's fd_set and timeval is compatible with those of Linux
-  struct timeval *h_timeout = (struct timeval*)guest_to_host(timeout);
 
-  fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
+  struct timeval timeout;
+  fd_set readfds, writefds, errorfds;
+  struct timeval *to;
+  fd_set *rfds, *wfds, *efds;
 
-  return syswrap(select(nfds, h_readfds, h_writefds, h_errorfds, h_timeout));
+  if (timeout_ptr == 0) {
+    to = NULL;
+  } else {
+    if (copy_from_user(&timeout, timeout_ptr, sizeof timeout))
+      return -LINUX_EFAULT;
+    to = &timeout;
+  }
+  if (readfds_ptr == 0) {
+    rfds = NULL;
+  } else {
+    if (copy_from_user(&readfds, readfds_ptr, sizeof readfds))
+      return -LINUX_EFAULT;
+    rfds = &readfds;
+  }
+  if (writefds_ptr == 0) {
+    wfds = NULL;
+  } else {
+    if (copy_from_user(&writefds, writefds_ptr, sizeof writefds))
+      return -LINUX_EFAULT;
+    wfds = &writefds;
+  }
+  if (errorfds_ptr == 0) {
+    efds = NULL;
+  } else {
+    if (copy_from_user(&errorfds, errorfds_ptr, sizeof errorfds))
+      return -LINUX_EFAULT;
+    efds = &errorfds;
+  }
+
+  int r = syswrap(select(nfds, rfds, wfds, efds, to));
+  if (r < 0)
+    return r;
+
+  if (readfds_ptr != 0 && copy_to_user(readfds_ptr, &readfds, sizeof readfds))
+    return -LINUX_EFAULT;
+  if (writefds_ptr != 0 && copy_to_user(writefds_ptr, &writefds, sizeof writefds))
+    return -LINUX_EFAULT;
+  if (errorfds_ptr != 0 && copy_to_user(errorfds_ptr, &errorfds, sizeof errorfds))
+    return -LINUX_EFAULT;
+  return r;
 }
 
-DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds, gaddr_t, writefds, gaddr_t, errorfds, gaddr_t, timeout, gaddr_t, sigmask)
+DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, gaddr_t, errorfds_ptr, gaddr_t, timeout_ptr, gaddr_t, sigmask_ptr)
 {
   // Darwin's fd_set and timeval is compatible with those of Linux
-  struct timespec *h_timeout = (struct timespec *) guest_to_host(timeout);
 
-  fd_set *h_readfds = guest_to_host(readfds), *h_writefds = guest_to_host(writefds), *h_errorfds = guest_to_host(errorfds);
+  struct timespec timeout;
+  fd_set readfds, writefds, errorfds;
+  struct timespec *to;
+  fd_set *rfds, *wfds, *efds;
+
+  if (timeout_ptr == 0) {
+    to = NULL;
+  } else {
+    if (copy_from_user(&timeout, timeout_ptr, sizeof timeout))
+      return -LINUX_EFAULT;
+    to = &timeout;
+  }
+  if (readfds_ptr == 0) {
+    rfds = NULL;
+  } else {
+    if (copy_from_user(&readfds, readfds_ptr, sizeof readfds))
+      return -LINUX_EFAULT;
+    rfds = &readfds;
+  }
+  if (writefds_ptr == 0) {
+    wfds = NULL;
+  } else {
+    if (copy_from_user(&writefds, writefds_ptr, sizeof writefds))
+      return -LINUX_EFAULT;
+    wfds = &writefds;
+  }
+  if (errorfds_ptr == 0) {
+    efds = NULL;
+  } else {
+    if (copy_from_user(&errorfds, errorfds_ptr, sizeof errorfds))
+      return -LINUX_EFAULT;
+    efds = &errorfds;
+  }
+
   // FIXME: Ignore sigmask now. Support it after implementing signal handling
+  int r = syswrap(pselect(nfds, rfds, wfds, efds, to, NULL));
+  if (r < 0)
+    return r;
 
-  return syswrap(pselect(nfds, h_readfds, h_writefds, h_errorfds, h_timeout, NULL));
+  if (readfds_ptr != 0 && copy_to_user(readfds_ptr, &readfds, sizeof readfds))
+    return -LINUX_EFAULT;
+  if (writefds_ptr != 0 && copy_to_user(writefds_ptr, &writefds, sizeof writefds))
+    return -LINUX_EFAULT;
+  if (errorfds_ptr != 0 && copy_to_user(errorfds_ptr, &errorfds, sizeof errorfds))
+    return -LINUX_EFAULT;
+  return r;
 }
 
-DEFINE_SYSCALL(poll, gaddr_t, fds, int, nfds, int, timeout)
+DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
 {
-  return syswrap(poll(guest_to_host(fds), nfds, timeout));
+  /* FIXME! event numbers should be translated */
+
+  struct pollfd fds[nfds];
+
+  if (copy_from_user(fds, fds_ptr, sizeof fds))
+    return -LINUX_EFAULT;
+
+  int r = syswrap(poll(fds, nfds, timeout));
+  if (r < 0)
+    return r;
+
+  if (copy_to_user(fds_ptr, fds, sizeof fds))
+    return -LINUX_EFAULT;
+
+  return r;
 }
 
 DEFINE_SYSCALL(chroot, gstr_t, path_ptr)

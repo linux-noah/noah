@@ -217,4 +217,8 @@ struct l_statfs {
 #define LINUX_ST_NODIRATIME   0x0800
 #define LINUX_ST_RELATIME     0x1000
 
+#define LINUX_FD_SETSIZE 1024
+
+typedef unsigned long l_fd_set[LINUX_FD_SETSIZE / (8 * sizeof(long))];
+
 #endif	/* !_LINUX_FILE_H_ */
