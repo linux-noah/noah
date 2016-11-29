@@ -204,8 +204,6 @@ elevate_privilege(void)
 int
 main(int argc, char *argv[], char **envp)
 {
-  abort();
-
   drop_privilege();
 
   static struct option long_options[] = {
