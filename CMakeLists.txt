@@ -15,7 +15,7 @@ add_executable(noah
   lib/vmm.c
   src/main.c
   src/meta_strace.c
-  src/common.c
+  src/base.c
   src/conv.c
   src/debug.c
   src/proc/exec.c
