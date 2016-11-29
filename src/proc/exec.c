@@ -387,7 +387,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   // Handle close-on-exec by bruteforce now. FIXME after introducing vfs
   struct rlimit rlimit;
   getrlimit(RLIMIT_NOFILE, &rlimit);
-  for (int i = 0; i < rlimit.rlim_cur; i++) {
+  for (size_t i = 0; i < rlimit.rlim_cur; i++) {
     int flag = fcntl(i, F_GETFD);
     if (flag < 0) {
       continue;
@@ -431,60 +431,81 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   return 0;
 }
 
-static int count_strings(gaddr_t v, int max)
-{
-  int ret = 0;
-  while (((gaddr_t*)guest_to_host(v))[ret] != 0) {
-    ret++;
-    if (ret > max) {
-      return -LINUX_E2BIG;
-    }
-  }
-  return ret;
-}
-
 DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 {
   int err;
   char elf_path[LINUX_PATH_MAX];
   strncpy_from_user(elf_path, gelf_path, sizeof elf_path);
 
-  if ((err = count_strings(gargv, LINUX_MAX_ARG_STRINGS)) < 0) {
-    return err;
-  }
-  int argc = err;
-  if ((err = count_strings(genvp, LINUX_MAX_ARG_STRINGS)) < 0) {
-    return err;
-  }
-  int envc = err;
-
-  char *argv[argc + 1], *envp[envc + 1];
-
-  // Copy args
-  char **vecs[] = {argv, envp};
-  gaddr_t gvecs[] = {gargv, genvp};
-  int maxs[] = {argc, envc};
-
-  for (int i = 0; i < 2; i++) {
-    char **vec = vecs[i];
-    gaddr_t *gvec = (gaddr_t *) guest_to_host(gvecs[i]);
-    int max_c = maxs[i];
-
-    for (int j = 0; j < max_c; j++) {
-      int size = strnlen_user(gvec[j], LINUX_MAX_ARG_STRLEN);
-      if (size > LINUX_MAX_ARG_STRLEN) {
-        return -LINUX_E2BIG;
-      }
-      vec[j] = alloca(size);
-      strncpy_from_user(vec[j], gvec[j], size);
-      // The string may be changed after strnsize_user by another thread
-      if (vec[j][size - 1] != 0) {
-        return -LINUX_E2BIG;
-      }
+  size_t argv_rsrv = 1024;
+  char **argv = malloc(sizeof(char *) * argv_rsrv);
+  size_t argc = 0;
+  while (true) {
+    size_t i = argc;
+    gaddr_t addr;
+    if (copy_from_user(&addr, gargv + sizeof(gaddr_t) * i, sizeof addr)) {
+      err = -LINUX_EFAULT;
+      goto argv_out;
     }
-
-    vec[max_c] = NULL;
+    if (addr == 0)
+      break;
+    argc++;
+    if (argc + 1 > LINUX_MAX_ARG_STRINGS) {
+      err = -LINUX_E2BIG;
+      goto argv_out;
+    }
+    if (argc + 1 > argv_rsrv) {
+      argv_rsrv *= 2;
+      argv = realloc(argv, sizeof(char *) * argv_rsrv);
+    }
+    int size = strnlen_user(addr, LINUX_MAX_ARG_STRLEN);
+    if (size == 0) {
+      err = -LINUX_EFAULT;
+      goto argv_out;
+    }
+    if (size > LINUX_MAX_ARG_STRLEN) {
+      err = -LINUX_E2BIG;
+      goto argv_out;
+    }
+    argv[i] = alloca(size);
+    copy_from_user(argv[i], addr, size); /* always success */
   }
+  argv[argc] = NULL;
+
+  size_t envp_rsrv = 1024;
+  char **envp = malloc(sizeof(char *) * envp_rsrv);
+  size_t envc = 0;
+  while (true) {
+    size_t i = envc;
+    gaddr_t addr;
+    if (copy_from_user(&addr, genvp + sizeof(gaddr_t) * i, sizeof addr)) {
+      err = -LINUX_EFAULT;
+      goto envp_out;
+    }
+    if (addr == 0)
+      break;
+    envc++;
+    if (envc + 1 > LINUX_MAX_ARG_STRINGS) {
+      err = -LINUX_E2BIG;
+      goto envp_out;
+    }
+    if (envc + 1 > envp_rsrv) {
+      envp_rsrv *= 2;
+      envp = realloc(envp, sizeof(char *) * envp_rsrv);
+    }
+    int size = strnlen_user(addr, LINUX_MAX_ARG_STRLEN);
+    if (size == 0) {
+      err = -LINUX_EFAULT;
+      goto envp_out;
+    }
+    if (size > LINUX_MAX_ARG_STRLEN) {
+      err = -LINUX_E2BIG;
+      goto envp_out;
+    }
+    envp[i] = alloca(size);
+    copy_from_user(envp[i], addr, size); /* always success */
+  }
+  envp[envc] = NULL;
 
   err = do_exec(elf_path, argc, argv, envp);
   if (err < 0) {
@@ -496,4 +517,10 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
   vmm_write_register(HV_X86_RIP, entry - 2); // because syscall handler adds 2 to current rip when returning to vmm_run
 
   return 0;
+
+ envp_out:
+  free(envp);
+ argv_out:
+  free(argv);
+  return err;
 }
