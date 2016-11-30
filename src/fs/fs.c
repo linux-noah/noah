@@ -1200,7 +1200,8 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 {
-  return -1;
+  printk("fadvise is unimplemented\n");
+  return 0;
 }
 
 DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, gaddr_t, errorfds_ptr, gaddr_t, timeout_ptr)
