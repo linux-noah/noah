@@ -1136,10 +1136,27 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov_ptr, int, iovcnt)
 
   struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
   for (int i = 0; i < iovcnt; ++i) {
+    iov[i].iov_len = liov[i].iov_len;
+    iov[i].iov_base = alloca(liov[i].iov_len);
+    if (copy_from_user(iov[i].iov_base, liov[i].iov_base, iov[i].iov_len))
+      return -LINUX_EFAULT;
+  }
+  return syswrap(writev(fd, iov, iovcnt));
+}
+
+DEFINE_SYSCALL(readv, int, fd, gaddr_t, iov_ptr, int, iovcnt)
+{
+  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
+
+  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
+    return -LINUX_EFAULT;
+
+  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
+  for (int i = 0; i < iovcnt; ++i) {
     iov[i].iov_base = alloca(liov[i].iov_len);
     iov[i].iov_len = liov[i].iov_len;
   }
-  int r = syswrap(writev(fd, iov, iovcnt));
+  int r = syswrap(readv(fd, iov, iovcnt));
   if (r < 0)
     return r;
   size_t size = r;

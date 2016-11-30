@@ -20,7 +20,7 @@
   SYSCALL(16, ioctl)                            \
   SYSCALL(17, pread64)                          \
   SYSCALL(18, unimplemented)                    \
-  SYSCALL(19, unimplemented)                    \
+  SYSCALL(19, readv)                            \
   SYSCALL(20, writev)                           \
   SYSCALL(21, access)                           \
   SYSCALL(22, pipe)                             \
