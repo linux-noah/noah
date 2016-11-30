@@ -149,6 +149,7 @@ statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs)
   l_statfs->f_fsid.val[0] = statfs->f_fsid.val[0];
   l_statfs->f_fsid.val[1] = statfs->f_fsid.val[1];
   l_statfs->f_namelen = NAME_MAX;
+  l_statfs->f_frsize = statfs->f_bsize;
 
   l_statfs->f_flags = LINUX_ST_VALID;
   if (statfs->f_flags & MNT_RDONLY)

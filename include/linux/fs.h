@@ -202,8 +202,9 @@ struct l_statfs {
   l_long	f_ffree;
   l_fsid_t	f_fsid;
   l_long	f_namelen;
+  l_long        f_frsize;
   l_long	f_flags;
-  l_long	f_spare[6];
+  l_long	f_spare[4];
 };
 
 #define LINUX_ST_RDONLY       0x0001
