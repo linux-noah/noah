@@ -116,3 +116,22 @@ char *sc_name_table[NR_SYSCALLS] = {
   SYSCALLS
 #undef SYSCALL
 };
+
+#define DEFINE_NOT_IMPLEMENTED_SYSCALL(name)      \
+  DEFINE_SYSCALL(name)                            \
+  {                                               \
+    return -LINUX_ENOSYS;                         \
+  }
+
+DEFINE_NOT_IMPLEMENTED_SYSCALL(vserver)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(uselib)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(epoll_ctl_old)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(epoll_wait_old)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(getpmsg)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(putpmsg)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(nfsservctl)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(security)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(set_thread_area)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(get_thread_area)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(tuxcall)
+DEFINE_NOT_IMPLEMENTED_SYSCALL(afs_syscall)

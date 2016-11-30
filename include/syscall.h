@@ -135,7 +135,7 @@
   SYSCALL(131, sigaltstack)                     \
   SYSCALL(132, unimplemented)                   \
   SYSCALL(133, unimplemented)                   \
-  SYSCALL(134, unimplemented)                   \
+  SYSCALL(134, uselib)                          \
   SYSCALL(135, unimplemented)                   \
   SYSCALL(136, unimplemented)                   \
   SYSCALL(137, statfs)                          \
@@ -181,12 +181,12 @@
   SYSCALL(177, unimplemented)                   \
   SYSCALL(178, unimplemented)                   \
   SYSCALL(179, unimplemented)                   \
-  SYSCALL(180, unimplemented)                   \
-  SYSCALL(181, unimplemented)                   \
-  SYSCALL(182, unimplemented)                   \
-  SYSCALL(183, unimplemented)                   \
-  SYSCALL(184, unimplemented)                   \
-  SYSCALL(185, unimplemented)                   \
+  SYSCALL(180, nfsservctl)                      \
+  SYSCALL(181, getpmsg)                         \
+  SYSCALL(182, putpmsg)                         \
+  SYSCALL(183, afs_syscall)                     \
+  SYSCALL(184, tuxcall)                         \
+  SYSCALL(185, security)                        \
   SYSCALL(186, gettid)                          \
   SYSCALL(187, unimplemented)                   \
   SYSCALL(188, unimplemented)                   \
@@ -206,17 +206,17 @@
   SYSCALL(202, futex)                           \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, unimplemented)                   \
-  SYSCALL(205, unimplemented)                   \
+  SYSCALL(205, set_thread_area)                 \
   SYSCALL(206, unimplemented)                   \
   SYSCALL(207, unimplemented)                   \
   SYSCALL(208, unimplemented)                   \
   SYSCALL(209, unimplemented)                   \
   SYSCALL(210, unimplemented)                   \
-  SYSCALL(211, unimplemented)                   \
+  SYSCALL(211, get_thread_area)                 \
   SYSCALL(212, unimplemented)                   \
   SYSCALL(213, unimplemented)                   \
-  SYSCALL(214, unimplemented)                   \
-  SYSCALL(215, unimplemented)                   \
+  SYSCALL(214, epoll_ctl_old)                   \
+  SYSCALL(215, epoll_wait_old)                  \
   SYSCALL(216, unimplemented)                   \
   SYSCALL(217, unimplemented)                   \
   SYSCALL(218, set_tid_address)                 \
@@ -237,7 +237,7 @@
   SYSCALL(233, unimplemented)                   \
   SYSCALL(234, unimplemented)                   \
   SYSCALL(235, utimes)                          \
-  SYSCALL(236, unimplemented)                   \
+  SYSCALL(236, vserver)                         \
   SYSCALL(237, unimplemented)                   \
   SYSCALL(238, unimplemented)                   \
   SYSCALL(239, unimplemented)                   \
