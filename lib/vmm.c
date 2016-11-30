@@ -226,6 +226,10 @@ init_page()
 void
 init_special_regs()
 {
+  uint64_t cr0;
+  vmm_read_vmcs(VMCS_GUEST_CR0, &cr0);
+  vmm_write_vmcs(VMCS_GUEST_CR0, (cr0 & ~CR0_EM) | CR0_MP);
+
   uint64_t cr4;
   vmm_read_vmcs(VMCS_GUEST_CR4, &cr4);
   vmm_write_vmcs(VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE);

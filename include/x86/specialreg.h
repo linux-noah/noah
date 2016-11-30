@@ -1,4 +1,6 @@
 #define CR0_PE          0x00000001      // Protection Enable
+#define CR0_MP          0x00000002      // for FPU/SSE
+#define CR0_EM          0x00000004      // fpu emulation
 #define CR0_NE          0x00000020      // Numeric Error Enable
 #define CR0_PG          0x80000000      // Paging
 #define CR4_PSE         0x00000010      // Page size extension
