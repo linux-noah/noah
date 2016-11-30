@@ -3,9 +3,12 @@
 
 #include "linux/common.h"
 #include "linux/misc.h"
+#include "linux/random.h"
 
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <sys/time.h>
 #include <sys/sysctl.h>
 
@@ -57,4 +60,29 @@ DEFINE_SYSCALL(sysinfo, gaddr_t, info_ptr)
   }
 
   return 0;
+}
+
+DEFINE_SYSCALL(getrandom, gaddr_t, buf_ptr, size_t, count, unsigned, flags)
+{
+  if (flags & ~(GRND_RANDOM | GRND_NONBLOCK)) {
+    return -LINUX_EINVAL;
+  }
+  const char *source;
+  source = flags & GRND_RANDOM ? "/dev/random" : "/dev/urandom";
+  int oflags = O_RDONLY;
+  oflags |= flags & GRND_NONBLOCK ? O_NONBLOCK : 0;
+  int fd = open(source, oflags);
+  if (fd < 0) {
+    printk("getrandom: logic flaw\n");
+    return -darwin_to_linux_errno(errno);
+  }
+  char buf[count];
+  int r = read(fd, buf, count);
+  if (r < 0) {
+    return -darwin_to_linux_errno(errno);
+  }
+  if (copy_to_user(buf_ptr, buf, count)) {
+    return -LINUX_EFAULT;
+  }
+  return r;
 }

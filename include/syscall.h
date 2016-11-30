@@ -319,7 +319,7 @@
   SYSCALL(315, unimplemented)                   \
   SYSCALL(316, unimplemented)                   \
   SYSCALL(317, unimplemented)                   \
-  SYSCALL(318, unimplemented)                   \
+  SYSCALL(318, getrandom)                       \
   SYSCALL(319, unimplemented)                   \
   SYSCALL(320, unimplemented)                   \
   SYSCALL(321, unimplemented)                   \
