@@ -265,6 +265,13 @@ DEFINE_SYSCALL(uname, gaddr_t, buf_ptr)
   return 0;
 }
 
+DEFINE_SYSCALL(prctl, int, option)
+{
+  /* FIXME */
+  printk("prctl is not implemented yet\n");
+  return -EINVAL;
+}
+
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 {
   uint64_t t;
