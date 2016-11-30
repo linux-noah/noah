@@ -34,6 +34,10 @@
 
 #include "linux/const.h"
 
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <netinet/in.h>
+
 /*
  * Socket defines
  */

@@ -37,6 +37,7 @@
 #include "linux/errno.h"
 #include "linux/ioctl.h"
 #include "linux/termios.h"
+#include "linux/socket.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -66,8 +67,8 @@ struct file {
 };
 
 struct file_operations {
-  int (*write)(struct file *f, const char *buf, size_t size);
-  int (*read)(struct file *f, char *buf, size_t size);
+  int (*readv)(struct file *f, struct iovec *iov, size_t iovcnt);
+  int (*writev)(struct file *f, const struct iovec *iov, size_t iovcnt);
   int (*close)(struct file *f);
   int (*stat)(struct file *f, struct l_newstat *stat);
   int (*fchown)(struct file *f, l_uid_t uid, l_gid_t gid);
@@ -81,15 +82,15 @@ struct file_operations {
 };
 
 int
-darwinfs_write(struct file *file, const char *buf, size_t size)
+darwinfs_writev(struct file *file, const struct iovec *iov, size_t iovcnt)
 {
-  return syswrap(write(file->fd, buf, size));
+  return syswrap(writev(file->fd, iov, iovcnt));
 }
 
 int
-darwinfs_read(struct file *file, char *buf, size_t size)
+darwinfs_readv(struct file *file, struct iovec *iov, size_t iovcnt)
 {
-  return syswrap(read(file->fd, buf, size));
+  return syswrap(readv(file->fd, iov, iovcnt));
 }
 
 int
@@ -289,8 +290,8 @@ struct file *
 vfs_acquire(int fd)
 {
   static struct file_operations ops = {
-    darwinfs_write,
-    darwinfs_read,
+    darwinfs_readv,
+    darwinfs_writev,
     darwinfs_close,
     darwinfs_stat,
     darwinfs_fchown,
@@ -326,11 +327,12 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
   if (file == NULL)
     return -LINUX_EBADF;
   int r;
-  if (file->ops->write == NULL) {
+  if (file->ops->writev == NULL) {
     r = -LINUX_EBADF;
     goto out;
   }
-  r = file->ops->write(file, buf, size);
+  struct iovec iov = { buf, size };
+  r = file->ops->writev(file, &iov, 1);
  out:
   vfs_release(file);
   return r;
@@ -343,17 +345,88 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   if (file == NULL)
     return -LINUX_EBADF;
   int r;
-  if (file->ops->read == NULL) {
+  if (file->ops->readv == NULL) {
     r = -LINUX_EBADF;
     goto out;
   }
-  r = file->ops->read(file, buf, size);
+  struct iovec iov = { buf, size };
+  r = file->ops->readv(file, &iov, 1);
   if (r < 0) {
     goto out;
   }
   if (copy_to_user(buf_ptr, buf, r)) {
     r = -LINUX_EFAULT;
     goto out;
+  }
+ out:
+  vfs_release(file);
+  return r;
+}
+
+DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov_ptr, int, iovcnt)
+{
+  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
+
+  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
+    return -LINUX_EFAULT;
+
+  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
+  for (int i = 0; i < iovcnt; ++i) {
+    iov[i].iov_len = liov[i].iov_len;
+    iov[i].iov_base = alloca(liov[i].iov_len);
+    if (copy_from_user(iov[i].iov_base, liov[i].iov_base, iov[i].iov_len))
+      return -LINUX_EFAULT;
+  }
+
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r;
+  if (file->ops->writev == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
+  }
+  r = file->ops->writev(file, iov, iovcnt);
+ out:
+  vfs_release(file);
+  return r;
+}
+
+DEFINE_SYSCALL(readv, int, fd, gaddr_t, iov_ptr, int, iovcnt)
+{
+  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
+
+  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
+    return -LINUX_EFAULT;
+
+  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
+  for (int i = 0; i < iovcnt; ++i) {
+    iov[i].iov_base = alloca(liov[i].iov_len);
+    iov[i].iov_len = liov[i].iov_len;
+  }
+
+  struct file *file = vfs_acquire(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  int r;
+  if (file->ops->readv == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
+  }
+  r = file->ops->readv(file, iov, iovcnt);
+  if (r < 0) {
+    goto out;
+  }
+  size_t size = r;
+  for (int i = 0; i < iovcnt; ++i) {
+    size_t s = MIN(size, iov[i].iov_len);
+    if (copy_to_user(liov[i].iov_base, iov[i].iov_base, s)) {
+      r = -LINUX_EFAULT;
+      goto out;
+    }
+    size -= s;
+    if (size == 0)
+      break;
   }
  out:
   vfs_release(file);
@@ -1123,55 +1196,6 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
 {
   printk("getxattr is unimplemented\n");
   return -LINUX_ENOTSUP;
-}
-
-struct l_iovec {
-  gaddr_t iov_base;
-  size_t iov_len;
-};
-
-DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov_ptr, int, iovcnt)
-{
-  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
-
-  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
-    return -LINUX_EFAULT;
-
-  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
-  for (int i = 0; i < iovcnt; ++i) {
-    iov[i].iov_len = liov[i].iov_len;
-    iov[i].iov_base = alloca(liov[i].iov_len);
-    if (copy_from_user(iov[i].iov_base, liov[i].iov_base, iov[i].iov_len))
-      return -LINUX_EFAULT;
-  }
-  return syswrap(writev(fd, iov, iovcnt));
-}
-
-DEFINE_SYSCALL(readv, int, fd, gaddr_t, iov_ptr, int, iovcnt)
-{
-  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * iovcnt);
-
-  if (copy_from_user(liov, iov_ptr, sizeof(struct l_iovec) * iovcnt))
-    return -LINUX_EFAULT;
-
-  struct iovec *iov = alloca(sizeof(struct iovec) * iovcnt);
-  for (int i = 0; i < iovcnt; ++i) {
-    iov[i].iov_base = alloca(liov[i].iov_len);
-    iov[i].iov_len = liov[i].iov_len;
-  }
-  int r = syswrap(readv(fd, iov, iovcnt));
-  if (r < 0)
-    return r;
-  size_t size = r;
-  for (int i = 0; i < iovcnt; ++i) {
-    size_t s = MIN(size, iov[i].iov_len);
-    if (copy_to_user(liov[i].iov_base, iov[i].iov_base, s))
-      return -LINUX_EFAULT;
-    size -= s;
-    if (size == 0)
-      break;
-  }
-  return r;
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
