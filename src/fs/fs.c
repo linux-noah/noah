@@ -235,10 +235,12 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
   }
   struct dirent *dent;
   size_t pos = 0;
+  long loc = telldir(dir);
   errno = 0;
   while ((dent = readdir(dir)) != NULL) {
     size_t reclen = roundup(offsetof(struct l_dirent, d_name) + dent->d_namlen + 2, 8);
     if (pos + reclen > count) {
+      seekdir(dir, loc);
       goto end;
     }
     /* fill dirent buffer */
@@ -250,6 +252,7 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
     ((char *) dp)[reclen - 1] = dent->d_type;
 
     pos += reclen;
+    loc = telldir(dir);
   }
   if (errno) {
     return -darwin_to_linux_errno(errno);
