@@ -16,7 +16,7 @@
   SYSCALL(12, brk)                              \
   SYSCALL(13, rt_sigaction)                     \
   SYSCALL(14, rt_sigprocmask)                   \
-  SYSCALL(15, unimplemented)                    \
+  SYSCALL(15, rt_sigreturn)                     \
   SYSCALL(16, ioctl)                            \
   SYSCALL(17, pread64)                          \
   SYSCALL(18, unimplemented)                    \

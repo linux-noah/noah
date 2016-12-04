@@ -32,6 +32,7 @@ set_initial_proc(struct proc *proc, char *root)
   INIT_LIST_HEAD(&proc->tasks);
   list_add(&task.tasks, &proc->tasks);
   init_mm(proc->mm);
+  init_signal(proc);
 }
 
 DEFINE_SYSCALL(sched_yield)

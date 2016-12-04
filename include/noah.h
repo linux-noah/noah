@@ -53,10 +53,18 @@ uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
 
 /* task related data */
 
+struct sighand {
+  pthread_rwlock_t lock;
+  l_sigaction_t sigaction[LINUX_NSIG];
+};
+
+_Thread_local extern atomic_sigbits_t task_sigpending;  // sigpending cannot be inside task struct because thread local variables referred by signal handler should be atomic type
+
 struct task {
   struct list_head tasks; /* Threads in the current proc */
   gaddr_t set_child_tid, clear_child_tid;
   l_sigset_t sigmask;
+  atomic_sigbits_t *sigpending;
 };
 
 struct proc {
@@ -65,12 +73,17 @@ struct proc {
   pthread_rwlock_t lock;
   struct mm *mm;
   char *root; /* FS root */
+  l_sigset_t sigpending;
+  struct sighand sighand;
 };
 
 extern struct proc proc;
 _Thread_local extern struct task task;
 
 void set_initial_proc(struct proc *proc, char *root);
+void init_signal(struct proc *);
+
+/* Linux kernel constants */
 
 #define LINUX_RELEASE "4.6.4"
 #define LINUX_VERSION "#1 SMP PREEMPT Mon Jul 11 19:12:32 CEST 2016" /* FIXME */

@@ -6,7 +6,9 @@
 #include <string.h>
 #include <sys/syslimits.h>
 #include <libgen.h>
+#include <strings.h>
 
+#include "common.h"
 #include "vmm.h"
 #include "mm.h"
 #include "noah.h"
@@ -47,10 +49,242 @@ handle_syscall(void)
   vmm_write_register(HV_X86_RAX, retval);
 }
 
+static inline int
+should_deliver(int sig)
+{
+  if (sig == 0) {
+    return 0;
+  }
+  return (1 << (sig - 1)) & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
+}
+
+static inline int
+get_procsig_to_deliver(bool unsets)
+{
+  uint64_t pending;
+  if ((pending = LINUX_SIGSET_TO_UI64(&proc.sigpending)) == 0) {
+    return 0;
+  }
+  int sig = 0;
+  while (sig <= 32) {
+    if (((pending >> sig++) & 1) == 0)
+      continue;
+    if (should_deliver(sig)) {
+      if (unsets) {
+        LINUX_SIGDELSET(&proc.sigpending, sig);
+      }
+      return sig;
+    }
+  }
+  return 0;
+}
+
+static inline int
+get_tasksig_to_deliver(bool unsets)
+{
+  uint64_t task_sig, sig;
+
+retry:
+  if ((task_sig = *task.sigpending) == 0) {
+    return 0;
+  }
+
+  sig = 0;
+  while (sig <= 32) {
+    if (((task_sig >> sig++) & 1) == 0)
+      continue;
+
+    if (should_deliver(sig)) {
+      if (unsets) {
+        uint64_t prev = sigbits_delbit(task.sigpending, sig);
+        if (!(prev & (1 << (sig - 1))))
+          goto retry;
+      }
+      return sig;
+    }
+  }
+  return 0;
+}
+
+int
+get_sig_to_deliver()
+{
+  int sig = get_procsig_to_deliver(false);
+  if (sig) {
+    return sig;
+  }
+  return get_tasksig_to_deliver(false);
+}
+
+int
+set_sigdelivering()
+{
+  int sig = 0;
+  if (LINUX_SIGSET_TO_UI64(&proc.sigpending) != 0) {
+    pthread_rwlock_wrlock(&proc.lock);
+    sig = ffs(LINUX_SIGSET_TO_UI64(&proc.sigpending));
+    if (sig && !should_deliver(sig)) {
+      LINUX_SIGDELSET(&proc.sigpending, sig);
+      //LINUX_SIGADDSET(&proc.sigdelivering, sig);
+      pthread_rwlock_unlock(&proc.lock);
+      return sig;
+    }
+    pthread_rwlock_unlock(&proc.lock);
+  }
+  sig = 0;
+  uint64_t task_sig;
+  if ((task_sig = *task.sigpending) != 0) {
+    sig = ffs(task_sig);
+    if (sig && !should_deliver(sig)) {
+      if (!atomic_compare_exchange_strong(task.sigpending, &task_sig, task_sig & ~(1 << (sig - 1)))) {
+        //LINUX_SIGADDSET(&proc.sigdelivering, sig);
+        return sig;
+      }
+    }
+  }
+
+  return 0;
+}
+
+static const struct retcode {
+  uint16_t poplmovl;
+  uint32_t nr_sigreturn;
+  uint64_t syscall;
+} __attribute__((packed)) retcode_bin = {
+  0xb858, // popl %eax; movl $..., %eax
+  NR_rt_sigreturn,
+  0x0f05, // syscall
+};
+
+struct sigcontext {
+  uint64_t vcpu_reg[NR_X86_REG_LIST]; //temporarily, FIXME
+  int signum;
+  l_sigset_t oldmask;
+};
+
+struct ucontext {
+  struct sigcontext sigcontext;
+};
+
+struct sigframe {
+  gaddr_t pretcode;
+  struct retcode retcode;
+  struct ucontext ucontext;
+  // siginfo
+};
+
+int
+setup_sigframe(int signum)
+{
+  int err = 0;
+  struct sigframe frame;
+
+  printf("setup_sigframe!\n");
+
+  assert(signum <= LINUX_NSIG);
+  assert(is_aligned(sizeof frame, sizeof(uint64_t)));
+  assert(is_aligned(offsetof(struct sigframe, retcode), sizeof(uint64_t)));
+
+  uint64_t rsp;
+  vmm_read_register(HV_X86_RSP, &rsp);
+  rsp -= sizeof frame;
+  vmm_write_register(HV_X86_RSP, rsp);
+
+  /* Setup sigframe */
+  if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
+    frame.pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
+  } else {
+    frame.pretcode = rsp + offsetof(struct sigframe, retcode);
+  }
+  frame.retcode = retcode_bin;
+
+
+  /* Setup sigcontext */
+  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
+    if (x86_reg_list[i] == HV_X86_IDT_BASE) {
+      break;
+    }
+    //TODO: save some segment related regs
+    //TODO: save FPU state
+    vmm_read_register(x86_reg_list[i], &frame.ucontext.sigcontext.vcpu_reg[i]);
+  }
+
+  sigset_t dset;
+  frame.ucontext.sigcontext.oldmask = task.sigmask;
+  l_sigset_t newmask = proc.sighand.sigaction[signum - 1].lsa_mask;
+  LINUX_SIGADDSET(&newmask, signum);
+  task.sigmask = newmask;
+  linux_to_darwin_sigset(&newmask, &dset);
+  sigprocmask(SIG_SETMASK, &dset, NULL);
+
+  frame.ucontext.sigcontext.signum = signum;
+
+  /* OK, push them then... */
+  if (copy_to_user(rsp, &frame, sizeof frame)) {
+    err = -LINUX_EFAULT;
+    goto error;
+  }
+
+  /* Setup signals */
+  vmm_write_register(HV_X86_RDI, signum);
+  vmm_write_register(HV_X86_RSI, 0); // TODO: siginfo
+  vmm_write_register(HV_X86_RDI, 0); // TODO: ucontext
+
+  vmm_write_register(HV_X86_RAX, 0);
+  printf("handler:%llx\n", proc.sighand.sigaction[signum - 1].lsa_handler);
+  vmm_write_register(HV_X86_RIP, proc.sighand.sigaction[signum - 1].lsa_handler);
+
+  return 0;
+
+error:
+  task.sigmask = frame.ucontext.sigcontext.oldmask;
+  linux_to_darwin_sigset(&task.sigmask, &dset);
+  sigprocmask(SIG_SETMASK, &dset, NULL);
+
+  return err;
+}
+
+void
+deliver_signal()
+{
+  int sig;
+
+  pthread_rwlock_wrlock(&proc.lock);
+  sig = get_procsig_to_deliver(true);
+  if (sig) {
+    if (setup_sigframe(sig) < 0) {
+      LINUX_SIGADDSET(&proc.sigpending, sig);
+      sig = 0;
+    }
+  }
+  pthread_rwlock_unlock(&proc.lock);
+
+  if (sig) {
+    return;
+  }
+
+  sig = get_tasksig_to_deliver(true);
+  if (sig) {
+    if (setup_sigframe(sig) < 0) {
+      sigbits_addbit(task.sigpending, sig);
+    }
+  }
+}
+
+int
+task_run()
+{
+  if (get_sig_to_deliver()) {
+    printf("deliver!:%d\n", get_sig_to_deliver());
+    deliver_signal();
+  }
+  return vmm_run();
+}
+
 void
 main_loop()
 {
-  while (vmm_run() == 0) {
+  while (task_run() == 0) {
 
     /* dump_instr(); */
     /* print_regs(); */
