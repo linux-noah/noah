@@ -164,8 +164,6 @@ setup_sigframe(int signum)
 
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
-  rsp -= sizeof frame;
-  vmm_write_register(HV_X86_RSP, rsp);
 
   /* Setup sigframe */
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
@@ -184,6 +182,7 @@ setup_sigframe(int signum)
     //TODO: save some segment related regs
     //TODO: save FPU state
     vmm_read_register(x86_reg_list[i], &frame.ucontext.sigcontext.vcpu_reg[i]);
+    printf("save: %s, %llx\n", x86_reg_str[i], frame.ucontext.sigcontext.vcpu_reg[i]);
   }
 
   sigset_t dset;
@@ -197,10 +196,13 @@ setup_sigframe(int signum)
   frame.ucontext.sigcontext.signum = signum;
 
   /* OK, push them then... */
+  rsp -= sizeof frame;
+  vmm_write_register(HV_X86_RSP, rsp);
   if (copy_to_user(rsp, &frame, sizeof frame)) {
     err = -LINUX_EFAULT;
     goto error;
   }
+  printf("setup rsp: %llx", rsp);
 
   /* Setup signals */
   vmm_write_register(HV_X86_RDI, signum);
@@ -387,7 +389,41 @@ DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
 
 DEFINE_SYSCALL(rt_sigreturn)
 {
-  printf("sig return!\n");
+  uint64_t rsp;
+  vmm_read_register(HV_X86_RSP, &rsp);
+
+  printf("sigreturn!\n");
+
+  struct sigframe frame;
+  if (copy_from_user(&frame, rsp - sizeof frame.pretcode, sizeof frame)) {
+    // Terminate with sigsegv
+    struct sigaction act;
+    act.sa_handler = SIG_DFL;
+    act.sa_flags = 0;
+    sigaction(SIGSEGV, &act, NULL);
+    kill(getpid(), SIGSEGV); 
+  }
+
+  /* Restore sigcontext */
+  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
+    if (x86_reg_list[i] == HV_X86_IDT_BASE) {
+      break;
+    }
+    //TODO: restore some segment related regs
+    //TODO: restore FPU state
+    vmm_write_register(x86_reg_list[i], frame.ucontext.sigcontext.vcpu_reg[i]);
+    printf("restore: %s, %llx\n", x86_reg_str[i], frame.ucontext.sigcontext.vcpu_reg[i]);
+  }
+
+  sigset_t dset;
+  task.sigmask = frame.ucontext.sigcontext.oldmask;
+  linux_to_darwin_sigset(&task.sigmask, &dset);
+  sigprocmask(SIG_SETMASK, &dset, NULL);
+
+  uint64_t rip;
+  vmm_read_register(HV_X86_RIP, &rip);
+  vmm_write_register(HV_X86_RIP, rip - 2); // Because syshandler add 2 when returning to guest
+
   return 0;
 }
 
