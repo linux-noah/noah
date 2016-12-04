@@ -27,11 +27,31 @@ is_syscall(int instlen, uint64_t rip)
   return op == OP_SYSCALL;
 }
 
+static void
+handle_syscall(void)
+{
+  uint64_t rax;
+  vmm_read_register(HV_X86_RAX, &rax);
+  if (rax >= NR_SYSCALLS) {
+    printf("unknown system call: %lld\n", rax);
+    exit(1);            /* TODO: signal something */
+  }
+  uint64_t rdi, rsi, rdx, r10, r8, r9;
+  vmm_read_register(HV_X86_RDI, &rdi);
+  vmm_read_register(HV_X86_RSI, &rsi);
+  vmm_read_register(HV_X86_RDX, &rdx);
+  vmm_read_register(HV_X86_R10, &r10);
+  vmm_read_register(HV_X86_R8, &r8);
+  vmm_read_register(HV_X86_R9, &r9);
+  printk(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
+  uint64_t retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
+  printk("<<<syscall done: %lld\n", retval);
+  vmm_write_register(HV_X86_RAX, retval);
+}
+
 void
 main_loop()
 {
-  uint64_t value;
-
   while (vmm_run() == 0) {
 
     dump_instr();
@@ -41,75 +61,135 @@ main_loop()
     vmm_read_vmcs(VMCS_RO_EXIT_REASON, &exit_reason);
 
     switch (exit_reason) {
-      uint64_t rax, rdi, rsi, rdx, r10, r8, r9;
-
     case VMX_REASON_VMCALL:
       printk("reason: vmcall\n");
       assert(false);
       break;
 
     case VMX_REASON_EXC_NMI: {
-      uint64_t instlen, rip, irqvec, irqerr, intstatus, exit_qual;
-      uint64_t retval;
+      /* References:
+       * - Intel SDM 27.2.2, Table 24-15: Information for VM Exits Due to Vectored Events
+       */
+      uint64_t exc_info;
+      vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_INFO, &exc_info);
 
-      printk("reason: exc or nmi\n");
-      printk("\n");
-      vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
-      printk("instr length = 0x%llx\n", instlen);
-      vmm_read_register(HV_X86_RIP, &rip);
-      printk("rip = 0x%llx\n", rip);
-      vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_INFO, &irqvec);
-      printk("irq info = %lld\n", irqvec);
-      vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_ERROR, &irqerr);
-      printk("irq error = %lld\n", irqerr);
-      vmm_read_vmcs(VMCS_GUEST_INT_STATUS, &intstatus);
-      printk("guest int status = %lld\n", intstatus);
-      vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &exit_qual);
-      printk("exit qualification = 0x%llx\n", exit_qual);
+#define VMCS_EXCTYPE_EXTERNAL_INTERRUPT 0
+#define VMCS_EXCTYPE_NONMASKTABLE_INTERRUPT 2
+#define VMCS_EXCTYPE_HARDWARE_EXCEPTION 3
+#define VMCS_EXCTYPE_SOFTWARE_EXCEPTION 6
 
-      if (! is_syscall(instlen, rip)) {
-        if (exit_qual != 0) { // Page Fault
-          fprintf(stderr, "page fault: %llx\n", exit_qual);
-          exit(1);
-        }
-
-        // Exception such as #P
-        printk("!!MAYBE AN Ignorable Exception!!\n");
-        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
+      int int_type = (exc_info & 0x700) >> 8;
+      switch (int_type) {
+      default:
+        assert(false);
+      case VMCS_EXCTYPE_EXTERNAL_INTERRUPT:
+      case VMCS_EXCTYPE_NONMASKTABLE_INTERRUPT:
+        /* nothing we can do, host os handles it */
         continue;
+      case VMCS_EXCTYPE_HARDWARE_EXCEPTION: /* including invalid opcode */
+      case VMCS_EXCTYPE_SOFTWARE_EXCEPTION: /* including break points, overflows */
+        break;
       }
 
-      vmm_read_register(HV_X86_RAX, &rax);
+      /* See also http://wiki.osdev.org/Exceptions#Virtualization_Exception */
+#define X86_VEC_DE 0            /* division by zero */
+#define X86_VEC_DB 1            /* debug */
+#define X86_VEC_BP 3            /* breakpoint */
+#define X86_VEC_OF 4            /* overflow */
+#define X86_VEC_BR 5            /* bound range exceeded */
+#define X86_VEC_UD 6            /* invalid opcode */
+#define X86_VEC_NM 7            /* device not available */
+#define X86_VEC_DF 8            /* double fault */
+#define X86_VEC_TS 10           /* invalid TSS */
+#define X86_VEC_NP 11           /* segment not present */
+#define X86_VEC_SS 12           /* stack segment fault */
+#define X86_VEC_GP 13           /* general protection fault */
+#define X86_VEC_PF 14           /* page fault */
+#define X86_VEC_MF 16           /* x87 floating-point exception */
+#define X86_VEC_AC 17           /* alignment check */
+#define X86_VEC_MC 18           /* machine check */
+#define X86_VEC_XM 19           /* SIMD floating-point exception */
+#define X86_VEC_VE 20           /* virtualization exception */
+#define X86_VEC_SX 30           /* security exception */
 
-      if (rax >= NR_SYSCALLS) {
-        printf("unknown system call: %lld\n", rax);
-        exit(1);
+      int exc_vec = exc_info & 0xff;
+      switch (exc_vec) {
+      default:
+        fprintf(stderr, "unhandled exception: vector %d\n", exc_vec);
+        assert(false);
+      case X86_VEC_PF: {
+        uint64_t gladdr;
+        vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &gladdr);
+        fprintf(stderr, "page fault: caused by guest linear address 0x%llx\n", gladdr);
+        exit(1);                /* TODO: signal segv */
       }
-
-      vmm_read_register(HV_X86_RDI, &rdi);
-      vmm_read_register(HV_X86_RSI, &rsi);
-      vmm_read_register(HV_X86_RDX, &rdx);
-      vmm_read_register(HV_X86_R10, &r10);
-      vmm_read_register(HV_X86_R8, &r8);
-      vmm_read_register(HV_X86_R9, &r9);
-
-      printk(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
-      retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-      printk("<<<syscall done: %lld\n", retval);
-
-      vmm_write_register(HV_X86_RAX, retval);
-
-      vmm_read_register(HV_X86_RIP, &value);
-      vmm_write_register(HV_X86_RIP, value + 2);
-
+      case X86_VEC_UD: {
+        uint64_t instlen, rip;
+        vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+        vmm_read_register(HV_X86_RIP, &rip);
+        if (is_syscall(instlen, rip)) {
+          handle_syscall();
+          vmm_read_register(HV_X86_RIP, &rip); /* reload rip for execve */
+          vmm_write_register(HV_X86_RIP, rip + 2);
+          continue;
+        }
+        /* FIXME */
+#if 0
+        fprintf(stderr, "invalid opcode!: ");
+        unsigned char inst[instlen];
+        if (copy_from_user(inst, rip, instlen))
+          assert(false);
+        for (uint64_t i = 0; i < instlen; ++i)
+          printf("%02x ", inst[i] & 0xff);
+        printf("\n");
+#endif
+        //        exit(1);
+        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
+        break;
+      }
+      case X86_VEC_DE:
+      case X86_VEC_DB:
+      case X86_VEC_BP:
+      case X86_VEC_OF:
+      case X86_VEC_BR:
+      case X86_VEC_NM:
+      case X86_VEC_DF:
+      case X86_VEC_TS:
+      case X86_VEC_NP:
+      case X86_VEC_SS:
+      case X86_VEC_GP:
+      case X86_VEC_MF:
+      case X86_VEC_AC:
+      case X86_VEC_MC:
+      case X86_VEC_XM:
+      case X86_VEC_VE:
+      case X86_VEC_SX: {
+        uint64_t instlen, rip;
+        vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
+        vmm_read_register(HV_X86_RIP, &rip);
+#if 0
+        fprintf(stderr, "exception ignored: %d\n", exc_vec);
+        fprintf(stderr, "inst: \n");
+        unsigned char inst[instlen];
+        if (copy_from_user(inst, rip, instlen))
+          assert(false);
+        for (uint64_t i = 0; i < instlen; ++i)
+          printf("%02x ", inst[i] & 0xff);
+        printf("\n");
+#endif
+        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
+        break;
+      }
+      }
       break;
     }
 
     case VMX_REASON_EPT_VIOLATION:
       printk("reason: ept_violation\n");
 
-      vmm_read_vmcs(VMCS_GUEST_PHYSICAL_ADDRESS, &value);
-      printk("guest-physical address = 0x%llx\n", value);
+      uint64_t gpaddr;
+      vmm_read_vmcs(VMCS_GUEST_PHYSICAL_ADDRESS, &gpaddr);
+      printk("guest-physical address = 0x%llx\n", gpaddr);
 
       uint64_t qual;
 
@@ -121,8 +201,9 @@ main_loop()
       if (qual & (1 << 2)) printk("cause: inst fetch\n");
 
       if (qual & (1 << 7)) {
-        vmm_read_vmcs(VMCS_RO_GUEST_LIN_ADDR, &value);
-        printk("guest linear address = 0x%llx\n", value);
+        uint64_t gladdr;
+        vmm_read_vmcs(VMCS_RO_GUEST_LIN_ADDR, &gladdr);
+        printk("guest linear address = 0x%llx\n", gladdr);
       } else {
         printk("guest linear address = (unavailable)\n");
       }
@@ -130,8 +211,9 @@ main_loop()
       break;
 
     case VMX_REASON_CPUID: {
+      uint64_t rax;
+      vmm_read_register(HV_X86_RAX, &rax);
       unsigned eax, ebx, ecx, edx;
-
       __get_cpuid(rax, &eax, &ebx, &ecx, &edx);
 
       vmm_write_register(HV_X86_RAX, eax);
@@ -139,8 +221,9 @@ main_loop()
       vmm_write_register(HV_X86_RCX, ecx);
       vmm_write_register(HV_X86_RDX, edx);
 
-      vmm_read_register(HV_X86_RIP, &value);
-      vmm_write_register(HV_X86_RIP, value + 2);
+      uint64_t rip;
+      vmm_read_register(HV_X86_RIP, &rip);
+      vmm_write_register(HV_X86_RIP, rip + 2);
 
       break;
     }
