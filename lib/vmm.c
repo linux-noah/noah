@@ -232,7 +232,7 @@ init_special_regs()
 
   uint64_t cr4;
   vmm_read_vmcs(VMCS_GUEST_CR4, &cr4);
-  vmm_write_vmcs(VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE);
+  vmm_write_vmcs(VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE | CR4_OSXSAVE);
 
   uint64_t efer;
   vmm_read_vmcs(VMCS_GUEST_IA32_EFER, &efer);

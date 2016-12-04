@@ -7,6 +7,7 @@
 #define CR4_PAE         0x00000020      
 #define CR4_OSFXSR      0x00000200
 #define CR4_OSXMMEXCPT  0x00000400
+#define CR4_OSXSAVE     (1 << 18)
 #define CR4_VMXE        0x00002000      
 
 #define EFER_SCE        0x00000001      // syscall Extension

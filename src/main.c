@@ -134,7 +134,6 @@ main_loop()
           continue;
         }
         /* FIXME */
-#if 0
         fprintf(stderr, "invalid opcode!: ");
         unsigned char inst[instlen];
         if (copy_from_user(inst, rip, instlen))
@@ -142,7 +141,6 @@ main_loop()
         for (uint64_t i = 0; i < instlen; ++i)
           printf("%02x ", inst[i] & 0xff);
         printf("\n");
-#endif
         //        exit(1);
         vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         break;
@@ -167,7 +165,6 @@ main_loop()
         uint64_t instlen, rip;
         vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
         vmm_read_register(HV_X86_RIP, &rip);
-#if 0
         fprintf(stderr, "exception ignored: %d\n", exc_vec);
         fprintf(stderr, "inst: \n");
         unsigned char inst[instlen];
@@ -176,7 +173,6 @@ main_loop()
         for (uint64_t i = 0; i < instlen; ++i)
           printf("%02x ", inst[i] & 0xff);
         printf("\n");
-#endif
         vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         break;
       }
