@@ -333,6 +333,54 @@ init_msr()
 }
 
 void
+init_fpu()
+{
+  struct fxregs_state {
+    uint16_t cwd; /* Control Word                    */
+    uint16_t swd; /* Status Word                     */
+    uint16_t twd; /* Tag Word                        */
+    uint16_t fop; /* Last Instruction Opcode         */
+    union {
+      struct {
+        uint64_t rip; /* Instruction Pointer             */
+        uint64_t rdp; /* Data Pointer                    */
+      };
+      struct {
+        uint32_t fip; /* FPU IP Offset                   */
+        uint32_t fcs; /* FPU IP Selector                 */
+        uint32_t foo; /* FPU Operand Offset              */
+        uint32_t fos; /* FPU Operand Selector            */
+      };
+    };
+    uint32_t mxcsr;       /* MXCSR Register State */
+    uint32_t mxcsr_mask;  /* MXCSR Mask           */
+    uint32_t st_space[32]; /* 8*16 bytes for each FP-reg = 128 bytes */
+    uint32_t xmm_space[64]; /* 16*16 bytes for each XMM-reg = 256 bytes */
+    uint32_t __padding[12];
+    union {
+      uint32_t __padding1[12];
+      uint32_t sw_reserved[12];
+    };
+  } __attribute__((aligned(16))) fx;
+
+  /* emulate 'fninit'
+   * - http://www.felixcloutier.com/x86/FINIT:FNINIT.html
+   */
+  fx.cwd = 0x037f;
+  fx.swd = 0;
+  fx.twd = 0xffff;
+  fx.fop = 0;
+  fx.rip = 0;
+  fx.rdp = 0;
+
+  /* default configuration for the SIMD core */
+  fx.mxcsr = 0x1f80;
+  fx.mxcsr_mask = 0;
+
+  hv_vcpu_write_fpstate(vcpu->vcpuid, &fx, sizeof fx);
+}
+
+void
 vmm_create()
 {
   hv_return_t ret;
@@ -475,6 +523,7 @@ vmm_snapshot_vcpu(struct vcpu_snapshot *snapshot)
   for (uint64_t i = 0; i < NR_VMCS_FIELD; i++) {
     vmm_read_vmcs(vmcs_field_list[i], &snapshot->vmcs[i]);
   }
+  hv_vcpu_read_fpstate(vcpu->vcpuid, snapshot->fpu_states, sizeof snapshot->fpu_states);
 }
 
 void
@@ -553,6 +602,9 @@ cont: ;
   for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
     vmm_write_register(x86_reg_list[i], snapshot->vcpu_reg[i]);
   }
+
+  /* restore fpu states */
+  hv_vcpu_write_fpstate(vcpu->vcpuid, snapshot->fpu_states, sizeof snapshot->fpu_states);
 
   /* restore MSRs. Initializing them is enough now */
   init_msr();

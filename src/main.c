@@ -250,6 +250,7 @@ init_vkernel()
   init_segment();
   init_idt();
   init_regs();
+  init_fpu();
 }
 
 static void
