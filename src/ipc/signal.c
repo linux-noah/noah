@@ -73,14 +73,13 @@ get_procsig_to_deliver(bool unsets)
   }
   int sig = 0;
   while (sig <= 32) {
-    if (((pending >> sig++) & 1) == 0)
+    if (((pending >> sig++) & 1) == 0 || !should_deliver(sig))
       continue;
-    if (should_deliver(sig)) {
-      if (unsets) {
-        LINUX_SIGDELSET(&proc.sigpending, sig);
-      }
-      return sig;
+
+    if (unsets) {
+      LINUX_SIGDELSET(&proc.sigpending, sig);
     }
+    return sig;
   }
   return 0;
 }
@@ -97,17 +96,13 @@ retry:
 
   sig = 0;
   while (sig <= 32) {
-    if (((task_sig >> sig++) & 1) == 0)
+    if (((task_sig >> sig++) & 1) == 0 || !should_deliver(sig))
       continue;
 
-    if (should_deliver(sig)) {
-      if (unsets) {
-        uint64_t prev = sigbits_delbit(task.sigpending, sig);
-        if (!(prev & (1 << (sig - 1))))
-          goto retry;
-      }
-      return sig;
+    if (unsets) {
+      sigbits_delbit(task.sigpending, sig);
     }
+    return sig;
   }
   return 0;
 }
