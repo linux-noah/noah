@@ -361,21 +361,21 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   }
 
   linux_to_darwin_sigset(&lset, &dset);
-  sigset_t *p_doset = (oset == 0) ? NULL : &doset;
 
-  int err = syswrap(sigprocmask(dhow, &dset, p_doset));
+  int err = syswrap(sigprocmask(dhow, &dset, &doset));
   if (err < 0) {
     return err;
   }
 
-  if (p_doset == NULL) {
-    return 0;
+  if (oset != 0) {
+    darwin_to_linux_sigset(&doset, &loset);
+    if (copy_to_user(oset, &loset, sizeof(l_sigset_t))) {
+      sigprocmask(SIG_SETMASK, &doset, NULL);
+      return -LINUX_EFAULT;
+    }
   }
 
-  darwin_to_linux_sigset(&doset, &loset);
-  if (copy_to_user(oset, &loset, sizeof(l_sigset_t))) {
-    return -LINUX_EFAULT;
-  }
+  task.sigmask = lset;
 
   return 0;
 }
