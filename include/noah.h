@@ -51,6 +51,9 @@ uint64_t sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
 
+void deliver_signal();
+int get_sig_to_deliver();
+
 /* task related data */
 
 struct sighand {
