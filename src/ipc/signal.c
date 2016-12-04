@@ -55,6 +55,7 @@ init_signal(struct proc *proc)
   sigpending(&set);
   darwin_to_linux_sigset(&set, &proc->sigpending);
 }
+
 static inline int
 should_deliver(int sig)
 {
@@ -120,36 +121,6 @@ get_sig_to_deliver()
     return sig;
   }
   return get_tasksig_to_deliver(false);
-}
-
-int
-set_sigdelivering()
-{
-  int sig = 0;
-  if (LINUX_SIGSET_TO_UI64(&proc.sigpending) != 0) {
-    pthread_rwlock_wrlock(&proc.lock);
-    sig = ffs(LINUX_SIGSET_TO_UI64(&proc.sigpending));
-    if (sig && !should_deliver(sig)) {
-      LINUX_SIGDELSET(&proc.sigpending, sig);
-      //LINUX_SIGADDSET(&proc.sigdelivering, sig);
-      pthread_rwlock_unlock(&proc.lock);
-      return sig;
-    }
-    pthread_rwlock_unlock(&proc.lock);
-  }
-  sig = 0;
-  uint64_t task_sig;
-  if ((task_sig = *task.sigpending) != 0) {
-    sig = ffs(task_sig);
-    if (sig && !should_deliver(sig)) {
-      if (!atomic_compare_exchange_strong(task.sigpending, &task_sig, task_sig & ~(1 << (sig - 1)))) {
-        //LINUX_SIGADDSET(&proc.sigdelivering, sig);
-        return sig;
-      }
-    }
-  }
-
-  return 0;
 }
 
 static const struct retcode {
