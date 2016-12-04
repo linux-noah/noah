@@ -156,8 +156,6 @@ setup_sigframe(int signum)
   int err = 0;
   struct sigframe frame;
 
-  printf("setup_sigframe!\n");
-
   assert(signum <= LINUX_NSIG);
   assert(is_aligned(sizeof frame, sizeof(uint64_t)));
   assert(is_aligned(offsetof(struct sigframe, retcode), sizeof(uint64_t)));
@@ -182,7 +180,6 @@ setup_sigframe(int signum)
     //TODO: save some segment related regs
     //TODO: save FPU state
     vmm_read_register(x86_reg_list[i], &frame.ucontext.sigcontext.vcpu_reg[i]);
-    printf("save: %s, %llx\n", x86_reg_str[i], frame.ucontext.sigcontext.vcpu_reg[i]);
   }
 
   sigset_t dset;
@@ -202,7 +199,6 @@ setup_sigframe(int signum)
     err = -LINUX_EFAULT;
     goto error;
   }
-  printf("setup rsp: %llx", rsp);
 
   /* Setup signals */
   vmm_write_register(HV_X86_RDI, signum);
@@ -210,7 +206,6 @@ setup_sigframe(int signum)
   vmm_write_register(HV_X86_RDI, 0); // TODO: ucontext
 
   vmm_write_register(HV_X86_RAX, 0);
-  printf("handler:%llx\n", proc.sighand.sigaction[signum - 1].lsa_handler);
   vmm_write_register(HV_X86_RIP, proc.sighand.sigaction[signum - 1].lsa_handler);
 
   return 0;
@@ -392,8 +387,6 @@ DEFINE_SYSCALL(rt_sigreturn)
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
 
-  printf("sigreturn!\n");
-
   struct sigframe frame;
   if (copy_from_user(&frame, rsp - sizeof frame.pretcode, sizeof frame)) {
     // Terminate with sigsegv
@@ -412,7 +405,6 @@ DEFINE_SYSCALL(rt_sigreturn)
     //TODO: restore some segment related regs
     //TODO: restore FPU state
     vmm_write_register(x86_reg_list[i], frame.ucontext.sigcontext.vcpu_reg[i]);
-    printf("restore: %s, %llx\n", x86_reg_str[i], frame.ucontext.sigcontext.vcpu_reg[i]);
   }
 
   sigset_t dset;

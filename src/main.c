@@ -53,7 +53,6 @@ int
 task_run()
 {
   if (get_sig_to_deliver()) {
-    printf("deliver!:%d\n", get_sig_to_deliver());
     deliver_signal();
   }
   return vmm_run();
