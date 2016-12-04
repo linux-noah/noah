@@ -52,7 +52,7 @@ init_signal(struct proc *proc)
   t->sigpending = &task_sigpending; //TODO
   sigbits_emptyset(t->sigpending);
   sigpending(&set);
-  darwin_to_linux_sigset(&set, &proc->sigpending);
+  sigset_to_sigbits(&proc->sigpending, &set);
 }
 
 static inline int
@@ -68,7 +68,7 @@ static inline int
 get_procsig_to_deliver(bool unsets)
 {
   uint64_t pending;
-  if ((pending = LINUX_SIGSET_TO_UI64(&proc.sigpending)) == 0) {
+  if ((pending = sigbits_load(&proc.sigpending)) == 0) {
     return 0;
   }
   int sig = 0;
@@ -77,7 +77,7 @@ get_procsig_to_deliver(bool unsets)
       continue;
 
     if (unsets) {
-      LINUX_SIGDELSET(&proc.sigpending, sig);
+      sigbits_delbit(&proc.sigpending, sig);
     }
     return sig;
   }
@@ -161,6 +161,7 @@ setup_sigframe(int signum)
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
     frame.pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
+    // Depending on the fact that we currently allow any data to be executed.
     frame.pretcode = rsp + offsetof(struct sigframe, retcode);
   }
   frame.retcode = retcode_bin;
@@ -221,7 +222,7 @@ deliver_signal()
   sig = get_procsig_to_deliver(true);
   if (sig) {
     if (setup_sigframe(sig) < 0) {
-      LINUX_SIGADDSET(&proc.sigpending, sig);
+      sigbits_addbit(&proc.sigpending, sig);
       sig = 0;
     }
   }
@@ -258,6 +259,12 @@ sigbits_ismember(atomic_sigbits_t *sigbits, int sig)
 }
 
 inline uint64_t
+sigbits_load(atomic_sigbits_t *sigbits)
+{
+  return atomic_load(sigbits);
+}
+
+inline uint64_t
 sigbits_addbit(atomic_sigbits_t *sigbits, int sig)
 {
   return atomic_fetch_or(sigbits, (1UL << (sig - 1)));
@@ -285,6 +292,19 @@ inline uint64_t
 sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set)
 {
   return atomic_exchange(sigbits, LINUX_SIGSET_TO_UI64(set));
+}
+
+inline void
+sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set)
+{
+  for (int i = 1; i <= NSIG; i++) {
+    if (!sigismember(set, i))
+      continue;
+    int num = darwin_to_linux_signal(i);
+    if (num) {
+      sigbits_addbit(sigbits, num);
+    }
+  }
 }
 
 DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size)

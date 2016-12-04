@@ -32,7 +32,7 @@ init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
     }
   }
 
-  LINUX_SIGEMPTYSET(&proc.sigpending);
+  sigbits_emptyset(&proc.sigpending);
 
   if (clone_flags & LINUX_CLONE_SETTLS) {
     vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);

@@ -45,11 +45,13 @@ typedef atomic_uint_least64_t atomic_sigbits_t;
 
 void sigbits_emptyset(atomic_sigbits_t *sigbits);
 int  sigbits_ismember(atomic_sigbits_t *sigbits, int sig);
+uint64_t sigbits_load(atomic_sigbits_t *sigbits);
 uint64_t sigbits_addbit(atomic_sigbits_t *sigbits, int sig);
 uint64_t sigbits_delbit(atomic_sigbits_t *sigbits, int sig);
 uint64_t sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
+void sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set);
 
 void deliver_signal();
 int get_sig_to_deliver();
@@ -76,7 +78,7 @@ struct proc {
   pthread_rwlock_t lock;
   struct mm *mm;
   char *root; /* FS root */
-  l_sigset_t sigpending;
+  atomic_sigbits_t sigpending;
   struct sighand sighand;
 };
 
