@@ -164,6 +164,11 @@ DEFINE_SYSCALL(gettid)
   return tid;
 }
 
+DEFINE_SYSCALL(setsid)
+{
+  return syswrap(setsid());
+}
+
 DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
 {
   struct rlimit rl;

@@ -113,7 +113,7 @@
   SYSCALL(109, setpgid)                         \
   SYSCALL(110, getppid)                         \
   SYSCALL(111, getpgrp)                         \
-  SYSCALL(112, unimplemented)                   \
+  SYSCALL(112, setsid)                          \
   SYSCALL(113, unimplemented)                   \
   SYSCALL(114, unimplemented)                   \
   SYSCALL(115, getgroups)                       \
