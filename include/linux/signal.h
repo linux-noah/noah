@@ -103,7 +103,7 @@ void darwin_to_linux_sigset(sigset_t *, l_sigset_t *);
 #define	LINUX_SIGSET_DEL(setp, masksetp)	((setp)->__mask &= ~((masksetp)->__mask))
 #define	LINUX_SIGSET_SET(setp, masksetp)	((setp)->__mask = (masksetp)->__mask)
 
-#define LINUX_SIGSET_TO_UI64(setp)      (setp->__mask)
+#define LINUX_SIGSET_TO_UI64(setp)      ((setp)->__mask)
 
 /* sigprocmask actions */
 #define	LINUX_SIG_BLOCK		0
