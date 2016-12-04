@@ -18,7 +18,6 @@ set_sigpending(int signum)
   int l_signum = darwin_to_linux_signal(signum);
   // locking proc structure also blcoks signals, so don't need to acquire rdlock of proc
   sigbits_addbit(&task_sigpending, l_signum);
-  printf("sigpendin!, sig:%llx\n", task_sigpending);
 }
 
 void
