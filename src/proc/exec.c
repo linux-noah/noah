@@ -346,7 +346,8 @@ init_reg_state(void)
   vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
 
   vmm_write_vmcs(VMCS_GUEST_LDTR, 0);
-  // TODO: initialize FPU state if it is implemented
+
+  init_fpu();
 }
 
 static void
