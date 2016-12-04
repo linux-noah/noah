@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include "types.h"
 #include "util/misc.h"
 #include "util/list.h"
@@ -36,9 +37,21 @@ int do_futex_wake(gaddr_t uaddr, int count);
 
 void main_loop();
 
-/* task related data */
+/* signal */
 
 #include "linux/signal.h"
+
+typedef atomic_uint_least64_t atomic_sigbits_t;
+
+void sigbits_emptyset(atomic_sigbits_t *sigbits);
+int  sigbits_ismember(atomic_sigbits_t *sigbits, int sig);
+uint64_t sigbits_addbit(atomic_sigbits_t *sigbits, int sig);
+uint64_t sigbits_delbit(atomic_sigbits_t *sigbits, int sig);
+uint64_t sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set);
+uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
+uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
+
+/* task related data */
 
 struct task {
   struct list_head tasks; /* Threads in the current proc */

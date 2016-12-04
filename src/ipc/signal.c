@@ -15,6 +15,48 @@ DEFINE_SYSCALL(alarm, unsigned int, seconds)
   return 0;
 }
 
+inline void
+sigbits_emptyset(atomic_sigbits_t *sigbits)
+{
+  *sigbits = ATOMIC_VAR_INIT(0);
+}
+
+inline int
+sigbits_ismember(atomic_sigbits_t *sigbits, int sig)
+{
+  return *sigbits & (1UL << (sig - 1));
+}
+
+inline uint64_t
+sigbits_addbit(atomic_sigbits_t *sigbits, int sig)
+{
+  return atomic_fetch_or(sigbits, (1UL << (sig - 1)));
+}
+
+inline uint64_t
+sigbits_delbit(atomic_sigbits_t *sigbits, int sig)
+{
+  return atomic_fetch_and(sigbits, ~(1UL << (sig - 1)));
+}
+
+inline uint64_t
+sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set)
+{
+  return atomic_fetch_or(sigbits, LINUX_SIGSET_TO_UI64(set));
+}
+
+inline uint64_t
+sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set)
+{
+  return atomic_fetch_and(sigbits, ~(LINUX_SIGSET_TO_UI64(set)));
+}
+
+inline uint64_t
+sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set)
+{
+  return atomic_exchange(sigbits, LINUX_SIGSET_TO_UI64(set));
+}
+
 DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size)
 {
   return 0;
