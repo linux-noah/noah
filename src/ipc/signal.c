@@ -340,7 +340,13 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
     return -LINUX_EFAULT;
   }
 
-  linux_to_darwin_sigaction(&lact, &dact, set_sigpending);
+  void *handler;
+  if (lact.lsa_flags & LINUX_SA_SIGINFO || (void *) lact.lsa_handler == SIG_DFL || (void *) lact.lsa_handler == SIG_IGN) {
+    handler = (void *) lact.lsa_handler;
+  } else {
+    handler = set_sigpending;
+  }
+  linux_to_darwin_sigaction(&lact, &dact, handler);
   dsig = linux_to_darwin_signal(sig);
 
   int err = 0;

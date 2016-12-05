@@ -528,7 +528,6 @@ linux_to_darwin_sigaction(l_sigaction_t *lsa, struct sigaction *dsa, void *handl
 {
 
 	linux_to_darwin_sigset(&lsa->lsa_mask, &dsa->sa_mask);
-	dsa->sa_handler = handler;
 	dsa->sa_flags = 0;
 	if (lsa->lsa_flags & LINUX_SA_NOCLDSTOP)
 		dsa->sa_flags |= SA_NOCLDSTOP;
@@ -544,6 +543,9 @@ linux_to_darwin_sigaction(l_sigaction_t *lsa, struct sigaction *dsa, void *handl
 		dsa->sa_flags |= SA_RESETHAND;
 	if (lsa->lsa_flags & LINUX_SA_NOMASK)
 		dsa->sa_flags |= SA_NODEFER;
+
+        if (!(lsa->lsa_flags & LINUX_SA_SIGINFO))
+          dsa->sa_handler = handler;
 }
 
 void
@@ -551,7 +553,6 @@ darwin_to_linux_sigaction(struct sigaction *dsa, l_sigaction_t *lsa, gaddr_t han
 {
 
 	darwin_to_linux_sigset(&dsa->sa_mask, &lsa->lsa_mask);
-	lsa->lsa_handler = handler;
 	lsa->lsa_restorer = 0;		/* unsupported */
 	lsa->lsa_flags = 0;
 	if (dsa->sa_flags & SA_NOCLDSTOP)
@@ -568,4 +569,7 @@ darwin_to_linux_sigaction(struct sigaction *dsa, l_sigaction_t *lsa, gaddr_t han
 		lsa->lsa_flags |= LINUX_SA_ONESHOT;
 	if (dsa->sa_flags & SA_NODEFER)
 		lsa->lsa_flags |= LINUX_SA_NOMASK;
+
+	if (!(dsa->sa_flags & SA_SIGINFO))
+          lsa->lsa_handler = handler;
 }
