@@ -334,22 +334,24 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
 
   l_sigaction_t lact;
   struct sigaction dact, doact;
+  int dsig;
 
   if (copy_from_user(&lact, act, sizeof(l_sigaction_t)))  {
     return -LINUX_EFAULT;
   }
 
   linux_to_darwin_sigaction(&lact, &dact, set_sigpending);
+  dsig = linux_to_darwin_signal(sig);
 
   int err = 0;
   pthread_rwlock_wrlock(&proc.sighand.lock);
   
-  err = syswrap(sigaction(sig, &dact, &doact));
+  err = syswrap(sigaction(dsig, &dact, &doact));
   if (err < 0) {
     goto out;
   }
   if (oact != 0 && copy_to_user(oact, &proc.sighand.sigaction[sig - 1], sizeof(l_sigaction_t))) {
-    sigaction(sig, &doact, NULL);
+    sigaction(dsig, &doact, NULL);
     err = -LINUX_EFAULT;
     goto out;
   }
