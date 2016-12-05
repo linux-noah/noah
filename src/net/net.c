@@ -115,7 +115,7 @@ DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
     return -1;
   }
 
-  int fd = connect(sockfd, sockaddr, sockaddr->sa_len);
+  int fd = syswrap(connect(sockfd, sockaddr, sockaddr->sa_len));
   free(sockaddr);
   return fd;
 }
