@@ -19,7 +19,7 @@ init_sink(const char *fn, FILE **sinkp, const char *name)
   if (! fn) {
     fn = "/dev/null";
   }
-  *sinkp = fopen(fn, "a");
+  *sinkp = fopen(fn, "w");
 
   char buf[1000];
   time_t now = time(0);
