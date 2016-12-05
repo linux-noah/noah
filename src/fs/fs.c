@@ -268,6 +268,10 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 {
   int r;
   switch (cmd) {
+  case LINUX_F_DUPFD:
+    return syswrap(fcntl(file->fd, F_DUPFD, arg));
+  case LINUX_F_DUPFD_CLOEXEC:
+    return syswrap(fcntl(file->fd, F_DUPFD_CLOEXEC, arg));
     /* no translation required for fd flags (i.e. CLOEXEC==1 */
   case LINUX_F_GETFD:
     return syswrap(fcntl(file->fd, F_GETFD));
@@ -558,6 +562,11 @@ DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
   int r = file->ops->fcntl(file, cmd, arg);
   vfs_release(file);
   return r;
+}
+
+DEFINE_SYSCALL(dup, unsigned int, fd)
+{
+  return sys_fcntl(fd, LINUX_F_DUPFD, 0);
 }
 
 DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
@@ -1165,11 +1174,6 @@ fail_fcntl:
   close(fildes[0]);
   close(fildes[1]);
   return (err0 < 0) ? err0 : err1;
-}
-
-DEFINE_SYSCALL(dup, unsigned int, fd)
-{
-  return syswrap(dup(fd));
 }
 
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
