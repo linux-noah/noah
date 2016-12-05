@@ -369,8 +369,8 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   if (copy_from_user(&lset, nset, sizeof(l_sigset_t)))  {
     return -LINUX_EFAULT;
   }
-  LINUX_SIGDELSET(&lset, SIGKILL);
-  LINUX_SIGDELSET(&lset, SIGSTOP);
+  LINUX_SIGDELSET(&lset, LINUX_SIGKILL);
+  LINUX_SIGDELSET(&lset, LINUX_SIGSTOP);
 
   int dhow;
   switch (how) {
