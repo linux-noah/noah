@@ -11,6 +11,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <limits.h>
+#include <fcntl.h>
 
 #include "linux/common.h"
 #include "linux/socket.h"
@@ -18,11 +19,21 @@
 
 DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
-  /* FIXME */
-  type &= ~LINUX_SOCK_NONBLOCK;
-  type &= ~LINUX_SOCK_CLOEXEC;
+  int fd = syswrap(socket(linux_to_darwin_sa_family(family), type & ~(LINUX_SOCK_NONBLOCK | LINUX_SOCK_CLOEXEC), protocol));
+  if (fd < 0)
+    return fd;
 
-  return syswrap(socket(linux_to_darwin_sa_family(family), type, protocol));
+  if (type & LINUX_SOCK_NONBLOCK) {
+    int e = syswrap(fcntl(fd, F_SETFL, O_NONBLOCK));
+    if (e < 0)
+      return e;
+  }
+  if (type & LINUX_SOCK_CLOEXEC) {
+    int e = syswrap(fcntl(fd, F_SETFD, FD_CLOEXEC));
+    if (e < 0)
+      return e;
+  }
+  return fd;
 }
 
 int
