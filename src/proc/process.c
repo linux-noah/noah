@@ -32,6 +32,12 @@ set_initial_proc(struct proc *proc, char *root)
   init_mm(proc->mm);
 }
 
+DEFINE_SYSCALL(sched_yield)
+{
+  sleep(0);
+  return 0;
+}
+
 DEFINE_SYSCALL(getpid)
 {
   return syswrap(getpid());

@@ -25,7 +25,7 @@
   SYSCALL(21, access)                           \
   SYSCALL(22, pipe)                             \
   SYSCALL(23, select)                           \
-  SYSCALL(24, unimplemented)                    \
+  SYSCALL(24, sched_yield)                      \
   SYSCALL(25, mremap)                           \
   SYSCALL(26, unimplemented)                    \
   SYSCALL(27, unimplemented)                    \
