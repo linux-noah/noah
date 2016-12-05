@@ -43,9 +43,7 @@ handle_syscall(void)
   vmm_read_register(HV_X86_R10, &r10);
   vmm_read_register(HV_X86_R8, &r8);
   vmm_read_register(HV_X86_R9, &r9);
-  printk(">>>start syscall handling...: %s (%lld)\n", sc_name_table[rax], rax);
   uint64_t retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
-  printk("<<<syscall done: %lld\n", retval);
   vmm_write_register(HV_X86_RAX, retval);
 }
 
@@ -54,8 +52,8 @@ main_loop()
 {
   while (vmm_run() == 0) {
 
-    dump_instr();
-    print_regs();
+    /* dump_instr(); */
+    /* print_regs(); */
 
     uint64_t exit_reason;
     vmm_read_vmcs(VMCS_RO_EXIT_REASON, &exit_reason);
@@ -181,6 +179,7 @@ main_loop()
     }
 
     case VMX_REASON_EPT_VIOLATION:
+#if 0
       printk("reason: ept_violation\n");
 
       uint64_t gpaddr;
@@ -203,7 +202,7 @@ main_loop()
       } else {
         printk("guest linear address = (unavailable)\n");
       }
-
+#endif
       break;
 
     case VMX_REASON_CPUID: {
@@ -232,7 +231,6 @@ main_loop()
     default:
       printk("other reason: %llu\n", exit_reason);
     }
-    printk("\n");
   }
 
   printk("exit...\n");

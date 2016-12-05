@@ -309,20 +309,20 @@ out:
 
 DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)
 {
-  printk("madvise is not implemented");
+  printk("madvise is not implemented\n");
   return 0;
 
 }
 
 DEFINE_SYSCALL(mlock, gaddr_t, addr, size_t, length)
 {
-  printk("mlock is not implemented");
+  printk("mlock is not implemented\n");
   return 0;
 }
 
 DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
 {
-  printk("munlock is not implemented");
+  printk("munlock is not implemented\n");
   return 0;
 }
 
