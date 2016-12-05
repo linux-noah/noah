@@ -33,7 +33,7 @@ handle_syscall(void)
   uint64_t rax;
   vmm_read_register(HV_X86_RAX, &rax);
   if (rax >= NR_SYSCALLS) {
-    printf("unknown system call: %lld\n", rax);
+    fprintf(stderr, "unknown system call: %lld\n", rax);
     exit(1);            /* TODO: signal something */
   }
   uint64_t rdi, rsi, rdx, r10, r8, r9;
@@ -137,8 +137,8 @@ main_loop()
         if (copy_from_user(inst, rip, instlen))
           assert(false);
         for (uint64_t i = 0; i < instlen; ++i)
-          printf("%02x ", inst[i] & 0xff);
-        printf("\n");
+          fprintf(stderr, "%02x ", inst[i] & 0xff);
+        fprintf(stderr, "\n");
         //        exit(1);
         vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         break;
@@ -169,8 +169,8 @@ main_loop()
         if (copy_from_user(inst, rip, instlen))
           assert(false);
         for (uint64_t i = 0; i < instlen; ++i)
-          printf("%02x ", inst[i] & 0xff);
-        printf("\n");
+          fprintf(stderr, "%02x ", inst[i] & 0xff);
+        fprintf(stderr, "\n");
         vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
         break;
       }
