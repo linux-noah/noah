@@ -75,6 +75,7 @@ struct linux_winsize;
 
 int linux_to_darwin_at_flags(int flags);
 int linux_to_darwin_o_flags(int l_flags);
+int darwin_to_linux_o_flags(int r);
 void stat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat);
 void statfs_darwin_to_linux(struct statfs *statfs, struct l_statfs *l_statfs);
 void darwin_to_linux_termios(struct termios *bios, struct linux_termios *lios);

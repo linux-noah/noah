@@ -266,7 +266,24 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
 int
 darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-  return syswrap(fcntl(file->fd, cmd, arg));
+  int r;
+  switch (cmd) {
+    /* no translation required for fd flags (i.e. CLOEXEC==1 */
+  case LINUX_F_GETFD:
+    return syswrap(fcntl(file->fd, F_GETFD));
+  case LINUX_F_SETFD:
+    return syswrap(fcntl(file->fd, F_SETFD, arg));
+  case LINUX_F_GETFL:
+    r = syswrap(fcntl(file->fd, F_GETFL));
+    if (r < 0)
+      return r;
+    return darwin_to_linux_o_flags(r);
+  case LINUX_F_SETFL:
+    return syswrap(fcntl(file->fd, F_SETFL, linux_to_darwin_o_flags(arg)));
+  default:
+    printk("unknown fcntl cmd: %d\n", cmd);
+    return -LINUX_EINVAL;
+  }
 }
 
 int

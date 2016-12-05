@@ -114,6 +114,28 @@ linux_to_darwin_o_flags(int l_flags)
   return ret;
 }
 
+int
+darwin_to_linux_o_flags(int r)
+{
+  int flags = 0;
+#define TEST(X,Y) do { if (r & X) { flags |= Y; r &= ~X; } } while (0)
+  TEST(O_RDONLY, LINUX_O_RDONLY);
+  TEST(O_WRONLY, LINUX_O_WRONLY);
+  TEST(O_RDWR, LINUX_O_RDWR);
+  TEST(O_APPEND, LINUX_O_APPEND);
+  TEST(O_NONBLOCK, LINUX_O_NONBLOCK);
+  TEST(O_FSYNC, LINUX_FASYNC);
+  TEST(O_CREAT, LINUX_O_CREAT);
+  TEST(O_TRUNC, LINUX_O_TRUNC);
+  TEST(O_EXCL, LINUX_O_EXCL);
+  TEST(O_NOCTTY, LINUX_O_NOCTTY);
+  TEST(O_NOFOLLOW, LINUX_O_NOFOLLOW);
+  TEST(O_DIRECTORY, LINUX_O_DIRECTORY);
+  TEST(O_CLOEXEC, LINUX_O_CLOEXEC);
+  assert(r == 0);
+  return flags;
+}
+
 void
 stat_darwin_to_linux(struct stat *stat, struct l_newstat *lstat)
 {
