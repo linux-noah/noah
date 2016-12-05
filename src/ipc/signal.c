@@ -55,6 +55,25 @@ init_signal(struct proc *proc)
   sigset_to_sigbits(&proc->sigpending, &set);
 }
 
+void
+flush_signal(struct proc *proc)
+{
+  for (int i = 0; i < NSIG; i++) {
+    if (proc->sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_DFL || proc->sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_IGN) {
+      continue;
+    }
+    proc->sighand.sigaction[i] = (l_sigaction_t) {
+      .lsa_handler = (l_handler_t) SIG_DFL,
+      .lsa_flags = 0,
+      .lsa_restorer= 0,
+      .lsa_mask = {0}
+    };
+    struct sigaction dact;
+    linux_to_darwin_sigaction(&proc->sighand.sigaction[i], &dact, SIG_DFL);
+    sigaction(i + 1, &dact, NULL);
+  }
+}
+
 static inline int
 should_deliver(int sig)
 {

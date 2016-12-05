@@ -87,6 +87,7 @@ _Thread_local extern struct task task;
 
 void set_initial_proc(struct proc *proc, char *root);
 void init_signal(struct proc *);
+void flush_signal(struct proc *proc);
 
 /* Linux kernel constants */
 
