@@ -224,7 +224,6 @@ main_loop()
     }
 
     case VMX_REASON_IRQ: {
-      printk("external interruption\n");
       break;
     }
 
