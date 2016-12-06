@@ -619,7 +619,7 @@ struct fs_operations {
   int (*linkat)(struct fs *fs, struct dir *dir1, const char *from, struct dir *dir2, const char *to, int flags);
   int (*unlinkat)(struct fs *fs, struct dir *dir, const char *path, int flags);
   int (*readlinkat)(struct fs *fs, struct dir *dir, const char *path, char *buf, int bufsize);
-  int (*mkdir)(struct fs *fs, struct dir *dir, const char *path, int mode);
+  int (*mkdirat)(struct fs *fs, struct dir *dir, const char *path, int mode);
 };
 
 int
@@ -673,7 +673,7 @@ darwinfs_readlinkat(struct fs *fs, struct dir *dir, const char *path, char *buf,
 }
 
 int
-darwinfs_mkdir(struct fs *fs, struct dir *dir, const char *path, int mode)
+darwinfs_mkdirat(struct fs *fs, struct dir *dir, const char *path, int mode)
 {
   return syswrap(mkdirat(dir->fd, path, mode));
 }
@@ -696,7 +696,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     darwinfs_linkat,
     darwinfs_unlinkat,
     darwinfs_readlinkat,
-    darwinfs_mkdir,
+    darwinfs_mkdirat,
   };
 
   static struct fs darwinfs = {
@@ -1041,7 +1041,7 @@ DEFINE_SYSCALL(mkdirat, int, dirfd, gstr_t, path_ptr, int, mode)
   if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
     return r;
   }
-  r = path.fs->ops->mkdir(path.fs, path.dir, path.subpath, mode);
+  r = path.fs->ops->mkdirat(path.fs, path.dir, path.subpath, mode);
   vfs_ungrab_dir(&path);
   return r;
 }
