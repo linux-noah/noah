@@ -170,7 +170,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 #define SB_ARGC_MAX 2
 
 int
-load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
+load_script(const char *script, size_t len, const char *elf_path, int argc, char *argv[], char **envp)
 {
   const char *script_end = script + len;
   char sb_argv[SB_ARGC_MAX][LINUX_PATH_MAX];
@@ -212,7 +212,8 @@ load_script(const char *script, size_t len, int argc, char *argv[], char **envp)
   for (int i = 0; i < sb_argc; ++i) {
     newargv[i] = sb_argv[i];
   }
-  memcpy(newargv + sb_argc, argv, argc * sizeof(char *));
+  newargv[sb_argc] = elf_path;
+  memcpy(newargv + sb_argc + 1, argv + 1, (argc - 1) * sizeof(char *));
 
   do_exec(newargv[0], newargc, newargv, envp);
 
@@ -415,7 +416,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     }
   }
   else if (2 <= st.st_size && data[0] == '#' && data[1] == '!') {
-    if ((err = load_script(data, st.st_size, argc, argv, envp)) < 0)
+    if ((err = load_script(data, st.st_size, elf_path, argc, argv, envp)) < 0)
       return err;
   }
   else if (4 <= st.st_size && memcmp(data, "\xcf\xfa\xed\xfe", 4) == 0) {
