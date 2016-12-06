@@ -84,56 +84,44 @@ should_deliver(int sig)
 }
 
 static inline int
-get_procsig_to_deliver(bool unsets)
+fetch_sig_from_sigbits(atomic_sigbits_t *sigbits)
 {
-  uint64_t pending;
-  if ((pending = sigbits_load(&proc.sigpending)) == 0) {
+  uint64_t bits, sig = 1;
+
+  if ((bits = *sigbits) == 0) {
     return 0;
   }
-  int sig = 0;
-  while (sig <= 32) {
-    if (((pending >> sig++) & 1) == 0 || !should_deliver(sig))
-      continue;
+  assert(bits < (1UL << 32));
 
-    if (unsets) {
-      sigbits_delbit(&proc.sigpending, sig);
+  while (sig <= 32){
+    if (((bits >> (sig - 1)) & 1) && should_deliver(sig)) {
+      break;
     }
-    return sig;
+    sig++;
   }
-  return 0;
+
+  if (!(sigbits_delbit(sigbits, sig) & (1 << (sig - 1)))) {
+    // Other threads delivered the signal, retry
+    return fetch_sig_from_sigbits(sigbits);
+  }
+
+  return sig;
 }
 
 static inline int
-get_tasksig_to_deliver(bool unsets)
+fetch_sig_to_deliver()
 {
-  uint64_t task_sig, sig;
-
-retry:
-  if ((task_sig = *task.sigpending) == 0) {
-    return 0;
-  }
-
-  sig = 0;
-  while (sig <= 32) {
-    if (((task_sig >> sig++) & 1) == 0 || !should_deliver(sig))
-      continue;
-
-    if (unsets) {
-      sigbits_delbit(task.sigpending, sig);
-    }
-    return sig;
-  }
-  return 0;
-}
-
-int
-get_sig_to_deliver()
-{
-  int sig = get_procsig_to_deliver(false);
+  int sig = fetch_sig_from_sigbits(&proc.sigpending);
   if (sig) {
     return sig;
   }
-  return get_tasksig_to_deliver(false);
+  return fetch_sig_from_sigbits(task.sigpending);
+}
+
+bool
+has_sigpending()
+{
+  return proc.sigpending || task.sigpending;
 }
 
 static const struct retcode {
@@ -233,30 +221,31 @@ error:
 }
 
 void
-deliver_signal()
+wake_sighandler()
 {
+  pthread_rwlock_rdlock(&proc.sighand.lock);
+
   int sig;
+  while ((sig = fetch_sig_to_deliver()) != 0) {
 
-  pthread_rwlock_wrlock(&proc.lock);
-  sig = get_procsig_to_deliver(true);
-  if (sig) {
-    if (setup_sigframe(sig) < 0) {
-      sigbits_addbit(&proc.sigpending, sig);
-      sig = 0;
+    switch (proc.sighand.sigaction[sig - 1].lsa_handler) {
+      case (l_handler_t) SIG_DFL:
+        fprintf(stderr, "[%d] Handling default signal in Noah is not implemented yet\n", getpid());
+        printk("Handling default signal in Noah is not implemented yet\n");
+        /* fall through */
+      case (l_handler_t) SIG_IGN:
+        continue;
+
+      default:
+        if (setup_sigframe(sig) < 0) {
+          die_with_forcedsig(SIGSEGV);
+        }
+        goto out;
     }
   }
-  pthread_rwlock_unlock(&proc.lock);
 
-  if (sig) {
-    return;
-  }
-
-  sig = get_tasksig_to_deliver(true);
-  if (sig) {
-    if (setup_sigframe(sig) < 0) {
-      sigbits_addbit(task.sigpending, sig);
-    }
-  }
+out:
+  pthread_rwlock_unlock(&proc.sighand.lock);
 }
 
 DEFINE_SYSCALL(alarm, unsigned int, seconds)
@@ -430,12 +419,7 @@ DEFINE_SYSCALL(rt_sigreturn)
 
   struct sigframe frame;
   if (copy_from_user(&frame, rsp - sizeof frame.pretcode, sizeof frame)) {
-    // Terminate with sigsegv
-    struct sigaction act;
-    act.sa_handler = SIG_DFL;
-    act.sa_flags = 0;
-    sigaction(SIGSEGV, &act, NULL);
-    kill(getpid(), SIGSEGV); 
+    die_with_forcedsig(SIGSEGV);
   }
 
   /* Restore sigcontext */

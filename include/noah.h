@@ -35,6 +35,7 @@ int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
 int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
+void die_with_forcedsig(int sig);
 void main_loop();
 
 /* signal */
@@ -53,8 +54,8 @@ uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
 void sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set);
 
-void deliver_signal();
-int get_sig_to_deliver();
+void wake_sighandler();
+bool has_sigpending();
 
 /* task related data */
 

@@ -17,6 +17,7 @@
 
 #include <mach-o/dyld.h>
 
+
 static bool
 is_syscall(int instlen, uint64_t rip)
 {
@@ -52,8 +53,8 @@ handle_syscall(void)
 int
 task_run()
 {
-  if (get_sig_to_deliver()) {
-    deliver_signal();
+  if (has_sigpending()) {
+    wake_sighandler();
   }
   return vmm_run();
 }
@@ -283,6 +284,24 @@ elevate_privilege(void)
   if (seteuid(0) != 0) {
     abort();
   }
+}
+
+void
+die_with_forcedsig(int sig)
+{
+  // TODO: Termination processing
+  
+  /* Force default signal action */
+  sigset_t mask;
+  sigfillset(&mask);
+  sigdelset(&mask, sig);
+  sigprocmask(SIG_SETMASK, &mask, NULL);
+  struct sigaction act;
+  act.sa_handler = SIG_DFL;
+  act.sa_flags = 0;
+  sigaction(sig, &act, NULL);
+  raise(sig);
+  assert(false); // sig should be one that can terminate procs
 }
 
 int
