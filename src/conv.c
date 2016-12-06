@@ -477,8 +477,7 @@ linux_to_darwin_signal(int signum)
   if (signum < LINUX_SIGRTMIN) {
     return linux_to_darwin_signum(signum);
   } else {
-    printk("RT signal is raised: %d\n", signum);
-    fprintf(stderr, "RT signal is raised: %d\n", signum);
+    // TODO: RT signals
     return 0;
   }
 }
@@ -489,8 +488,7 @@ darwin_to_linux_signal(int signum)
   if (signum < LINUX_SIGRTMIN) {
     return darwin_to_linux_signum(signum);
   } else {
-    printk("RT signal is raised: %d\n", signum);
-    fprintf(stderr, "RT signal is raised: %d\n", signum);
+    // TODO: RT signals
     return 0;
   }
 }

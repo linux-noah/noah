@@ -451,5 +451,9 @@ DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
 
 DEFINE_SYSCALL(kill, l_pid_t, pid, int, sig)
 {
+  if (sig >= LINUX_SIGRTMIN) {
+    printk("RT signal is raised: %d\n", sig);
+    fprintf(stderr, "RT signal is raised: %d\n", sig);
+  }
   return syswrap(kill(pid, linux_to_darwin_signal(sig)));
 }
