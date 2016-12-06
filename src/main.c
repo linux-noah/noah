@@ -14,6 +14,8 @@
 #include "noah.h"
 #include "syscall.h"
 #include "linux/errno.h"
+#include "x86/irq_vectors.h"
+#include "x86/vmx.h"
 
 #include <mach-o/dyld.h>
 
@@ -83,11 +85,6 @@ main_loop()
       uint64_t exc_info;
       vmm_read_vmcs(VMCS_RO_VMEXIT_IRQ_INFO, &exc_info);
 
-#define VMCS_EXCTYPE_EXTERNAL_INTERRUPT 0
-#define VMCS_EXCTYPE_NONMASKTABLE_INTERRUPT 2
-#define VMCS_EXCTYPE_HARDWARE_EXCEPTION 3
-#define VMCS_EXCTYPE_SOFTWARE_EXCEPTION 6
-
       int int_type = (exc_info & 0x700) >> 8;
       switch (int_type) {
       default:
@@ -100,27 +97,6 @@ main_loop()
       case VMCS_EXCTYPE_SOFTWARE_EXCEPTION: /* including break points, overflows */
         break;
       }
-
-      /* See also http://wiki.osdev.org/Exceptions#Virtualization_Exception */
-#define X86_VEC_DE 0            /* division by zero */
-#define X86_VEC_DB 1            /* debug */
-#define X86_VEC_BP 3            /* breakpoint */
-#define X86_VEC_OF 4            /* overflow */
-#define X86_VEC_BR 5            /* bound range exceeded */
-#define X86_VEC_UD 6            /* invalid opcode */
-#define X86_VEC_NM 7            /* device not available */
-#define X86_VEC_DF 8            /* double fault */
-#define X86_VEC_TS 10           /* invalid TSS */
-#define X86_VEC_NP 11           /* segment not present */
-#define X86_VEC_SS 12           /* stack segment fault */
-#define X86_VEC_GP 13           /* general protection fault */
-#define X86_VEC_PF 14           /* page fault */
-#define X86_VEC_MF 16           /* x87 floating-point exception */
-#define X86_VEC_AC 17           /* alignment check */
-#define X86_VEC_MC 18           /* machine check */
-#define X86_VEC_XM 19           /* SIMD floating-point exception */
-#define X86_VEC_VE 20           /* virtualization exception */
-#define X86_VEC_SX 30           /* security exception */
 
       int exc_vec = exc_info & 0xff;
       switch (exc_vec) {
