@@ -710,8 +710,9 @@ darwinfs_statfs(struct fs *fs, struct dir *dir, const char *path, struct l_statf
 }
 
 int
-darwinfs_fchownat(struct fs *fs, struct dir *dir, const char *path, l_uid_t uid, l_gid_t gid, int flags)
+darwinfs_fchownat(struct fs *fs, struct dir *dir, const char *path, l_uid_t uid, l_gid_t gid, int l_flags)
 {
+  int flags = linux_to_darwin_at_flags(l_flags);
   return syswrap(fchownat(dir->fd, path, uid, gid, flags));
 }
 
