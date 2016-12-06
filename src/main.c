@@ -36,7 +36,7 @@ handle_syscall(void)
   uint64_t rax;
   vmm_read_register(HV_X86_RAX, &rax);
   if (rax >= NR_SYSCALLS) {
-    fprintf(stderr, "unknown system call: %lld\n", rax);
+    warnk("unknown system call: %lld\n", rax);
     exit(1);            /* TODO: signal something */
   }
   uint64_t rdi, rsi, rdx, r10, r8, r9;
@@ -142,7 +142,7 @@ main_loop()
           continue;
         }
         /* FIXME */
-        fprintf(stderr, "invalid opcode! (rip = %p): ", (void *) rip);
+        warnk("invalid opcode! (rip = %p): ", (void *) rip);
         unsigned char inst[instlen];
         if (copy_from_user(inst, rip, instlen))
           assert(false);
@@ -170,7 +170,7 @@ main_loop()
       case X86_VEC_SX:
       default:
         /* FIXME */
-        fprintf(stderr, "exception thrown: %d\n", exc_vec);
+        warnk("exception thrown: %d\n", exc_vec);
         uint64_t instlen, rip;
         vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
         vmm_read_register(HV_X86_RIP, &rip);
