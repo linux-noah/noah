@@ -70,15 +70,16 @@ struct file_operations {
   int (*readv)(struct file *f, struct iovec *iov, size_t iovcnt);
   int (*writev)(struct file *f, const struct iovec *iov, size_t iovcnt);
   int (*close)(struct file *f);
-  int (*stat)(struct file *f, struct l_newstat *stat);
-  int (*fchown)(struct file *f, l_uid_t uid, l_gid_t gid);
-  int (*fchmod)(struct file *f, l_mode_t mode);
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
   int (*lseek)(struct file *f, l_off_t offset, int whence);
   int (*getdents)(struct file *f, char *buf, uint count);
   int (*fcntl)(struct file *f, unsigned int cmd, unsigned long arg);
-  int (*fstatfs)(struct file *f, struct l_statfs *buf);
   int (*fsync)(struct file *f);
+  /* inode operations */
+  int (*fstat)(struct file *f, struct l_newstat *stat);
+  int (*fstatfs)(struct file *f, struct l_statfs *buf);
+  int (*fchown)(struct file *f, l_uid_t uid, l_gid_t gid);
+  int (*fchmod)(struct file *f, l_mode_t mode);
 };
 
 int
@@ -97,30 +98,6 @@ int
 darwinfs_close(struct file *file)
 {
   return syswrap(close(file->fd));
-}
-
-int
-darwinfs_stat(struct file *file, struct l_newstat *l_st)
-{
-  struct stat st;
-  int ret = syswrap(fstat(file->fd, &st));
-  if (ret < 0) {
-    return ret;
-  }
-  stat_darwin_to_linux(&st, l_st);
-  return ret;
-}
-
-int
-darwinfs_fchown(struct file *file, l_uid_t uid, l_gid_t gid)
-{
-  return syswrap(fchown(file->fd, uid, gid));
-}
-
-int
-darwinfs_fchmod(struct file *file, l_mode_t mode)
-{
-  return syswrap(fchmod(file->fd, mode));
 }
 
 int
@@ -291,6 +268,36 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 
 int
+darwinfs_fsync(struct file *file)
+{
+  return syswrap(fsync(file->fd));
+}
+
+int
+darwinfs_fstat(struct file *file, struct l_newstat *l_st)
+{
+  struct stat st;
+  int ret = syswrap(fstat(file->fd, &st));
+  if (ret < 0) {
+    return ret;
+  }
+  stat_darwin_to_linux(&st, l_st);
+  return ret;
+}
+
+int
+darwinfs_fchown(struct file *file, l_uid_t uid, l_gid_t gid)
+{
+  return syswrap(fchown(file->fd, uid, gid));
+}
+
+int
+darwinfs_fchmod(struct file *file, l_mode_t mode)
+{
+  return syswrap(fchmod(file->fd, mode));
+}
+
+int
 darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
 {
   struct statfs st;
@@ -301,12 +308,6 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
   return r;
 }
 
-int
-darwinfs_fsync(struct file *file)
-{
-  return syswrap(fsync(file->fd));
-}
-
 struct file *
 vfs_acquire(int fd)
 {
@@ -314,15 +315,15 @@ vfs_acquire(int fd)
     darwinfs_readv,
     darwinfs_writev,
     darwinfs_close,
-    darwinfs_stat,
-    darwinfs_fchown,
-    darwinfs_fchmod,
     darwinfs_ioctl,
     darwinfs_lseek,
     darwinfs_getdents,
     darwinfs_fcntl,
-    darwinfs_fstatfs,
     darwinfs_fsync,
+    darwinfs_fstat,
+    darwinfs_fstatfs,
+    darwinfs_fchown,
+    darwinfs_fchmod,
   };
 
   struct file *file;
@@ -477,7 +478,7 @@ DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
   if (file == NULL)
     return -LINUX_EBADF;
   struct l_newstat st;
-  int n = file->ops->stat(file, &st);
+  int n = file->ops->fstat(file, &st);
   if (n < 0)
     goto out;
   if (copy_to_user(st_ptr, &st, sizeof st)) {
@@ -620,6 +621,11 @@ struct fs_operations {
   int (*unlinkat)(struct fs *fs, struct dir *dir, const char *path, int flags);
   int (*readlinkat)(struct fs *fs, struct dir *dir, const char *path, char *buf, int bufsize);
   int (*mkdirat)(struct fs *fs, struct dir *dir, const char *path, int mode);
+  /* inode operations */
+  int (*fstatat)(struct fs *fs, struct dir *dir, const char *path, struct l_newstat *stat, int flags);
+  int (*statfs)(struct fs *fs, struct dir *dir, const char *path, struct l_statfs *buf);
+  int (*fchownat)(struct fs *fs, struct dir *dir, const char *path, l_uid_t uid, l_gid_t gid, int flags);
+  int (*fchmodat)(struct fs *fs, struct dir *dir, const char *path, l_mode_t mode);
 };
 
 int
@@ -678,6 +684,43 @@ darwinfs_mkdirat(struct fs *fs, struct dir *dir, const char *path, int mode)
   return syswrap(mkdirat(dir->fd, path, mode));
 }
 
+int
+darwinfs_fstatat(struct fs *fs, struct dir *dir, const char *path, struct l_newstat *l_st, int l_flags)
+{
+  int flags = linux_to_darwin_at_flags(l_flags);
+  struct stat st;
+  int ret = syswrap(fstatat(dir->fd, path, &st, flags));
+  if (ret < 0) {
+    return ret;
+  }
+  stat_darwin_to_linux(&st, l_st);
+  return ret;
+}
+
+int
+darwinfs_statfs(struct fs *fs, struct dir *dir, const char *path, struct l_statfs *buf)
+{
+  assert(dir->fd == AT_FDCWD);
+  struct statfs st;
+  int r = syswrap(statfs(path, &st));
+  if (r < 0)
+    return r;
+  statfs_darwin_to_linux(&st, buf);
+  return r;
+}
+
+int
+darwinfs_fchownat(struct fs *fs, struct dir *dir, const char *path, l_uid_t uid, l_gid_t gid, int flags)
+{
+  return syswrap(fchownat(dir->fd, path, uid, gid, flags));
+}
+
+int
+darwinfs_fchmodat(struct fs *fs, struct dir *dir, const char *path, l_mode_t mode)
+{
+  return syswrap(fchmodat(dir->fd, path, mode, 0));
+}
+
 #define LOOKUP_NOFOLLOW   0x0001
 #define LOOKUP_DIRECTORY  0x0002
 /* #define LOOKUP_CONTINUE   0x0004 */
@@ -697,6 +740,10 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     darwinfs_unlinkat,
     darwinfs_readlinkat,
     darwinfs_mkdirat,
+    darwinfs_fstatat,
+    darwinfs_statfs,
+    darwinfs_fchownat,
+    darwinfs_fchmodat,
   };
 
   static struct fs darwinfs = {
@@ -798,17 +845,22 @@ DEFINE_SYSCALL(symlink, gstr_t, path1_ptr, gstr_t, path2_ptr)
 
 DEFINE_SYSCALL(newfstatat, int, dirfd, gstr_t, path_ptr, gaddr_t, st_ptr, int, flags)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  char pathname[LINUX_PATH_MAX];
+  strncpy_from_user(pathname, path_ptr, sizeof pathname);
   if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
     return -LINUX_EINVAL;
   }
-  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LINUX_O_PATH | LINUX_O_NOFOLLOW : 0;
-  int fd = do_openat(dirfd, path, oflags, 0);
-  if (fd < 0)
-    return fd;
-  int r = sys_fstat(fd, st_ptr);
-  do_close(fd);
+  int grab_flags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LOOKUP_NOFOLLOW : 0;
+  struct path path;
+  int r = vfs_grab_dir(dirfd, pathname, grab_flags, &path);
+  if (r < 0) {
+    return r;
+  }
+  struct l_newstat st;
+  r = path.fs->ops->fstatat(path.fs, path.dir, path.subpath, &st, flags);
+  vfs_ungrab_dir(&path);
+  if (0 <= r && copy_to_user(st_ptr, &st, sizeof st))
+    return -LINUX_EFAULT;
   return r;
 }
 
@@ -824,17 +876,19 @@ DEFINE_SYSCALL(lstat, gstr_t, path, gaddr_t, st)
 
 DEFINE_SYSCALL(fchownat, int, dirfd, gstr_t, path_ptr, l_uid_t, user, l_gid_t, group, int, flags)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  char pathname[LINUX_PATH_MAX];
+  strncpy_from_user(pathname, path_ptr, sizeof pathname);
   if (flags & ~(LINUX_AT_SYMLINK_NOFOLLOW)) {
     return -LINUX_EINVAL;
   }
-  int oflags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LINUX_O_PATH | LINUX_O_NOFOLLOW : 0;
-  int fd = do_openat(dirfd, path, oflags, 0);
-  if (fd < 0)
-    return fd;
-  int r = sys_fchown(fd, user, group);
-  do_close(fd);
+  int grab_flags = flags & LINUX_AT_SYMLINK_NOFOLLOW ? LOOKUP_NOFOLLOW : 0;
+  struct path path;
+  int r = vfs_grab_dir(dirfd, pathname, grab_flags, &path);
+  if (r < 0) {
+    return r;
+  }
+  r = path.fs->ops->fchownat(path.fs, path.dir, path.subpath, user, group, flags);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -850,13 +904,15 @@ DEFINE_SYSCALL(lchown, gstr_t, path, int, uid, int, gid)
 
 DEFINE_SYSCALL(fchmodat, int, dirfd, gstr_t, path_ptr, l_mode_t, mode)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(dirfd, path, 0, 0);
-  if (fd < 0)
-    return fd;
-  int r = sys_fchmod(fd, mode);
-  do_close(fd);
+  char pathname[LINUX_PATH_MAX];
+  strncpy_from_user(pathname, path_ptr, sizeof pathname);
+  struct path path;
+  int r = vfs_grab_dir(dirfd, pathname, 0, &path);
+  if (r < 0) {
+    return r;
+  }
+  r = path.fs->ops->fchmodat(path.fs, path.dir, path.subpath, mode);
+  vfs_ungrab_dir(&path);
   return r;
 }
 
@@ -867,13 +923,18 @@ DEFINE_SYSCALL(chmod, gstr_t, path, int, mode)
 
 DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
 {
-  char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(LINUX_AT_FDCWD, path, 0, 0);
-  if (fd < 0)
-    return fd;
-  int r = sys_fstatfs(fd, buf_ptr);
-  do_close(fd);
+  char pathname[LINUX_PATH_MAX];
+  strncpy_from_user(pathname, path_ptr, sizeof pathname);
+  struct path path;
+  int r = vfs_grab_dir(LINUX_AT_FDCWD, pathname, 0, &path);
+  if (r < 0) {
+    return r;
+  }
+  struct l_statfs st;
+  r = path.fs->ops->statfs(path.fs, path.dir, path.subpath, &st);
+  vfs_ungrab_dir(&path);
+  if (0 <= r && copy_to_user(buf_ptr, &st, sizeof st))
+    return -LINUX_EFAULT;
   return r;
 }
 
