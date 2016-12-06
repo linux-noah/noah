@@ -94,7 +94,7 @@ DEFINE_SYSCALL(unimplemented)
 
   printk("unimplemented syscall: %lld\n", rax);
   fprintf(stderr, "unimplemented syscall: %lld\n", rax);
-  exit(1);
+  return -LINUX_ENOSYS;
 }
 
 #include "syscall.h"
