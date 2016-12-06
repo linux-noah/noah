@@ -381,7 +381,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     return fd;
   }
   if (proc.nr_tasks > 1) {
-    fprintf(stderr, "Multi-thread execve is not implemented yet\n");
+    warnk("Multi-thread execve is not implemented yet\n");
     return -LINUX_EINVAL;
   }
 

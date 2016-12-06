@@ -92,8 +92,7 @@ DEFINE_SYSCALL(unimplemented)
 
   vmm_read_register(HV_X86_RAX, &rax);
 
-  printk("unimplemented syscall: %lld\n", rax);
-  fprintf(stderr, "unimplemented syscall: %lld\n", rax);
+  warnk("unimplemented syscall: %lld\n", rax);
   return -LINUX_ENOSYS;
 }
 

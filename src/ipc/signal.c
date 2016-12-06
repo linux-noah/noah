@@ -33,7 +33,7 @@ init_signal(struct proc *proc)
     struct sigaction oact;
     sigaction(i + 1, NULL, &oact);
     if (!(oact.sa_handler == SIG_IGN || oact.sa_handler == SIG_DFL)) {
-      fprintf(stderr, "sa_handler:%d\n", (int)oact.sa_handler);
+      warnk("sa_handler:%d\n", (int)oact.sa_handler);
     }
     assert(oact.sa_handler == SIG_IGN || oact.sa_handler == SIG_DFL);
     // flags, restorer, and mask will be flushed in execve, so just leave them 0
@@ -230,8 +230,7 @@ wake_sighandler()
 
     switch (proc.sighand.sigaction[sig - 1].lsa_handler) {
       case (l_handler_t) SIG_DFL:
-        fprintf(stderr, "[%d] Handling default signal in Noah is not implemented yet\n", getpid());
-        printk("Handling default signal in Noah is not implemented yet\n");
+        warnk("Handling default signal in Noah is not implemented yet\n");
         /* fall through */
       case (l_handler_t) SIG_IGN:
         continue;
@@ -452,8 +451,7 @@ DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
 DEFINE_SYSCALL(kill, l_pid_t, pid, int, sig)
 {
   if (sig >= LINUX_SIGRTMIN) {
-    printk("RT signal is raised: %d\n", sig);
-    fprintf(stderr, "RT signal is raised: %d\n", sig);
+    warnk("RT signal is raised: %d\n", sig);
   }
   return syswrap(kill(pid, linux_to_darwin_signal(sig)));
 }

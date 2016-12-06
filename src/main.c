@@ -128,7 +128,7 @@ main_loop()
         /* FIXME */
         uint64_t gladdr;
         vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &gladdr);
-        fprintf(stderr, "page fault: caused by guest linear address 0x%llx\n", gladdr);
+        warnk("page fault: caused by guest linear address 0x%llx\n", gladdr);
         exit(1);                /* TODO: signal segv */
       }
       case X86_VEC_UD: {
@@ -319,10 +319,13 @@ main(int argc, char *argv[], char **envp)
 
   char root[PATH_MAX] = {0};
 
-  while ((c = getopt_long(argc, argv, "+o:s:m:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+o:w:s:m:", long_options, &option_index)) != -1) {
     switch (c) {
     case 'o':
       init_printk(optarg);
+      break;
+    case 'w':
+      init_warnk(optarg);
       break;
     case 's':
       init_meta_strace(optarg);

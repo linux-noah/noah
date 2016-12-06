@@ -140,8 +140,7 @@ do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gad
     implemented |= needed;
   }
   if ((clone_flags & ~implemented) || (clone_flags & needed) != needed) {
-    fprintf(stderr, "unsupported clone_flags: %lx\n", clone_flags);
-    printk("unsupported clone_flags: %lx\n", clone_flags);
+    warnk("unsupported clone_flags: %lx\n", clone_flags);
     return -LINUX_EINVAL;
   }
 

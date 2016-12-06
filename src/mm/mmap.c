@@ -51,7 +51,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
   len = roundup(len, PAGE_SIZE(PAGE_4KB));
 
   if ((l_flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
-    fprintf(stderr, "unsupported mmap l_flags: 0x%x\n", l_flags);
+    warnk("unsupported mmap l_flags: 0x%x\n", l_flags);
     exit(1);
   }
   if (l_flags & LINUX_MAP_ANON) {
@@ -135,8 +135,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   if (is_page_aligned((void*)old_addr, PAGE_4KB))
     return -LINUX_EINVAL;
   if (!(flags & LINUX_MREMAP_MAYMOVE)) {
-    printk("unsupported mremap flags: 0x%x\n", flags);
-    fprintf(stderr, "unsupported mremap flags: 0x%x\n", flags);
+    warnk("unsupported mremap flags: 0x%x\n", flags);
     return -LINUX_ENOSYS;
   }
 

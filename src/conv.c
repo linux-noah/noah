@@ -56,8 +56,7 @@ linux_to_darwin_at_flags(int flags)
   }
 
   if (flags) {
-    printk("unsupported at flags:0x%x\n", flags);
-    fprintf(stderr, "unsupported at flags:0x%x\n", flags);
+    warnk("unsupported at flags:0x%x\n", flags);
   }
 
   return ret;
