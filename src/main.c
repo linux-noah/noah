@@ -112,10 +112,8 @@ main_loop()
 
       int exc_vec = exc_info & 0xff;
       switch (exc_vec) {
-      default:
-        fprintf(stderr, "unhandled exception: vector %d\n", exc_vec);
-        assert(false);
       case X86_VEC_PF: {
+        /* FIXME */
         uint64_t gladdr;
         vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &gladdr);
         fprintf(stderr, "page fault: caused by guest linear address 0x%llx\n", gladdr);
@@ -139,9 +137,7 @@ main_loop()
         for (uint64_t i = 0; i < instlen; ++i)
           fprintf(stderr, "%02x ", inst[i] & 0xff);
         fprintf(stderr, "\n");
-        //        exit(1);
-        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
-        break;
+        exit(1);                /* TODO: signal SIGILL */
       }
       case X86_VEC_DE:
       case X86_VEC_DB:
@@ -159,11 +155,13 @@ main_loop()
       case X86_VEC_MC:
       case X86_VEC_XM:
       case X86_VEC_VE:
-      case X86_VEC_SX: {
+      case X86_VEC_SX:
+      default:
+        /* FIXME */
+        fprintf(stderr, "exception thrown: %d\n", exc_vec);
         uint64_t instlen, rip;
         vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
         vmm_read_register(HV_X86_RIP, &rip);
-        fprintf(stderr, "exception ignored: %d\n", exc_vec);
         fprintf(stderr, "inst: \n");
         unsigned char inst[instlen];
         if (copy_from_user(inst, rip, instlen))
@@ -171,9 +169,7 @@ main_loop()
         for (uint64_t i = 0; i < instlen; ++i)
           fprintf(stderr, "%02x ", inst[i] & 0xff);
         fprintf(stderr, "\n");
-        vmm_write_vmcs(VMCS_GUEST_RIP, instlen + rip);
-        break;
-      }
+        exit(1);                /* TODO */
       }
       break;
     }
