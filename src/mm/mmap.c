@@ -69,10 +69,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
 
   void *ptr = mmap(0, len, d_prot, mflags, fd, offset);
   if (ptr == MAP_FAILED) {
-    perror("holy cow!");
-    fprintf(stderr, "addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
-    print_bt();
-    exit(1);
+    panic("mmap failed. addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
   }
 
   record_region(proc.mm, ptr, addr, len, l_prot, l_flags, fd, offset);
@@ -173,10 +170,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   /* new_size > old_size */
   void *moved_to = mmap(0, new_size, PROT_NONE, region->mm_flags, region->mm_fd, region->pgoff);
   if (moved_to == MAP_FAILED) {
-    perror("ieeee!");
-    fprintf(stderr, "mremap old_addr :0x%llx, old_size: 0x%lux, new_size: 0x%lux, flags:0x%ux, new_addr: 0x%llx", old_addr, old_size, new_size, flags, new_addr);
-    print_bt();
-    exit(1);
+    panic("mremap failed. old_addr :0x%llx, old_size: 0x%lux, new_size: 0x%lux, flags:0x%ux, new_addr: 0x%llx", old_addr, old_size, new_size, flags, new_addr);
   }
   if (!(region->mm_flags & LINUX_MAP_ANONYMOUS)) {
     /* A file is mapped to this region. We have to take the file permission into account */

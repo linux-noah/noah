@@ -6,6 +6,9 @@
 #include <time.h>
 #include <pthread.h>
 #include <execinfo.h>
+#include <stdnoreturn.h>
+#include <errno.h>
+#include <string.h>
 
 #include "noah.h"
 #include "vmm.h"
@@ -28,26 +31,27 @@ init_sink(const char *fn, FILE **sinkp, const char *name)
   strftime(buf, sizeof buf, "%a, %d %b %Y %H:%M:%S %Z", &tm);
   fprintf(*sinkp, "\n//==================\n");
   fprintf(*sinkp, "%s log started: [%s]\n", name, buf);
+  fflush(*sinkp);
 }
 
 void
-print_to_sink(FILE *sink, pthread_mutex_t *sync, va_list ap, const char *fmt)
+print_to_sink(FILE *sink, pthread_mutex_t *sync, const char *mes)
 {
   if (!sink) {
-    va_end(ap);
     return;
   }
 
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
 
-  pthread_mutex_lock(sync);
-  fprintf(sink, "[%d:%lld] ", getpid(), tid);
-  vfprintf(sink, fmt, ap);
+  if (sync) {
+    pthread_mutex_lock(sync);
+  }
+  fprintf(sink, "[%d:%lld] %s", getpid(), tid, mes);
   fflush(sink);
-  pthread_mutex_unlock(sync);
-
-  va_end(ap);
+  if (sync) {
+    pthread_mutex_unlock(sync);
+  }
 }
 
 void
@@ -61,9 +65,17 @@ printk(const char *fmt, ...)
 {
   va_list ap;
   va_start(ap, fmt);
+  char *mes;
 
-  print_to_sink(printk_sink, &printk_sync, ap, fmt);
+  if (!printk_sink) {
+    va_end(ap);
+    return;
+  }
 
+  vasprintf(&mes, fmt, ap);
+  print_to_sink(printk_sink, &printk_sync, mes);
+
+  free(mes);
   va_end(ap);
 }
 
@@ -76,46 +88,82 @@ init_warnk(const char *fn)
 void
 warnk(const char *fmt, ...)
 {
-  va_list ap, cp1, cp2;
+  va_list ap;
   va_start(ap, fmt);
-  va_copy(cp1, ap);va_copy(cp2, ap);
-
   char *mes;
-  asprintf(&mes, "WARNING: %s", fmt);
 
-  print_to_sink(printk_sink, &printk_sync, cp1, mes);
-  print_to_sink(warnk_sink, &printk_sync, cp2, mes);
+  vasprintf(&mes, fmt, ap);
+
+  printk("WARNING: %s", mes);
+  print_to_sink(warnk_sink, &printk_sync, mes);
 
 #ifndef NDEBUG
   const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
-  char *colored;
-  asprintf(&colored, "%s%s%s", magenda, mes, reset);
-  vfprintf(stderr, colored, ap);
-  free(colored);
+  fprintf(stderr, "%sNoah WARNING: %s%s", magenda, mes, reset);
 #endif
 
   free(mes);
-
-  va_end(ap);va_end(cp1);va_end(cp2);
+  va_end(ap);
 }
 
-void
-print_bt(void)
+static void
+printbt_to_sink(FILE *sink, pthread_mutex_t *sync)
 {
+  if (!sink) {
+    return;
+  }
+
   void *array[10];
   size_t size;
   char **strings;
   size_t i;
   uint64_t tid;
-  pthread_threadid_np(NULL, &tid);
 
+  pthread_threadid_np(NULL, &tid);
   size = backtrace(array, 10);
   strings = backtrace_symbols(array, size);
 
-  fprintf(stderr, "[%d:%lld] Obtained %zd stack frames.\n", getpid(), tid, size);
-
+  if (sync) {
+    pthread_mutex_lock(sync);
+  }
+  fprintf(sink, "[%d:%lld] Obtained %zd stack frames.\n", getpid(), tid, size);
   for(i = 0; i < size; i++)
-    fprintf(stderr, "%s\n", strings[i]);
+    fprintf(sink, "%s\n", strings[i]);
+  fflush(sink);
+  if (sync) {
+    pthread_mutex_unlock(sync);
+  }
 
   free(strings);
+}
+
+noreturn void
+panic(const char *fmt, ...)
+{
+  int err = errno;
+  va_list ap, cp;
+  va_start(ap, fmt);
+  va_copy(cp, ap);
+  char *given, *mes;
+
+  vasprintf(&given, fmt, ap);
+  asprintf(&mes, "!!PANIC!!\nperror is \"%s\" if it is valid\n%s\n", strerror(err), given);
+
+  printk("%s", mes);
+  printbt_to_sink(printk_sink, &printk_sync);
+
+  print_to_sink(warnk_sink, &warnk_sync, mes);
+  printbt_to_sink(warnk_sink, &warnk_sync);
+
+  const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
+  fprintf(stderr, "%s%s", magenda, mes);
+  printbt_to_sink(stderr, NULL);
+  fprintf(stderr, "%s\n", reset);
+
+  free(given);
+  free(mes);
+
+  // TODO: Termination processing
+
+  exit(1);
 }
