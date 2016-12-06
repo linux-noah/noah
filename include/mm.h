@@ -5,9 +5,8 @@
 #include <stdbool.h>
 
 #include "types.h"
-#include "util/list.h"
-#include "x86/page.h"
 #include "noah.h"
+#include "util/list.h"
 
 struct mm_region {
   void *haddr;

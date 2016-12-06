@@ -19,12 +19,8 @@
 #include <Hypervisor/hv_vmx.h>
 #include <Hypervisor/hv_arch_vmx.h>
 
+#include "x86/vm.h"
 #include "x86/specialreg.h"
-#include "x86/page.h"
-#include "x86/segment.h"
-#include "x86/idt.h"
-#include "x86/msr.h"
-#include "x86/vmemparam.h"
 #include "x86/vmx.h"
 
 struct vcpu {

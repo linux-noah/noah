@@ -3,7 +3,7 @@
 #include "noah.h"
 #include "vmm.h"
 #include "mm.h"
-#include "x86/page.h"
+#include "x86/vm.h"
 
 #include "linux/mman.h"
 

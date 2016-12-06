@@ -9,7 +9,7 @@
 #include "vmm.h"
 #include "noah.h"
 
-#include "x86/page.h"
+#include "x86/vm.h"
 
 /* 
  * Manage kernel memory space allocated by kmap.

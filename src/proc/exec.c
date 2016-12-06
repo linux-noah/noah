@@ -15,9 +15,7 @@
 #include "noah.h"
 #include "vmm.h"
 #include "mm.h"
-#include "x86/page.h"
-#include "x86/vmemparam.h"
-#include "x86/segment.h"
+#include "x86/vm.h"
 #include "elf.h"
 
 #include "linux/common.h"

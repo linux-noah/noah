@@ -1,2 +1,0 @@
-#define STACK_SIZE (1 << 21)
-#define STACK_TOP  0x0000007fc0000000ULL
