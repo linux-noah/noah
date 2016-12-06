@@ -312,7 +312,7 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 {
   task.clear_child_tid = tidptr;
-  return 0;
+  return sys_gettid();
 }
 
 DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)

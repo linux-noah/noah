@@ -132,7 +132,7 @@ main_loop()
           continue;
         }
         /* FIXME */
-        fprintf(stderr, "invalid opcode!: ");
+        fprintf(stderr, "invalid opcode! (rip = %p): ", (void *) rip);
         unsigned char inst[instlen];
         if (copy_from_user(inst, rip, instlen))
           assert(false);
