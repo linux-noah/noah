@@ -8,7 +8,6 @@ configure_file(include/version.h.in ${PROJECT_SOURCE_DIR}/include/version.h)
 set(CMAKE_C_FLAGS "-g -Wall -Wextra -Wno-unused-parameter -std=gnu11")
 set(CMAKE_C_FLAGS_DEBUG "-DDEBUG_MODE=1 -O0")
 set(CMAKE_C_FLAGS_RELEASE "-O2")
-set(CMAKE_BUILD_TYPE Release)
 include_directories(include)
 
 add_executable(noah
