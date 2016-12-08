@@ -56,6 +56,7 @@ void sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set);
 
 void wake_sighandler();
 bool has_sigpending();
+int send_signal(pid_t pid, int sig);
 
 /* task related data */
 

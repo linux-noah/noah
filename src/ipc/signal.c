@@ -13,11 +13,22 @@
 
 _Thread_local atomic_sigbits_t task_sigpending;  // sigpending cannot be inside task struct because thread local variables referred by signal handler should be atomic type
 
-void
+static void
 set_sigpending(int signum)
 {
   int l_signum = darwin_to_linux_signal(signum);
   sigbits_addbit(&task_sigpending, l_signum);
+}
+
+int
+send_signal(pid_t pid, int signum)
+{
+  // Currently, just kill it to them
+  if (signum >= LINUX_SIGRTMIN) {
+    warnk("RT signal is raised: %d\n", signum);
+    return 0;
+  }
+  return syswrap(kill(pid, linux_to_darwin_signal(signum)));
 }
 
 void
@@ -450,8 +461,5 @@ DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
 
 DEFINE_SYSCALL(kill, l_pid_t, pid, int, sig)
 {
-  if (sig >= LINUX_SIGRTMIN) {
-    warnk("RT signal is raised: %d\n", sig);
-  }
-  return syswrap(kill(pid, linux_to_darwin_signal(sig)));
+  return send_signal(pid, sig);
 }

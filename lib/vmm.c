@@ -500,7 +500,7 @@ dump_instr()
       sprintf(inst_str + 3 * i, "%02x ", ip[i]);
     } else {
       printk("rip is in invalid user address: 0x%016llx\n", rip);
-      volatile int raise_segv = ip[i]; // Raise segmentation fault in host
+      send_signal(getpid(), LINUX_SIGSEGV);
       return;
     }
   }

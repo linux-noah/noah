@@ -39,7 +39,7 @@ handle_syscall(void)
   vmm_read_register(HV_X86_RAX, &rax);
   if (rax >= NR_SYSCALLS) {
     warnk("unknown system call: %lld\n", rax);
-    exit(1);            /* TODO: signal something */
+    send_signal(getpid(), LINUX_SIGSYS);
   }
   uint64_t rdi, rsi, rdx, r10, r8, r9;
   vmm_read_register(HV_X86_RDI, &rdi);
@@ -105,7 +105,7 @@ main_loop()
         uint64_t gladdr;
         vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &gladdr);
         warnk("page fault: caused by guest linear address 0x%llx\n", gladdr);
-        exit(1);                /* TODO: signal segv */
+        send_signal(getpid(), LINUX_SIGSEGV);
       }
       case X86_VEC_UD: {
         uint64_t instlen, rip;
@@ -125,7 +125,7 @@ main_loop()
         for (uint64_t i = 0; i < instlen; ++i)
           fprintf(stderr, "%02x ", inst[i] & 0xff);
         fprintf(stderr, "\n");
-        exit(1);                /* TODO: signal SIGILL */
+        send_signal(getpid(), LINUX_SIGILL);
       }
       case X86_VEC_DE:
       case X86_VEC_DB:
