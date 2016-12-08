@@ -429,7 +429,7 @@ DEFINE_SYSCALL(rt_sigreturn)
 
   struct sigframe frame;
   if (copy_from_user(&frame, rsp - sizeof frame.pretcode, sizeof frame)) {
-    die_with_forcedsig(SIGSEGV);
+    die_with_forcedsig(LINUX_SIGSEGV);
   }
 
   /* Restore sigcontext */

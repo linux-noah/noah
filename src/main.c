@@ -268,15 +268,16 @@ die_with_forcedsig(int sig)
   // TODO: Termination processing
   
   /* Force default signal action */
+  int dsig = linux_to_darwin_signal(sig);
   sigset_t mask;
   sigfillset(&mask);
-  sigdelset(&mask, sig);
+  sigdelset(&mask, dsig);
   sigprocmask(SIG_SETMASK, &mask, NULL);
   struct sigaction act;
   act.sa_handler = SIG_DFL;
   act.sa_flags = 0;
-  sigaction(sig, &act, NULL);
-  raise(sig);
+  sigaction(dsig, &act, NULL);
+  raise(dsig);
   assert(false); // sig should be one that can terminate procs
 }
 
