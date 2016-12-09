@@ -7,7 +7,7 @@ node {
     stage "Build Noah"
     sh '''mkdir -p build
       cd build
-      cmake ..
+      cmake -DCMAKE_BUILD_TYPE=Release ..
       make'''
 
     stage "User Program Test"
