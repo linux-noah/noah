@@ -339,6 +339,10 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
     return -LINUX_EFAULT;
   }
 
+  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_ONESHOT | LINUX_SA_NOMASK | LINUX_SA_ONSTACK)) {
+    warnk("unimplemented sa_flags is passed: 0x%llx\n", lact.lsa_flags);
+  }
+
   void *handler;
   if (lact.lsa_flags & LINUX_SA_SIGINFO || (void *) lact.lsa_handler == SIG_DFL || (void *) lact.lsa_handler == SIG_IGN) {
     handler = (void *) lact.lsa_handler;
