@@ -250,6 +250,10 @@ wake_sighandler()
         if (setup_sigframe(sig) < 0) {
           die_with_forcedsig(SIGSEGV);
         }
+        if (proc.sighand.sigaction[sig - 1].lsa_flags & LINUX_SA_ONESHOT) {
+          proc.sighand.sigaction[sig - 1].lsa_handler = (l_handler_t) SIG_DFL;
+          // Host signal handler must be set to SIG_DFL already by Darwin kernel
+        }
         goto out;
     }
   }
@@ -339,7 +343,7 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
     return -LINUX_EFAULT;
   }
 
-  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_ONESHOT | LINUX_SA_NOMASK | LINUX_SA_ONSTACK)) {
+  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_NOMASK | LINUX_SA_ONSTACK)) {
     warnk("unimplemented sa_flags is passed: 0x%llx\n", lact.lsa_flags);
   }
 
