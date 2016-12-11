@@ -13,6 +13,7 @@
 
 _Thread_local atomic_sigbits_t task_sigpending;  // sigpending cannot be inside task struct because thread local variables referred by signal handler should be atomic type
 
+static inline int should_deliver(int sig);
 static void
 set_sigpending(int signum)
 {
@@ -198,7 +199,9 @@ setup_sigframe(int signum)
   sigset_t dset;
   frame.ucontext.sigcontext.oldmask = task.sigmask;
   l_sigset_t newmask = proc.sighand.sigaction[signum - 1].lsa_mask;
-  LINUX_SIGADDSET(&newmask, signum);
+  if (!(proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_NOMASK)) {
+    LINUX_SIGADDSET(&newmask, signum);
+  }
   task.sigmask = newmask;
   linux_to_darwin_sigset(&newmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
@@ -213,7 +216,7 @@ setup_sigframe(int signum)
     goto error;
   }
 
-  /* Setup signals */
+  /* Setup registers */
   vmm_write_register(HV_X86_RDI, signum);
   vmm_write_register(HV_X86_RSI, 0); // TODO: siginfo
   vmm_write_register(HV_X86_RDI, 0); // TODO: ucontext
@@ -343,7 +346,7 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
     return -LINUX_EFAULT;
   }
 
-  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_NOMASK | LINUX_SA_ONSTACK)) {
+  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_ONSTACK)) {
     warnk("unimplemented sa_flags is passed: 0x%llx\n", lact.lsa_flags);
   }
 
