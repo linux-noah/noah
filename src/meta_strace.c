@@ -166,6 +166,20 @@ meta_strace_post(int syscall_num, char *syscall_name, uint64_t ret, ...)
 }
 
 void
+meta_strace_sigdeliver(int signum)
+{
+  uint64_t tid;
+  pthread_threadid_np(NULL, &tid);
+
+  pthread_mutex_lock(&strace_sync);
+
+  fprintf(strace_sink, "[%d:%lld] --- %s ---\n", getpid(), tid, linux_signum_str(signum));
+
+  fflush(strace_sink);
+  pthread_mutex_unlock(&strace_sync);
+}
+
+void
 trace_read_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
 {
   // Print nothing

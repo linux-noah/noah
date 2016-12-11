@@ -242,6 +242,7 @@ wake_sighandler()
   int sig;
   while ((sig = fetch_sig_to_deliver()) != 0) {
 
+    meta_strace_sigdeliver(sig);
     switch (proc.sighand.sigaction[sig - 1].lsa_handler) {
       case (l_handler_t) SIG_DFL:
         warnk("Handling default signal in Noah is not implemented yet\n");

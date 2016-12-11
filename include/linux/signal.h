@@ -78,6 +78,7 @@
 DECLARE_CENUM(signum, LINUX_STSIGNUM);
 DECLARE_CMAP_FUNC(darwin_to_linux, signum, LINUX_STSIGNUM);
 DECLARE_CMAP_FUNC(linux_to_darwin, signum, LINUX_STSIGNUM);
+DECLARE_CSTR_FUNC(signum, LINUX_STSIGNUM);
 
 
 #define LINUX_NSIG              64
