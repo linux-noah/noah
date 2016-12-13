@@ -343,6 +343,16 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   struct sigaction dact, doact;
   int dsig;
 
+  if (oact != 0) {
+    int n = copy_to_user(oact, &proc.sighand.sigaction[sig - 1], sizeof(l_sigaction_t));
+    if (n > 0)
+      return -LINUX_EFAULT;
+  }
+
+  if (act == 0) {
+    return 0;
+  }
+
   if (copy_from_user(&lact, act, sizeof(l_sigaction_t)))  {
     return -LINUX_EFAULT;
   }
@@ -364,17 +374,10 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   pthread_rwlock_wrlock(&proc.sighand.lock);
   
   err = syswrap(sigaction(dsig, &dact, &doact));
-  if (err < 0) {
-    goto out;
+  if (err >= 0) {
+    proc.sighand.sigaction[sig - 1] = lact;
   }
-  if (oact != 0 && copy_to_user(oact, &proc.sighand.sigaction[sig - 1], sizeof(l_sigaction_t))) {
-    sigaction(dsig, &doact, NULL);
-    err = -LINUX_EFAULT;
-    goto out;
-  }
-  proc.sighand.sigaction[sig - 1] = lact;
 
-out:
   pthread_rwlock_unlock(&proc.sighand.lock);
 
   return err;
