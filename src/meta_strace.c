@@ -168,6 +168,10 @@ meta_strace_post(int syscall_num, char *syscall_name, uint64_t ret, ...)
 void
 meta_strace_sigdeliver(int signum)
 {
+  if (!strace_sink) {
+    return;
+  }
+
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
 
