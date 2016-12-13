@@ -1116,6 +1116,7 @@ DEFINE_SYSCALL(mkdir, gstr_t, path_ptr, int, mode)
 int
 vfs_getcwd(char *buf, size_t size)
 {
+  errno = 0;
   char *ptr = getcwd(buf, size); /* FIXME: path translation */
   if (! ptr) {
     return -darwin_to_linux_errno(errno);
@@ -1135,6 +1136,16 @@ vfs_umask(int mask)
   return syswrap(umask(mask));
 }
 
+/*
+ * The syscall version of getcwd differs from that provided by glibc!
+ * Quoting a part of source code of linux:
+ *
+ * > NOTE! The user-level library version returns a
+ * > character pointer. The kernel system call just
+ * > returns the length of the buffer filled (which
+ * > includes the ending '\0' character), or a negative
+ * > error value. So libc would do something like
+ */
 DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
 {
   char buf[size];
@@ -1146,7 +1157,7 @@ DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
   if (copy_to_user(buf_ptr, buf, size)) {
     return -LINUX_EFAULT;
   }
-  return buf_ptr;
+  return strlen(buf) + 1;
 }
 
 DEFINE_SYSCALL(fchdir, int, fd)
