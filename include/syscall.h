@@ -235,7 +235,7 @@
   SYSCALL(231, exit_group)                      \
   SYSCALL(232, unimplemented)                   \
   SYSCALL(233, unimplemented)                   \
-  SYSCALL(234, unimplemented)                   \
+  SYSCALL(234, tgkill)                          \
   SYSCALL(235, utimes)                          \
   SYSCALL(236, vserver)                         \
   SYSCALL(237, unimplemented)                   \
