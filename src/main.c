@@ -223,6 +223,10 @@ main_loop()
       break;
     }
 
+    case VMX_REASON_HLT: {
+      break;
+    }
+
     default:
       printk("other reason: %llu\n", exit_reason);
     }
