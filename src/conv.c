@@ -497,12 +497,13 @@ linux_to_darwin_sigset(l_sigset_t *lset, sigset_t *dset)
 {
   sigemptyset(dset);
   for (int i = 1; i <= LINUX_SIGRTMAX; i++) {
-    if (LINUX_SIGISMEMBER(lset, i)) {
-      int num = linux_to_darwin_signal(i);
-      if (num > 0) {
-        sigaddset(dset, num);
-      }
+    if (!LINUX_SIGISMEMBER(lset, i)) {
+      continue;
     }
+    if (i == LINUX_SIGSTKFLT || i == LINUX_SIGPWR) {
+      continue; // No corresponding signals in Darwin
+    }
+    sigaddset(dset, linux_to_darwin_signal(i));
   }
 }
 
