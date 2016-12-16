@@ -55,6 +55,7 @@ typedef uint64_t	l_ulong;
 typedef uint16_t	l_ushort;
 
 typedef l_ulong		l_uintptr_t;
+typedef l_ulong		l_ucharptr_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_ulong		l_dev_t;

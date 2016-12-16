@@ -152,15 +152,10 @@ struct sigcontext {
   l_sigset_t oldmask;
 };
 
-struct ucontext {
-  struct sigcontext sigcontext;
-};
-
 struct sigframe {
-  gaddr_t pretcode;
+  struct l_rt_sigframe rt_sigframe;
   struct retcode retcode;
-  struct ucontext ucontext;
-  // siginfo
+  struct sigcontext sigcontext;
 };
 
 int
@@ -178,10 +173,10 @@ setup_sigframe(int signum)
 
   /* Setup sigframe */
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
-    frame.pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
+    frame.rt_sigframe.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
     // Depending on the fact that we currently allow any data to be executed.
-    frame.pretcode = rsp + offsetof(struct sigframe, retcode);
+    frame.rt_sigframe.sf_pretcode = rsp + offsetof(struct sigframe, retcode);
   }
   frame.retcode = retcode_bin;
 
@@ -193,11 +188,11 @@ setup_sigframe(int signum)
     }
     //TODO: save some segment related regs
     //TODO: save FPU state
-    vmm_read_register(x86_reg_list[i], &frame.ucontext.sigcontext.vcpu_reg[i]);
+    vmm_read_register(x86_reg_list[i], &frame.sigcontext.vcpu_reg[i]);
   }
 
   sigset_t dset;
-  frame.ucontext.sigcontext.oldmask = task.sigmask;
+  frame.sigcontext.oldmask = task.sigmask;
   l_sigset_t newmask = proc.sighand.sigaction[signum - 1].lsa_mask;
   if (!(proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_NOMASK)) {
     LINUX_SIGADDSET(&newmask, signum);
@@ -206,7 +201,7 @@ setup_sigframe(int signum)
   linux_to_darwin_sigset(&newmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
-  frame.ucontext.sigcontext.signum = signum;
+  frame.sigcontext.signum = signum;
 
   /* OK, push them then... */
   rsp -= sizeof frame;
@@ -227,7 +222,7 @@ setup_sigframe(int signum)
   return 0;
 
 error:
-  task.sigmask = frame.ucontext.sigcontext.oldmask;
+  task.sigmask = frame.sigcontext.oldmask;
   linux_to_darwin_sigset(&task.sigmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
@@ -443,7 +438,7 @@ DEFINE_SYSCALL(rt_sigreturn)
   vmm_read_register(HV_X86_RSP, &rsp);
 
   struct sigframe frame;
-  if (copy_from_user(&frame, rsp - sizeof frame.pretcode, sizeof frame)) {
+  if (copy_from_user(&frame, rsp - sizeof frame.rt_sigframe.sf_pretcode, sizeof frame)) {
     die_with_forcedsig(LINUX_SIGSEGV);
   }
 
@@ -454,11 +449,11 @@ DEFINE_SYSCALL(rt_sigreturn)
     }
     //TODO: restore some segment related regs
     //TODO: restore FPU state
-    vmm_write_register(x86_reg_list[i], frame.ucontext.sigcontext.vcpu_reg[i]);
+    vmm_write_register(x86_reg_list[i], frame.sigcontext.vcpu_reg[i]);
   }
 
   sigset_t dset;
-  task.sigmask = frame.ucontext.sigcontext.oldmask;
+  task.sigmask = frame.sigcontext.oldmask;
   linux_to_darwin_sigset(&task.sigmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
