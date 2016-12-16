@@ -176,7 +176,10 @@ struct l_sigcontext {
   l_ushort		sc_cs;
   l_ushort		sc_gs;
   l_ushort		sc_fs;
-  l_ushort		sc___pad0;
+  union {
+    l_ushort		sc_ss;
+    l_ushort		sc___pad0;
+  };
   l_ulong		sc_err;
   l_ulong		sc_trapno;
   l_sigset_t		sc_mask;
@@ -192,6 +195,10 @@ struct l_ucontext {
   struct l_sigcontext	uc_mcontext;
   l_sigset_t	uc_sigmask;
 };
+
+#define LINUX_UC_FP_XSTATE	0x1
+#define LINUX_UC_SIGCONTEXT_SS	0x2
+#define LINUX_UC_STRICT_RESTORE_SS	0x4
 
 #define LINUX_SI_PREAMBLE_SIZE	(4 * sizeof(int))
 #define	LINUX_SI_MAX_SIZE	128

@@ -146,53 +146,102 @@ static const struct retcode {
   0x0f05, // syscall
 };
 
-struct sigcontext {
-  uint64_t vcpu_reg[NR_X86_REG_LIST]; //temporarily, FIXME
-  int signum;
-  l_sigset_t oldmask;
-};
+static void
+setup_sigcontext(struct l_sigcontext *mcontext)
+{
+  vmm_read_register(HV_X86_R8, &mcontext->sc_r8);
+  vmm_read_register(HV_X86_R9, &mcontext->sc_r9);
+  vmm_read_register(HV_X86_R10, &mcontext->sc_r10);
+  vmm_read_register(HV_X86_R11, &mcontext->sc_r11);
+  vmm_read_register(HV_X86_R12, &mcontext->sc_r12);
+  vmm_read_register(HV_X86_R13, &mcontext->sc_r13);
+  vmm_read_register(HV_X86_R14, &mcontext->sc_r14);
+  vmm_read_register(HV_X86_R15, &mcontext->sc_r15);
+  vmm_read_register(HV_X86_RDI, &mcontext->sc_rdi);
+  vmm_read_register(HV_X86_RSI, &mcontext->sc_rsi);
+  vmm_read_register(HV_X86_RBP, &mcontext->sc_rbp);
+  vmm_read_register(HV_X86_RBX, &mcontext->sc_rbx);
+  vmm_read_register(HV_X86_RDX, &mcontext->sc_rdx);
+  vmm_read_register(HV_X86_RAX, &mcontext->sc_rax);
+  vmm_read_register(HV_X86_RCX, &mcontext->sc_rcx);
+  vmm_read_register(HV_X86_RSP, &mcontext->sc_rsp);
+  vmm_read_register(HV_X86_RIP, &mcontext->sc_rip);
+  vmm_read_register(HV_X86_RFLAGS, &mcontext->sc_rflags);
+  uint64_t cs, gs, fs, ss;
+  vmm_read_register(HV_X86_CS, &cs); // Is saving segment indices really suffice? Manipulating base, limit may be needed.
+  vmm_read_register(HV_X86_GS, &gs);
+  vmm_read_register(HV_X86_FS, &fs);
+  vmm_read_register(HV_X86_SS, &ss);
+  mcontext->sc_cs = cs;
+  mcontext->sc_gs = gs;
+  mcontext->sc_fs = fs;
+  mcontext->sc_ss = ss;
+  // TODO: err, trapno
+  mcontext->sc_mask = task.sigmask;
+  // TODO: cr2
+  // TODO: save FPU state
+}
 
-struct sigframe {
-  struct l_rt_sigframe rt_sigframe;
-  struct retcode retcode;
-  struct sigcontext sigcontext;
-};
+static void
+restore_sigcontext(struct l_sigcontext *mcontext)
+{
+  vmm_write_register(HV_X86_R8, mcontext->sc_r8);
+  vmm_write_register(HV_X86_R9, mcontext->sc_r9);
+  vmm_write_register(HV_X86_R10, mcontext->sc_r10);
+  vmm_write_register(HV_X86_R11, mcontext->sc_r11);
+  vmm_write_register(HV_X86_R12, mcontext->sc_r12);
+  vmm_write_register(HV_X86_R13, mcontext->sc_r13);
+  vmm_write_register(HV_X86_R14, mcontext->sc_r14);
+  vmm_write_register(HV_X86_R15, mcontext->sc_r15);
+  vmm_write_register(HV_X86_RDI, mcontext->sc_rdi);
+  vmm_write_register(HV_X86_RSI, mcontext->sc_rsi);
+  vmm_write_register(HV_X86_RBP, mcontext->sc_rbp);
+  vmm_write_register(HV_X86_RBX, mcontext->sc_rbx);
+  vmm_write_register(HV_X86_RDX, mcontext->sc_rdx);
+  vmm_write_register(HV_X86_RAX, mcontext->sc_rax);
+  vmm_write_register(HV_X86_RCX, mcontext->sc_rcx);
+  vmm_write_register(HV_X86_RSP, mcontext->sc_rsp);
+  vmm_write_register(HV_X86_RIP, mcontext->sc_rip);
+  vmm_write_register(HV_X86_RFLAGS, mcontext->sc_rflags); // TODO: fix some flags after implementing proper rflags initialization
+  // TODO: set user mode bits
+  vmm_write_register(HV_X86_CS, mcontext->sc_cs);
+  vmm_write_register(HV_X86_GS, mcontext->sc_gs);
+  vmm_write_register(HV_X86_FS, mcontext->sc_fs);
+  vmm_write_register(HV_X86_SS, mcontext->sc_ss); // TODO: handle ss register more carefully if you want to support software such as DOSEMU
+  
+  // TODO: restore FPU state
+}
 
 int
 setup_sigframe(int signum)
 {
   int err = 0;
-  struct sigframe frame;
+  struct l_rt_sigframe frame;
+  const struct retcode retcode = retcode_bin;
 
   assert(signum <= LINUX_NSIG);
-  static_assert(is_aligned(sizeof frame, sizeof(uint64_t)), "signal frame should be aligned");
-  static_assert(is_aligned(offsetof(struct sigframe, retcode), sizeof(uint64_t)), "signal retcode should be aligned");
+  static_assert(is_aligned(sizeof frame, sizeof(uint64_t)), "signal frame size should be aligned");
 
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
 
   /* Setup sigframe */
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
-    frame.rt_sigframe.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
+    frame.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
     // Depending on the fact that we currently allow any data to be executed.
-    frame.rt_sigframe.sf_pretcode = rsp + offsetof(struct sigframe, retcode);
+    frame.sf_pretcode = rsp + sizeof frame;
   }
-  frame.retcode = retcode_bin;
 
-
-  /* Setup sigcontext */
-  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (x86_reg_list[i] == HV_X86_IDT_BASE) {
-      break;
-    }
-    //TODO: save some segment related regs
-    //TODO: save FPU state
-    vmm_read_register(x86_reg_list[i], &frame.sigcontext.vcpu_reg[i]);
-  }
+  /* Setup ucontext */
+  frame.sf_sc.uc_flags = LINUX_UC_FP_XSTATE | LINUX_UC_SIGCONTEXT_SS | LINUX_UC_STRICT_RESTORE_SS; // Handle more carefully if you want to support DOSEMU
+  frame.sf_sc.uc_link = 0;
+  frame.sf_sc.uc_sigmask = task.sigmask;
+  // TODO: stack
+  setup_sigcontext(&frame.sf_sc.uc_mcontext);
 
   sigset_t dset;
-  frame.sigcontext.oldmask = task.sigmask;
+  frame.sf_sc.uc_mcontext.sc_mask = task.sigmask;
   l_sigset_t newmask = proc.sighand.sigaction[signum - 1].lsa_mask;
   if (!(proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_NOMASK)) {
     LINUX_SIGADDSET(&newmask, signum);
@@ -201,12 +250,14 @@ setup_sigframe(int signum)
   linux_to_darwin_sigset(&newmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
-  frame.sigcontext.signum = signum;
-
   /* OK, push them then... */
-  rsp -= sizeof frame;
+  rsp -= sizeof frame + sizeof retcode;
   vmm_write_register(HV_X86_RSP, rsp);
   if (copy_to_user(rsp, &frame, sizeof frame)) {
+    err = -LINUX_EFAULT;
+    goto error;
+  }
+  if (copy_to_user(rsp + sizeof frame, &retcode, sizeof retcode)) {
     err = -LINUX_EFAULT;
     goto error;
   }
@@ -222,7 +273,7 @@ setup_sigframe(int signum)
   return 0;
 
 error:
-  task.sigmask = frame.sigcontext.oldmask;
+  task.sigmask = frame.sf_sc.uc_mcontext.sc_mask;
   linux_to_darwin_sigset(&task.sigmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
@@ -440,23 +491,14 @@ DEFINE_SYSCALL(rt_sigreturn)
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
 
-  struct sigframe frame;
-  if (copy_from_user(&frame, rsp - sizeof frame.rt_sigframe.sf_pretcode, sizeof frame)) {
+  struct l_rt_sigframe frame;
+  if (copy_from_user(&frame, rsp - sizeof frame.sf_pretcode, sizeof frame)) {
     die_with_forcedsig(LINUX_SIGSEGV);
   }
 
-  /* Restore sigcontext */
-  for (uint64_t i = 0; i < NR_X86_REG_LIST; i++) {
-    if (x86_reg_list[i] == HV_X86_IDT_BASE) {
-      break;
-    }
-    //TODO: restore some segment related regs
-    //TODO: restore FPU state
-    vmm_write_register(x86_reg_list[i], frame.sigcontext.vcpu_reg[i]);
-  }
-
+  restore_sigcontext(&frame.sf_sc.uc_mcontext);
   sigset_t dset;
-  task.sigmask = frame.sigcontext.oldmask;
+  task.sigmask = frame.sf_sc.uc_mcontext.sc_mask;
   linux_to_darwin_sigset(&task.sigmask, &dset);
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
