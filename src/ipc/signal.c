@@ -165,8 +165,8 @@ setup_sigframe(int signum)
   struct sigframe frame;
 
   assert(signum <= LINUX_NSIG);
-  assert(is_aligned(sizeof frame, sizeof(uint64_t)));
-  assert(is_aligned(offsetof(struct sigframe, retcode), sizeof(uint64_t)));
+  static_assert(is_aligned(sizeof frame, sizeof(uint64_t)), "signal frame should be aligned");
+  static_assert(is_aligned(offsetof(struct sigframe, retcode), sizeof(uint64_t)), "signal retcode should be aligned");
 
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);

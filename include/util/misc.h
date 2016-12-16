@@ -12,6 +12,4 @@ static inline uint64_t roundup(uint64_t x, uint64_t y) {
   return (x + y - 1) / y * y;
 }
 
-static inline bool is_aligned(uint64_t x, uint64_t y) {
-  return rounddown(x, y) == x;
-}
+#define is_aligned(x,y) (((x) / (y) * (y))== (x))
