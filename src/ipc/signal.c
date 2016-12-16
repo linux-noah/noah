@@ -15,7 +15,7 @@ _Thread_local atomic_sigbits_t task_sigpending;  // sigpending cannot be inside 
 
 static inline int should_deliver(int sig);
 static void
-set_sigpending(int signum)
+set_sigpending(int signum, siginfo_t *info, ucontext_t *context)
 {
   int l_signum = darwin_to_linux_signal(signum);
   sigbits_addbit(&task_sigpending, l_signum);
@@ -61,7 +61,7 @@ init_signal(struct proc *proc)
   sigset_t set;
   sigprocmask(0, NULL, &set);
   darwin_to_linux_sigset(&set, &t->sigmask);
-  t->sigpending = &task_sigpending; //TODO
+  t->sigpending = &task_sigpending;
   sigbits_emptyset(t->sigpending);
   sigpending(&set);
   sigset_to_sigbits(&proc->sigpending, &set);
@@ -357,9 +357,10 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   }
 
   void *handler;
-  if (lact.lsa_flags & LINUX_SA_SIGINFO || (void *) lact.lsa_handler == SIG_DFL || (void *) lact.lsa_handler == SIG_IGN) {
+  if ((void *) lact.lsa_handler == SIG_DFL || (void *) lact.lsa_handler == SIG_IGN) {
     handler = (void *) lact.lsa_handler;
   } else {
+    lact.lsa_flags |= LINUX_SA_SIGINFO;
     handler = set_sigpending;
   }
   linux_to_darwin_sigaction(&lact, &dact, handler);
