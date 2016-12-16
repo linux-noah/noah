@@ -365,6 +365,7 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   }
   linux_to_darwin_sigaction(&lact, &dact, handler);
   dsig = linux_to_darwin_signal(sig);
+  // TODO: make handlings of linux specific signals consistent
 
   int err = 0;
   pthread_rwlock_wrlock(&proc.sighand.lock);
@@ -384,6 +385,7 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   l_sigset_t lset, loset;
   sigset_t dset, doset;
 
+  // TODO: Fix the NULL nset handling
   if (copy_from_user(&lset, nset, sizeof(l_sigset_t)))  {
     return -LINUX_EFAULT;
   }
