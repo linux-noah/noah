@@ -232,6 +232,8 @@ setup_sigframe(int signum)
     // Depending on the fact that we currently allow any data to be executed.
     frame.sf_pretcode = rsp + sizeof frame;
   }
+  bzero(&frame.sf_si, sizeof(l_siginfo_t));
+  frame.sf_si.lsi_signo = signum;
 
   /* Setup ucontext */
   frame.sf_sc.uc_flags = LINUX_UC_FP_XSTATE | LINUX_UC_SIGCONTEXT_SS | LINUX_UC_STRICT_RESTORE_SS; // Handle more carefully if you want to support DOSEMU
@@ -264,8 +266,8 @@ setup_sigframe(int signum)
 
   /* Setup registers */
   vmm_write_register(HV_X86_RDI, signum);
-  vmm_write_register(HV_X86_RSI, 0); // TODO: siginfo
-  vmm_write_register(HV_X86_RDI, 0); // TODO: ucontext
+  vmm_write_register(HV_X86_RSI, rsp + offsetof(struct l_rt_sigframe, sf_si));
+  vmm_write_register(HV_X86_RDX, rsp + offsetof(struct l_rt_sigframe, sf_sc));
 
   vmm_write_register(HV_X86_RAX, 0);
   vmm_write_register(HV_X86_RIP, proc.sighand.sigaction[signum - 1].lsa_handler);
