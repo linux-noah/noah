@@ -433,10 +433,19 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
 
 DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, size)
 {
-  l_sigset_t lset, loset;
-  sigset_t dset, doset;
+  l_sigset_t lset;
+  sigset_t dset;
 
-  // TODO: Fix the NULL nset handling
+  if (oset != 0) {
+    if (copy_to_user(oset, &task.sigmask, sizeof task.sigmask)) {
+      return -LINUX_EFAULT;
+    }
+  }
+
+  if (nset == 0) {
+    return 0;
+  }
+
   if (copy_from_user(&lset, nset, sizeof(l_sigset_t)))  {
     return -LINUX_EFAULT;
   }
@@ -463,17 +472,9 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
 
   linux_to_darwin_sigset(&lset, &dset);
 
-  int err = syswrap(sigprocmask(dhow, &dset, &doset));
+  int err = syswrap(sigprocmask(dhow, &dset, NULL));
   if (err < 0) {
     return err;
-  }
-
-  if (oset != 0) {
-    darwin_to_linux_sigset(&doset, &loset);
-    if (copy_to_user(oset, &loset, sizeof(l_sigset_t))) {
-      sigprocmask(SIG_SETMASK, &doset, NULL);
-      return -LINUX_EFAULT;
-    }
   }
 
   task.sigmask = lset;

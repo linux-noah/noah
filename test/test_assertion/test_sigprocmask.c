@@ -17,9 +17,8 @@ int main()
   assert_true(1);         // And this line should run
   
   // Test oset is updated
-  sigemptyset(&set);
   sigemptyset(&oset);
   assert_false(sigismember(&oset, SIGINT));
-  sigprocmask(SIG_BLOCK, &set, &oset);
+  sigprocmask(SIG_BLOCK, NULL, &oset);
   assert_true(sigismember(&oset, SIGINT));
 }
