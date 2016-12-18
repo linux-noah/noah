@@ -65,13 +65,11 @@ struct sighand {
   l_sigaction_t sigaction[LINUX_NSIG];
 };
 
-_Thread_local extern atomic_sigbits_t task_sigpending;  // sigpending cannot be inside task struct because thread local variables referred by signal handler should be atomic type
-
 struct task {
   struct list_head tasks; /* Threads in the current proc */
   gaddr_t set_child_tid, clear_child_tid;
   l_sigset_t sigmask;
-  atomic_sigbits_t *sigpending;
+  atomic_sigbits_t sigpending;
 };
 
 struct proc {

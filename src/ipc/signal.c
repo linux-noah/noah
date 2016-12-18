@@ -11,14 +11,12 @@
 #include <assert.h>
 #include <stdatomic.h>
 
-_Thread_local atomic_sigbits_t task_sigpending;  // sigpending cannot be inside task struct because thread local variables referred by signal handler should be atomic type
-
 static inline int should_deliver(int sig);
 static void
 set_sigpending(int signum, siginfo_t *info, ucontext_t *context)
 {
   int l_signum = darwin_to_linux_signal(signum);
-  sigbits_addbit(&task_sigpending, l_signum);
+  sigbits_addbit(&task.sigpending, l_signum);
 }
 
 int
@@ -62,8 +60,7 @@ init_signal(struct proc *proc)
   sigset_t set;
   sigprocmask(0, NULL, &set);
   darwin_to_linux_sigset(&set, &t->sigmask);
-  t->sigpending = &task_sigpending;
-  sigbits_emptyset(t->sigpending);
+  sigbits_emptyset(&t->sigpending);
   sigpending(&set);
   sigset_to_sigbits(&proc->sigpending, &set);
 }
@@ -128,7 +125,7 @@ fetch_sig_to_deliver()
   if (sig) {
     return sig;
   }
-  return fetch_sig_from_sigbits(task.sigpending);
+  return fetch_sig_from_sigbits(&task.sigpending);
 }
 
 bool

@@ -96,8 +96,7 @@ __start_thread(struct clone_thread_arg *arg)
   list_add(&task.tasks, &proc.tasks);
   pthread_rwlock_unlock(&proc.lock);
 
-  task.sigpending = &task_sigpending;
-  sigbits_emptyset(task.sigpending);
+  sigbits_emptyset(&task.sigpending);
 
   init_task(arg->clone_flags, arg->child_tid, arg->tls);
 
