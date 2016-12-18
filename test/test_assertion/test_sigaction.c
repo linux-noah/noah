@@ -34,10 +34,16 @@ handle_nodefer(int signum)
   handle_nodefer_count--;
 }
 
+void
+handle_sigaction(int signum, siginfo_t *info, void *context)
+{
+  assert_true(info->si_signo == SIGINT);
+}
+
 int
 main()
 {
-  nr_tests(5);
+  nr_tests(6);
 
   struct sigaction act, oact;
   act.sa_handler = handle;
@@ -64,6 +70,11 @@ main()
 
   sigaction(SIGINT, NULL, &oact);
   assert_true(oact.sa_handler == handle_nodefer);
+
+  act.sa_sigaction = handle_sigaction;
+  act.sa_flags = SA_SIGINFO;
+  sigaction(SIGINT, &act, NULL);
+  kill(getpid(), SIGINT);
 
   assert_true(1); // Must arrive here
 }
