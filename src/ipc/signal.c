@@ -29,7 +29,8 @@ send_signal(pid_t pid, int signum)
     warnk("RT signal is raised: %d\n", signum);
     return 0;
   }
-  return syswrap(kill(pid, linux_to_darwin_signal(signum)));
+  int dsignum = (signum == 0) ? 0 : linux_to_darwin_signal(signum);
+  return syswrap(kill(pid, dsignum));
 }
 
 void
