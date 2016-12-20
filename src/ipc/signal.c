@@ -514,7 +514,18 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
 
 DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
 {
-  return 0;
+  if (size > sizeof(l_sigset_t)) {
+    return -LINUX_EINVAL;
+  }
+  int ret = 0;
+
+  pthread_rwlock_rdlock(&proc.sighand.lock);
+  if (copy_to_user(set, &task.sigpending, size) > 0) {
+    ret = -LINUX_EFAULT;
+  }
+  pthread_rwlock_unlock(&proc.sighand.lock);
+
+  return ret;
 }
 
 DEFINE_SYSCALL(rt_sigreturn)
