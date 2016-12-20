@@ -70,6 +70,7 @@ struct task {
   gaddr_t set_child_tid, clear_child_tid;
   l_sigset_t sigmask;
   atomic_sigbits_t sigpending;
+  l_stack_t sas;
 };
 
 struct proc {

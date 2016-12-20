@@ -140,6 +140,10 @@ typedef struct {
   l_size_t	ss_size;
 } l_stack_t;
 
+#define LINUX_SS_ONSTACK      1
+#define LINUX_SS_DISABLE      2
+#define LINUX_SS_AUTODISARM   (1U << 31)
+
 struct l_fpstate {
   u_int16_t cwd;
   u_int16_t swd;

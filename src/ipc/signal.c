@@ -65,6 +65,16 @@ init_signal(struct proc *proc)
   sigset_to_sigbits(&proc->sigpending, &set);
 }
 
+static void
+reset_sas()
+{
+  task.sas = (l_stack_t) {
+    .ss_sp = 0,
+    .ss_flags = LINUX_SS_DISABLE,
+    .ss_size = 0
+  };
+}
+
 void
 flush_signal(struct proc *proc)
 {
@@ -82,6 +92,7 @@ flush_signal(struct proc *proc)
     linux_to_darwin_sigaction(&proc->sighand.sigaction[i], &dact, SIG_DFL);
     sigaction(i + 1, &dact, NULL);
   }
+  reset_sas();
 }
 
 static inline int
@@ -210,6 +221,18 @@ restore_sigcontext(struct l_sigcontext *mcontext)
   // TODO: restore FPU state
 }
 
+static l_int
+sas_ss_flags(uint64_t rsp)
+{
+  if (task.sas.ss_flags & LINUX_SS_DISABLE || task.sas.ss_size == 0) {
+    return LINUX_SS_DISABLE;
+  }
+  if (rsp > task.sas.ss_sp && rsp - task.sas.ss_sp < task.sas.ss_size) {
+    return LINUX_SS_ONSTACK | task.sas.ss_flags;
+  }
+  return task.sas.ss_flags;
+}
+
 int
 setup_sigframe(int signum)
 {
@@ -222,6 +245,9 @@ setup_sigframe(int signum)
 
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
+  if ((proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_ONSTACK) && (sas_ss_flags(rsp) & ~LINUX_SS_AUTODISARM) == 0) {
+    rsp = task.sas.ss_sp + task.sas.ss_size;
+  }
 
   /* Setup sigframe */
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
@@ -237,7 +263,10 @@ setup_sigframe(int signum)
   frame.sf_sc.uc_flags = LINUX_UC_FP_XSTATE | LINUX_UC_SIGCONTEXT_SS | LINUX_UC_STRICT_RESTORE_SS; // Handle more carefully if you want to support DOSEMU
   frame.sf_sc.uc_link = 0;
   frame.sf_sc.uc_sigmask = task.sigmask;
-  // TODO: stack
+  frame.sf_sc.uc_stack = task.sas;
+  if (task.sas.ss_flags & LINUX_SS_AUTODISARM) {
+    reset_sas();
+  }
   setup_sigcontext(&frame.sf_sc.uc_mcontext);
 
   sigset_t dset;
@@ -512,6 +541,38 @@ DEFINE_SYSCALL(rt_sigreturn)
 
 DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
 {
+  uint64_t rsp;
+  vmm_read_register(HV_X86_RSP, &rsp);
+  l_stack_t ss, oss = task.sas;
+  oss.ss_flags = sas_ss_flags(rsp);
+  printf("rsp:%llx, oss.ss_flags:%d\n", rsp, oss.ss_flags);
+
+  if (uoss != 0) {
+    if (copy_to_user(uoss, &oss, sizeof task.sas)) {
+      return -LINUX_EFAULT;
+    }
+  }
+  if (uss == 0) {
+    return 0;
+  }
+  if (oss.ss_flags & LINUX_SS_ONSTACK) {
+    return -LINUX_EPERM;
+  }
+
+  if (copy_from_user(&ss, uss, sizeof ss)) {
+    return -LINUX_EFAULT;
+  }
+
+  if (ss.ss_size < LINUX_MINSIGSTKSZ) {
+    return -LINUX_ENOMEM;
+  }
+  int mode = ss.ss_flags & ~LINUX_SS_AUTODISARM;
+  if (mode != SS_DISABLE && mode != SS_ONSTACK && mode != 0) { // Linux allows only SS_ONSTACK to be passed against man
+    return -LINUX_EINVAL;
+  }
+
+  task.sas = ss;
+
   return 0;
 }
 
