@@ -432,8 +432,8 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
     return -LINUX_EFAULT;
   }
 
-  if (lact.lsa_flags & (LINUX_SA_SIGINFO | LINUX_SA_ONSTACK)) {
-    warnk("unimplemented sa_flags is passed: 0x%llx\n", lact.lsa_flags);
+  if (lact.lsa_flags & (LINUX_SA_SIGINFO)) {
+    warnk("SA_SIGINFO implementaion is incomplete: 0x%llx\n", lact.lsa_flags);
   }
 
   void *handler;
