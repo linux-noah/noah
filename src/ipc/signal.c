@@ -411,7 +411,7 @@ sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set)
 
 DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size)
 {
-  if (sig <= 0 || sig > LINUX_NSIG || sig == LINUX_SIGKILL || sig == LINUX_SIGSTOP) {
+  if (sig <= 0 || sig > LINUX_NSIG || sig == LINUX_SIGKILL || sig == LINUX_SIGSTOP || size != sizeof(l_sigset_t)) {
     return -LINUX_EINVAL;
   }
 
@@ -465,6 +465,10 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
 {
   l_sigset_t lset;
   sigset_t dset;
+
+  if (size != sizeof(l_sigset_t)) {
+    return -LINUX_EINVAL;
+  }
 
   if (oset != 0) {
     if (copy_to_user(oset, &task.sigmask, sizeof task.sigmask)) {
