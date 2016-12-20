@@ -157,4 +157,6 @@ Shell Test:
 end
 
 main
-exit(1) unless @assertion_reports.empty? and @stdout_reports.empty?
+if [@assertion, @stdout, @shell].inject(0) {|sum, v| sum + v[:fail] + v[:premature]} > 0
+  exit(1)
+end
