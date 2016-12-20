@@ -1,5 +1,5 @@
 TEST_UPROGS := \
-	$(addprefix test_assertion/build/, fib test_fork test_thread test_execve test_execve2 test_sigprocmask)\
+	$(addprefix test_assertion/build/, fib test_fork test_thread test_execve test_execve2 test_sigprocmask test_sigaction test_sigaltstack)\
 	$(addprefix test_stdout/build/, hello cat echo)\
 	$(addprefix test_shell/build/, mv env gcc)
 
