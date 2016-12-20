@@ -148,7 +148,7 @@ has_sigpending()
 static const struct retcode {
   uint16_t poplmovl;
   uint32_t nr_sigreturn;
-  uint64_t syscall;
+  uint16_t syscall;
 } __attribute__((packed)) retcode_bin = {
   0xb858, // popl %eax; movl $..., %eax
   NR_rt_sigreturn,
@@ -254,7 +254,7 @@ setup_sigframe(int signum)
     frame.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
     // Depending on the fact that we currently allow any data to be executed.
-    frame.sf_pretcode = rsp + sizeof frame;
+    frame.sf_pretcode = rsp - sizeof retcode;
   }
   bzero(&frame.sf_si, sizeof(l_siginfo_t));
   frame.sf_si.lsi_signo = signum;
