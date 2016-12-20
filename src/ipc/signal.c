@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <assert.h>
 #include <stdatomic.h>
+#include <pthread.h>
 
 static inline int should_deliver(int sig);
 static void
@@ -501,7 +502,7 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
 
   linux_to_darwin_sigset(&lset, &dset);
 
-  int err = syswrap(sigprocmask(dhow, &dset, NULL));
+  int err = syswrap(pthread_sigmask(dhow, &dset, NULL));
   if (err < 0) {
     return err;
   }
