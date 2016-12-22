@@ -4,10 +4,13 @@
 #include <sys/mman.h>
 #include <strings.h>
 
+#include "common.h"
 #include "util/list.h"
 #include "mm.h"
 #include "vmm.h"
 #include "noah.h"
+
+#include "linux/mman.h"
 
 #include "x86/vm.h"
 
@@ -144,4 +147,48 @@ destroy_mm(struct mm *mm)
     vmm_munmap(r->gaddr, r->size);
     free(r);
   }
+}
+
+DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)
+{
+  printk("madvise is not implemented\n");
+  return 0;
+
+}
+
+DEFINE_SYSCALL(mlock, gaddr_t, addr, size_t, length)
+{
+  printk("mlock is not implemented\n");
+  return 0;
+}
+
+DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
+{
+  printk("munlock is not implemented\n");
+  return 0;
+}
+
+DEFINE_SYSCALL(brk, unsigned long, brk)
+{
+  uint64_t ret;
+  brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
+
+  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
+  if (brk < proc.mm->start_brk) {
+    ret = proc.mm->start_brk;
+    goto out;
+  }
+
+  if (brk < proc.mm->current_brk) {
+    ret = proc.mm->current_brk = brk;
+    goto out;
+  }
+
+  do_mmap(proc.mm->current_brk, brk - proc.mm->current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+  ret = proc.mm->current_brk = brk;
+
+out:
+  pthread_rwlock_unlock(&proc.mm->alloc_lock);
+
+  return ret;
 }
