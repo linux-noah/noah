@@ -226,7 +226,6 @@ sas_ss_flags(uint64_t rsp)
 int
 setup_sigframe(int signum)
 {
-  int err = 0;
   struct l_rt_sigframe frame;
 
   assert(signum <= LINUX_NSIG);
@@ -243,7 +242,7 @@ setup_sigframe(int signum)
     frame.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
     // x86_64 should always use SA_RESTORER
-    die_with_forcedsig(LINUX_SIGSEGV);
+    return -LINUX_EFAULT;
   }
   bzero(&frame.sf_si, sizeof(l_siginfo_t));
   frame.sf_si.lsi_signo = signum;
@@ -272,8 +271,7 @@ setup_sigframe(int signum)
   rsp -= sizeof frame;
   vmm_write_register(HV_X86_RSP, rsp);
   if (copy_to_user(rsp, &frame, sizeof frame)) {
-    err = -LINUX_EFAULT;
-    goto error;
+    return -LINUX_EFAULT;
   }
 
   /* Setup registers */
@@ -285,13 +283,6 @@ setup_sigframe(int signum)
   vmm_write_register(HV_X86_RIP, proc.sighand.sigaction[signum - 1].lsa_handler);
 
   return 0;
-
-error:
-  task.sigmask = frame.sf_sc.uc_mcontext.sc_mask;
-  linux_to_darwin_sigset(&task.sigmask, &dset);
-  sigprocmask(SIG_SETMASK, &dset, NULL);
-
-  return err;
 }
 
 void
@@ -312,7 +303,7 @@ wake_sighandler()
 
       default:
         if (setup_sigframe(sig) < 0) {
-          die_with_forcedsig(SIGSEGV);
+          die_with_forcedsig(LINUX_SIGSEGV);
         }
         if (proc.sighand.sigaction[sig - 1].lsa_flags & LINUX_SA_ONESHOT) {
           proc.sighand.sigaction[sig - 1].lsa_handler = (l_handler_t) SIG_DFL;
