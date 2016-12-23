@@ -12,7 +12,6 @@
 #include <stdatomic.h>
 #include <pthread.h>
 
-static inline int should_deliver(int sig);
 static void
 set_sigpending(int signum, siginfo_t *info, ucontext_t *context)
 {
