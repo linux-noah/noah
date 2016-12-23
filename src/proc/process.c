@@ -243,6 +243,12 @@ DEFINE_SYSCALL(exit_group, int, reason)
   _exit(reason);
 }
 
+DEFINE_SYSCALL(tgkill)
+{
+  printk("unimplemented syscall: tgkill\n");
+  return -LINUX_ENOSYS;
+}
+
 DEFINE_SYSCALL(capget, gaddr_t, header_ptr, gaddr_t, data_ptr)
 {
   printk("capget is unimplemented\n");

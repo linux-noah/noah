@@ -166,7 +166,7 @@ linux_to_darwin_clockid(l_clockid_t id)
 DEFINE_SYSCALL(clock_gettime, l_clockid_t, id, gaddr_t, spec_ptr)
 {
   struct timespec ts;
-  int r = syswrap(clock_gettime(id, &ts));
+  int r = syswrap(clock_gettime(linux_to_darwin_clockid(id), &ts));
   if (r < 0) {
     return r;
   }

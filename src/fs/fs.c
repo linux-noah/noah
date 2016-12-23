@@ -103,6 +103,7 @@ darwinfs_close(struct file *file)
 int
 darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
 {
+  uint64_t sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
   int fd = file->fd;
   int r;
 
@@ -190,6 +191,9 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     }
     return syswrap(tcflush(fd, sel));
   }
+  case LINUX_FIOCLEX: {
+    return sys_fcntl(fd, LINUX_F_SETFD, 1);
+  }
   default:
     printk("unhandled darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
     return -LINUX_EPERM;
@@ -246,7 +250,7 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
   int r;
   switch (cmd) {
   case LINUX_F_DUPFD:
-    return syswrap(fcntl(file->fd, F_DUPFD, arg));
+    return syswrap(fcntl(file->fd, F_DUPFD, arg)); /* FIXME */
   case LINUX_F_DUPFD_CLOEXEC:
     return syswrap(fcntl(file->fd, F_DUPFD_CLOEXEC, arg));
     /* no translation required for fd flags (i.e. CLOEXEC==1 */
