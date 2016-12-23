@@ -13,6 +13,7 @@
 #include "linux/mman.h"
 
 #include "x86/vm.h"
+#include "x86/specialreg.h"
 
 /* 
  * Manage kernel memory space allocated by kmap.
@@ -21,6 +22,109 @@
 struct mm vkern_mm;
 
 void init_mmap(struct mm *mm);
+
+gaddr_t
+kmap(void *ptr, size_t size, hv_memory_flags_t flags)
+{
+  static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
+
+  assert((size & 0xfff) == 0);
+  assert(((uint64_t) ptr & 0xfff) == 0);
+
+  pthread_rwlock_wrlock(&vkern_mm.alloc_lock);
+
+  record_region(&vkern_mm, ptr, noah_kern_brk, size, hv_mflag_to_linux_mprot(flags), -1, -1, 0);
+  vmm_mmap(noah_kern_brk, size, flags, ptr);
+  noah_kern_brk += size;
+
+  pthread_rwlock_unlock(&vkern_mm.alloc_lock);
+
+  return noah_kern_brk - size;
+}
+
+uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
+  [0] = PTE_U | PTE_W | PTE_P,
+};
+
+uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
+  /* straight mapping */
+#include "pdp.h"
+};
+
+void
+init_page()
+{
+  kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
+  pml4[0] |= kmap(pdp, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE) & 0x000ffffffffff000ul;
+
+  vmm_write_vmcs(VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
+  vmm_write_vmcs(VMCS_GUEST_CR3, host_to_guest(pml4));
+}
+
+uint64_t gdt[3] __page_aligned = {
+  [SEG_NULL] = 0,                  // NULL SEL
+  [SEG_CODE] = 0x0020980000000000, // CODE SEL
+  [SEG_DATA] = 0x0000900000000000, // DATA SEL
+};
+
+void
+init_segment()
+{
+  kmap(gdt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
+
+  vmm_write_vmcs(VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
+  vmm_write_vmcs(VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
+
+  vmm_write_vmcs(VMCS_GUEST_TR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_TR_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_TR_AR, 0x0000008b);
+
+  vmm_write_vmcs(VMCS_GUEST_LDTR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_LDTR_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
+
+  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, 0xffff);
+
+  uint32_t codeseg_ar = 0x0000209B;
+  uint32_t dataseg_ar = 0x00000093;
+  vmm_write_vmcs(VMCS_GUEST_CS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_CS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_CS_AR, codeseg_ar);
+
+  vmm_write_vmcs(VMCS_GUEST_DS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_DS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_DS_AR, dataseg_ar);
+
+  vmm_write_vmcs(VMCS_GUEST_ES, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_ES_AR, dataseg_ar);
+
+  vmm_write_vmcs(VMCS_GUEST_FS, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_FS_AR, dataseg_ar);
+
+  vmm_write_vmcs(VMCS_GUEST_GS, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_GS_AR, dataseg_ar);
+
+  vmm_write_vmcs(VMCS_GUEST_SS, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_BASE, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_LIMIT, 0);
+  vmm_write_vmcs(VMCS_GUEST_SS_AR, dataseg_ar);
+
+  vmm_write_register(HV_X86_CS, GSEL(SEG_CODE, 0));
+  vmm_write_register(HV_X86_DS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_ES, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_FS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_GS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_SS, GSEL(SEG_DATA, 0));
+  vmm_write_register(HV_X86_TR, 0);
+  vmm_write_register(HV_X86_LDTR, 0);
+}
 
 void
 init_mm(struct mm *mm)
@@ -31,6 +135,7 @@ init_mm(struct mm *mm)
   INIT_LIST_HEAD(&mm->mm_regions);
   pthread_rwlock_init(&mm->alloc_lock, NULL);
 }
+
 
 /* Look up the first mm_region which gaddr in [mm_region->gaddr, +size) */
 struct mm_region*

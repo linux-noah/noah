@@ -9,8 +9,6 @@
 #include <libgen.h>
 #include <sys/syslimits.h>
 
-#include "linux/mman.h"
-
 #include "vmm.h"
 #include "mm.h"
 #include "util/list.h"
@@ -20,7 +18,6 @@
 #include <Hypervisor/hv_arch_vmx.h>
 
 #include "x86/vm.h"
-#include "x86/specialreg.h"
 #include "x86/vmx.h"
 
 struct vcpu {
@@ -149,231 +146,19 @@ host_to_guest(void *haddr)
 }
 
 void
-init_vmcs()
+vmm_write_fpstate(void *buffer, size_t size)
 {
-  uint64_t vmx_cap_pinbased, vmx_cap_procbased, vmx_cap_procbased2, vmx_cap_entry, vmx_cap_exit;
-
-  hv_vmx_read_capability(HV_VMX_CAP_PINBASED, &vmx_cap_pinbased);
-  hv_vmx_read_capability(HV_VMX_CAP_PROCBASED, &vmx_cap_procbased);
-  hv_vmx_read_capability(HV_VMX_CAP_PROCBASED2, &vmx_cap_procbased2);
-  hv_vmx_read_capability(HV_VMX_CAP_ENTRY, &vmx_cap_entry);
-  hv_vmx_read_capability(HV_VMX_CAP_EXIT, &vmx_cap_exit);
-
-  /* set up vmcs misc */
-
-#define cap2ctrl(cap,ctrl) (((ctrl) | ((cap) & 0xffffffff)) & ((cap) >> 32))
-
-  vmm_write_vmcs(VMCS_CTRL_PIN_BASED, cap2ctrl(vmx_cap_pinbased, 0));
-  vmm_write_vmcs(VMCS_CTRL_CPU_BASED, cap2ctrl(vmx_cap_procbased,
-                                               CPU_BASED_HLT |
-                                               CPU_BASED_CR8_LOAD |
-                                               CPU_BASED_CR8_STORE));
-  vmm_write_vmcs(VMCS_CTRL_CPU_BASED2, cap2ctrl(vmx_cap_procbased2, 0));
-  vmm_write_vmcs(VMCS_CTRL_VMENTRY_CONTROLS,  cap2ctrl(vmx_cap_entry,
-                                                       VMENTRY_LOAD_EFER |
-                                                       VMENTRY_GUEST_IA32E));
-  vmm_write_vmcs(VMCS_CTRL_VMEXIT_CONTROLS, cap2ctrl(vmx_cap_exit, VMEXIT_LOAD_EFER));
-  vmm_write_vmcs(VMCS_CTRL_EXC_BITMAP, 0xffffffff);
-  vmm_write_vmcs(VMCS_CTRL_CR0_SHADOW, 0);
-  vmm_write_vmcs(VMCS_CTRL_CR4_MASK, 0);
-  vmm_write_vmcs(VMCS_CTRL_CR4_SHADOW, 0);
-}
-
-#define __page_aligned __attribute__((aligned(0x1000)))
-
-static gaddr_t
-kmap(void *ptr, size_t size, hv_memory_flags_t flags)
-{
-  static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
-
-  assert((size & 0xfff) == 0);
-  assert(((uint64_t) ptr & 0xfff) == 0);
-
-  pthread_rwlock_wrlock(&vkern_mm.alloc_lock);
-
-  record_region(&vkern_mm, ptr, noah_kern_brk, size, hv_mflag_to_linux_mprot(flags), -1, -1, 0);
-  vmm_mmap(noah_kern_brk, size, flags, ptr);
-  noah_kern_brk += size;
-
-  pthread_rwlock_unlock(&vkern_mm.alloc_lock);
-
-  return noah_kern_brk - size;
-}
-
-uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
-  [0] = PTE_U | PTE_W | PTE_P,
-};
-
-uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
-  /* straight mapping */
-#include "vmm_pdp.h"
-};
-
-void
-init_page()
-{
-  kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
-  pml4[0] |= kmap(pdp, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE) & 0x000ffffffffff000ul;
-
-  vmm_write_vmcs(VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
-  vmm_write_vmcs(VMCS_GUEST_CR3, host_to_guest(pml4));
-}
-
-void
-init_special_regs()
-{
-  uint64_t cr0;
-  vmm_read_vmcs(VMCS_GUEST_CR0, &cr0);
-  vmm_write_vmcs(VMCS_GUEST_CR0, (cr0 & ~CR0_EM) | CR0_MP);
-
-  uint64_t cr4;
-  vmm_read_vmcs(VMCS_GUEST_CR4, &cr4);
-  vmm_write_vmcs(VMCS_GUEST_CR4, cr4 | CR4_PAE | CR4_OSFXSR | CR4_OSXMMEXCPT | CR4_VMXE | CR4_OSXSAVE);
-
-  uint64_t efer;
-  vmm_read_vmcs(VMCS_GUEST_IA32_EFER, &efer);
-  vmm_write_vmcs(VMCS_GUEST_IA32_EFER, efer | EFER_LME | EFER_LMA);
-}
-
-uint64_t gdt[3] __page_aligned = {
-  [SEG_NULL] = 0,                  // NULL SEL
-  [SEG_CODE] = 0x0020980000000000, // CODE SEL
-  [SEG_DATA] = 0x0000900000000000, // DATA SEL
-};
-
-void
-init_segment()
-{
-  kmap(gdt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
-
-  vmm_write_vmcs(VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
-  vmm_write_vmcs(VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
-
-  vmm_write_vmcs(VMCS_GUEST_TR_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_TR_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_TR_AR, 0x0000008b);
-
-  vmm_write_vmcs(VMCS_GUEST_LDTR_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_LDTR_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_LDTR_AR, DESC_UNUSABLE);
-
-  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, 0xffff);
-
-  uint32_t codeseg_ar = 0x0000209B;
-  uint32_t dataseg_ar = 0x00000093;
-  vmm_write_vmcs(VMCS_GUEST_CS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_CS_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_CS_AR, codeseg_ar);
-
-  vmm_write_vmcs(VMCS_GUEST_DS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_DS_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_DS_AR, dataseg_ar);
-
-  vmm_write_vmcs(VMCS_GUEST_ES, 0);
-  vmm_write_vmcs(VMCS_GUEST_ES_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_ES_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_ES_AR, dataseg_ar);
-
-  vmm_write_vmcs(VMCS_GUEST_FS, 0);
-  vmm_write_vmcs(VMCS_GUEST_FS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_FS_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_FS_AR, dataseg_ar);
-
-  vmm_write_vmcs(VMCS_GUEST_GS, 0);
-  vmm_write_vmcs(VMCS_GUEST_GS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_GS_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_GS_AR, dataseg_ar);
-
-  vmm_write_vmcs(VMCS_GUEST_SS, 0);
-  vmm_write_vmcs(VMCS_GUEST_SS_BASE, 0);
-  vmm_write_vmcs(VMCS_GUEST_SS_LIMIT, 0);
-  vmm_write_vmcs(VMCS_GUEST_SS_AR, dataseg_ar);
-
-  vmm_write_register(HV_X86_CS, GSEL(SEG_CODE, 0));
-  vmm_write_register(HV_X86_DS, GSEL(SEG_DATA, 0));
-  vmm_write_register(HV_X86_ES, GSEL(SEG_DATA, 0));
-  vmm_write_register(HV_X86_FS, GSEL(SEG_DATA, 0));
-  vmm_write_register(HV_X86_GS, GSEL(SEG_DATA, 0));
-  vmm_write_register(HV_X86_SS, GSEL(SEG_DATA, 0));
-  vmm_write_register(HV_X86_TR, 0);
-  vmm_write_register(HV_X86_LDTR, 0);
-}
-
-struct gate_desc idt[256] __page_aligned;
-
-void
-init_idt()
-{
-  kmap(idt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
-
-  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
-  vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, sizeof idt);
-}
-
-void
-init_regs()
-{
-  /* set up cpu regs */
-  vmm_write_register(HV_X86_RFLAGS, 0x2);
-}
-
-void
-init_msr()
-{
-  if (hv_vcpu_enable_native_msr(vcpu->vcpuid, MSR_TIME_STAMP_COUNTER, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(vcpu->vcpuid, MSR_TSC_AUX, 1) == HV_SUCCESS &&
-      hv_vcpu_enable_native_msr(vcpu->vcpuid, MSR_KERNEL_GS_BASE, 1) == HV_SUCCESS) { // MSR_KGSBASE must be set properly later
-    printk("MSR initialization failed.\n");
+  if (hv_vcpu_write_fpstate(vcpu->vcpuid, buffer, size) != HV_SUCCESS) {
+    abort();
   }
 }
 
 void
-init_fpu()
+vmm_enable_native_msr(uint32_t msr, bool enable)
 {
-  struct fxregs_state {
-    uint16_t cwd; /* Control Word                    */
-    uint16_t swd; /* Status Word                     */
-    uint16_t twd; /* Tag Word                        */
-    uint16_t fop; /* Last Instruction Opcode         */
-    union {
-      struct {
-        uint64_t rip; /* Instruction Pointer             */
-        uint64_t rdp; /* Data Pointer                    */
-      };
-      struct {
-        uint32_t fip; /* FPU IP Offset                   */
-        uint32_t fcs; /* FPU IP Selector                 */
-        uint32_t foo; /* FPU Operand Offset              */
-        uint32_t fos; /* FPU Operand Selector            */
-      };
-    };
-    uint32_t mxcsr;       /* MXCSR Register State */
-    uint32_t mxcsr_mask;  /* MXCSR Mask           */
-    uint32_t st_space[32]; /* 8*16 bytes for each FP-reg = 128 bytes */
-    uint32_t xmm_space[64]; /* 16*16 bytes for each XMM-reg = 256 bytes */
-    uint32_t __padding[12];
-    union {
-      uint32_t __padding1[12];
-      uint32_t sw_reserved[12];
-    };
-  } __attribute__((aligned(16))) fx;
-
-  /* emulate 'fninit'
-   * - http://www.felixcloutier.com/x86/FINIT:FNINIT.html
-   */
-  fx.cwd = 0x037f;
-  fx.swd = 0;
-  fx.twd = 0xffff;
-  fx.fop = 0;
-  fx.rip = 0;
-  fx.rdp = 0;
-
-  /* default configuration for the SIMD core */
-  fx.mxcsr = 0x1f80;
-  fx.mxcsr_mask = 0;
-
-  hv_vcpu_write_fpstate(vcpu->vcpuid, &fx, sizeof fx);
+  if (hv_vcpu_enable_native_msr(vcpu->vcpuid, msr, enable) != HV_SUCCESS) {
+    abort();
+  }
 }
 
 void
@@ -538,6 +323,8 @@ vmm_snapshot(struct vmm_snapshot *snapshot)
 
   pthread_rwlock_unlock(&alloc_lock);
 }
+
+void init_msr(); // TODO: save and resotre MSR. just call init_msr in main.c now
 
 void
 vmm_restore_vcpu(struct vcpu_snapshot *snapshot)

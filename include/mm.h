@@ -29,8 +29,12 @@ struct mm {
 
 extern struct mm vkern_mm;
 
+void init_page();
+void init_segment();
 void init_mm(struct mm *mm);
 void init_shm_malloc();
+
+gaddr_t kmap(void *ptr, size_t size, hv_memory_flags_t flags);
 
 struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);
 struct mm_region *record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);

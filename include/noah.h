@@ -10,6 +10,8 @@
 #include "malloc.h"
 #include "version.h"
 
+#define __page_aligned __attribute__((aligned(0x1000)))
+
 /* privilege management */
 
 void drop_privilege(void);
@@ -89,6 +91,8 @@ _Thread_local extern struct task task;
 void set_initial_proc(struct proc *proc, char *root);
 void init_signal(struct proc *);
 void flush_signal(struct proc *proc);
+
+void init_fpu();
 
 /* Linux kernel constants */
 
