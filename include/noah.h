@@ -22,6 +22,11 @@ void elevate_privilege(void);
 gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
 
+#define VERIFY_READ  0
+#define VERIFY_WRITE HV_MEMORY_WRITE
+#define VERIFY_EXEC  HV_MEMORY_EXEC
+bool addr_ok(gaddr_t, int verify);
+
 size_t copy_from_user(void *haddr, gaddr_t gaddr, size_t n); /* returns 0 on success */
 ssize_t strncpy_from_user(void *haddr, gaddr_t gaddr, size_t n);
 size_t copy_to_user(gaddr_t gaddr, const void *haddr, size_t n);

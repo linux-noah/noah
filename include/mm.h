@@ -27,6 +27,8 @@ struct mm {
   pthread_rwlock_t alloc_lock;
 };
 
+extern const gaddr_t user_addr_max;
+
 extern struct mm vkern_mm;
 
 void init_page();

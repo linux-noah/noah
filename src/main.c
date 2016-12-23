@@ -106,7 +106,7 @@ main_loop()
         /* FIXME */
         uint64_t gladdr;
         vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &gladdr);
-        warnk("page fault: caused by guest linear address 0x%llx\n", gladdr);
+        printk("page fault: caused by guest linear address 0x%llx\n", gladdr);
         send_signal(getpid(), LINUX_SIGSEGV);
       }
       case X86_VEC_UD: {
@@ -165,7 +165,6 @@ main_loop()
     }
 
     case VMX_REASON_EPT_VIOLATION:
-#if 0
       printk("reason: ept_violation\n");
 
       uint64_t gpaddr;
@@ -177,18 +176,27 @@ main_loop()
       vmm_read_vmcs(VMCS_RO_EXIT_QUALIFIC, &qual);
       printk("exit qualification = 0x%llx\n", qual);
 
-      if (qual & (1 << 0)) printk("cause: data read\n");
-      if (qual & (1 << 1)) printk("cause: data write\n");
-      if (qual & (1 << 2)) printk("cause: inst fetch\n");
-
       if (qual & (1 << 7)) {
         uint64_t gladdr;
         vmm_read_vmcs(VMCS_RO_GUEST_LIN_ADDR, &gladdr);
         printk("guest linear address = 0x%llx\n", gladdr);
+
+        int verify = 0;
+        if (qual & (1 << 0)) {
+          verify = VERIFY_READ;
+        } else if (qual & (1 << 1)) {
+          verify = VERIFY_WRITE;
+        } else if (qual & (1 << 2)) {
+          verify = VERIFY_EXEC;
+        }
+
+        if (!addr_ok(gladdr, verify)) {
+          printk("page fault: caused by guest linear address 0x%llx\n", gladdr);
+          send_signal(getpid(), LINUX_SIGSEGV);
+        }
       } else {
         printk("guest linear address = (unavailable)\n");
       }
-#endif
       break;
 
     case VMX_REASON_CPUID: {

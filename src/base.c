@@ -1,12 +1,31 @@
 #include "common.h"
 #include "noah.h"
 #include "vmm.h"
+#include "mm.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
 #include "linux/errno.h"
+
+bool
+addr_ok(gaddr_t addr, int access)
+{
+  if (addr >= user_addr_max) {
+    return false;
+  }
+  uint64_t haddr;
+  int prot;
+  if (!vmm_mmap_entry(addr, &haddr, &prot)) {
+    return false;
+  }
+  if (access & ~prot) {
+    return false;
+  }
+
+  return true;
+}
 
 size_t
 copy_from_user(void *to, gaddr_t src_ptr, size_t n)

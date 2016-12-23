@@ -23,10 +23,12 @@ struct mm vkern_mm;
 
 void init_mmap(struct mm *mm);
 
+const gaddr_t user_addr_max = 0x0000007fc0000000ULL;
+
 gaddr_t
 kmap(void *ptr, size_t size, hv_memory_flags_t flags)
 {
-  static uint64_t noah_kern_brk = 0x0000007fc0000000ULL;
+  static uint64_t noah_kern_brk = user_addr_max;
 
   assert((size & 0xfff) == 0);
   assert(((uint64_t) ptr & 0xfff) == 0);
