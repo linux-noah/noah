@@ -146,16 +146,6 @@ has_sigpending()
   return proc.sigpending || task.sigpending;
 }
 
-static const struct retcode {
-  uint16_t poplmovl;
-  uint32_t nr_sigreturn;
-  uint16_t syscall;
-} __attribute__((packed)) retcode_bin = {
-  0xb858, // popl %eax; movl $..., %eax
-  NR_rt_sigreturn,
-  0x0f05, // syscall
-};
-
 static void
 setup_sigcontext(struct l_sigcontext *mcontext)
 {
@@ -239,7 +229,6 @@ setup_sigframe(int signum)
 {
   int err = 0;
   struct l_rt_sigframe frame;
-  const struct retcode retcode = retcode_bin;
 
   assert(signum <= LINUX_NSIG);
   static_assert(is_aligned(sizeof frame, sizeof(uint64_t)), "signal frame size should be aligned");
@@ -254,8 +243,8 @@ setup_sigframe(int signum)
   if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
     frame.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
   } else {
-    // Depending on the fact that we currently allow any data to be executed.
-    frame.sf_pretcode = rsp - sizeof retcode;
+    // x86_64 should always use SA_RESTORER
+    die_with_forcedsig(LINUX_SIGSEGV);
   }
   bzero(&frame.sf_si, sizeof(l_siginfo_t));
   frame.sf_si.lsi_signo = signum;
@@ -281,13 +270,9 @@ setup_sigframe(int signum)
   sigprocmask(SIG_SETMASK, &dset, NULL);
 
   /* OK, push them then... */
-  rsp -= sizeof frame + sizeof retcode;
+  rsp -= sizeof frame;
   vmm_write_register(HV_X86_RSP, rsp);
   if (copy_to_user(rsp, &frame, sizeof frame)) {
-    err = -LINUX_EFAULT;
-    goto error;
-  }
-  if (copy_to_user(rsp + sizeof frame, &retcode, sizeof retcode)) {
     err = -LINUX_EFAULT;
     goto error;
   }
