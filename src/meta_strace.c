@@ -48,7 +48,7 @@ print_arg(int syscall_num, int arg_idx, const char *arg_name, const char *type_n
     fprintf(strace_sink, "%s: ", arg_name);
 
     if (strcmp(type_name, "gstr_t") == 0) {
-      print_gstr(val, 100);
+      print_gstr(val, 50);
 
     } else if (strcmp(type_name, "gaddr_t") == 0) {
       fprintf(strace_sink, "0x%016llx [host: 0x%016llx]", val, (uint64_t)guest_to_host(val));
@@ -199,7 +199,7 @@ trace_read_post(int syscall_num, int argc, char *argnames[6], char *typenames[6]
     }
     if (i == 1) {
       fprintf(strace_sink, "%s: ", argnames[1]);
-      print_gstr(vals[1], ret); // Print buf as string
+      print_gstr(vals[1], MIN(50, ret)); // Print buf as string
     } else {
       print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
     }
@@ -217,7 +217,7 @@ trace_write_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6]
     }
     if (i == 1) {
       fprintf(strace_sink, "%s: ", argnames[1]);
-      print_gstr(vals[1], vals[2]); // Print buf as string
+      print_gstr(vals[1], MIN(50, vals[2])); // Print buf as string
     } else {
       print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
     }
@@ -240,7 +240,7 @@ trace_recvfrom_post(int syscall_num, int argc, char *argnames[6], char *typename
     }
     if (i == 1) {
       fprintf(strace_sink, "%s: ", argnames[1]);
-      print_gstr(vals[1], ret); // Print buf as string
+      print_gstr(vals[1], MIN(50, ret)); // Print buf as string
     } else {
       print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
     }
@@ -258,7 +258,7 @@ trace_sendto_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6
     }
     if (i == 1) {
       fprintf(strace_sink, "%s: ", argnames[1]);
-      print_gstr(vals[1], vals[2]); // Print buf as string
+      print_gstr(vals[1], MIN(50, vals[2])); // Print buf as string
     } else {
       print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
     }
@@ -287,15 +287,79 @@ trace_execve_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6
   print_arg(syscall_num, 2, argnames[2], typenames[2], vals[2]); // envp
 }
 
+static void
+print_sigset(l_sigset_t *sigset)
+{
+  fprintf(strace_sink, "[");
+  for (int i = 1; i < LINUX_SIGRTMIN; i++) {
+    if (LINUX_SIGISMEMBER(sigset, i)) {
+      fprintf(strace_sink, "%s, ", linux_signum_str(i));
+    }
+  }
+  fprintf(strace_sink, "]");
+}
+
+void
+trace_rt_sigprocmask_pre(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+}
+
+void
+trace_rt_sigprocmask_post(int syscall_num, int argc, char *argnames[6], char *typenames[6], uint64_t vals[6], uint64_t ret)
+{
+  for (int i = 0; i < argc; i++) {
+    if (i > 0) {
+      fprintf(strace_sink, ", ");
+    }
+    if (i == 0) {
+      // how
+      fprintf(strace_sink, "%s: ", argnames[1]);
+      switch  (vals[i]) {
+        case LINUX_SIG_BLOCK:
+          fprintf(strace_sink, "BLOCK");
+          break;
+        case LINUX_SIG_UNBLOCK:
+          fprintf(strace_sink, "UNBLOCK");
+          break;
+        case LINUX_SIG_SETMASK:
+          fprintf(strace_sink, "SETMASK");
+          break;
+        default:
+          fprintf(strace_sink, "UNKNOWN_HOW");
+          break;
+      }
+    } else if (i == 1 || i == 2) {
+      if (vals[i] == 0) {
+        fprintf(strace_sink, "NULL (");
+        print_sigset(&task.sigmask);
+        fprintf(strace_sink, ")");
+        continue;
+      }
+      l_sigset_t lset;
+      if (copy_from_user(&lset, vals[i], sizeof(l_sigset_t)))  {
+        fprintf(strace_sink, "FAULT...");
+        continue;
+      }
+      print_sigset(&lset);
+    } else {
+      print_arg(syscall_num, i, argnames[i], typenames[i], vals[i]);
+    }
+  }
+
+  print_ret(syscall_num, argc, argnames, typenames, vals, ret);
+}
+
 meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
   [NR_read] = trace_read_pre,
   [NR_recvfrom] = trace_recvfrom_pre,
   [NR_write] = trace_write_pre,
   [NR_sendto] = trace_sendto_pre,
   [NR_execve] = trace_execve_pre,
+  [NR_rt_sigprocmask] = trace_rt_sigprocmask_post,
 };
 meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
   [NR_read] = trace_read_post,
   [NR_recvfrom] = trace_recvfrom_post,
+  [NR_rt_sigprocmask] = trace_rt_sigprocmask_pre,
 };
 
