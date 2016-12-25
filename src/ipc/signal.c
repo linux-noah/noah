@@ -319,8 +319,7 @@ out:
 
 DEFINE_SYSCALL(alarm, unsigned int, seconds)
 {
-  assert(seconds == 0);
-  return 0;
+  return syswrap(alarm(seconds));
 }
 
 inline void
