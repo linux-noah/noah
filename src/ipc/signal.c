@@ -461,32 +461,26 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   LINUX_SIGDELSET(&lset, LINUX_SIGKILL);
   LINUX_SIGDELSET(&lset, LINUX_SIGSTOP);
 
-  int dhow;
   switch (how) {
     case LINUX_SIG_BLOCK:
-      dhow = SIG_BLOCK;
       LINUX_SIGSET_ADD(&task.sigmask, &lset);
       break;
     case LINUX_SIG_UNBLOCK:
-      dhow = SIG_UNBLOCK;
       LINUX_SIGSET_DEL(&task.sigmask, &lset);
       break;
     case LINUX_SIG_SETMASK:
-      dhow = SIG_SETMASK;
       LINUX_SIGSET_SET(&task.sigmask, &lset);
       break;
     default:
       return -LINUX_EINVAL;
   }
 
-  linux_to_darwin_sigset(&lset, &dset);
+  linux_to_darwin_sigset(&task.sigmask, &dset);
 
-  int err = syswrap(pthread_sigmask(dhow, &dset, NULL));
+  int err = syswrap(pthread_sigmask(SIG_SETMASK, &dset, NULL));
   if (err < 0) {
     return err;
   }
-
-  task.sigmask = lset;
 
   return 0;
 }
