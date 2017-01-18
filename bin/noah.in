@@ -33,8 +33,8 @@ if (! -d $noahdir) {
 if (! defined $root) {
   $root = "$noahdir/tree";
   if (! -d $root) {
-    prompt_yn("Noah is installing the initial filesystem into ~/.noah/tree. Proceed? [Y/n]") or exit 1;
-    system "sudo noahstrap -p archlinux $root";
+    prompt_yn("Noah is installing the initial filesystem in ~/.noah/tree. Proceed? [Y/n]") or exit 1;
+    system "sudo noahstrap -p ubuntu $root";
   }
 }
 
