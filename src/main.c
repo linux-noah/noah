@@ -7,6 +7,7 @@
 #include <sys/syslimits.h>
 #include <libgen.h>
 #include <strings.h>
+#include <fcntl.h>
 
 #include "common.h"
 #include "vmm.h"
@@ -465,7 +466,12 @@ main(int argc, char *argv[], char **envp)
   if (root[0] == 0) {
     default_mnt(root);
   }
-  set_initial_proc(&proc, strdup(root));
+  int rootfd = open(root, O_RDONLY | O_DIRECTORY);
+  if (rootfd < 0) {
+    perror("could not open initial root directory");
+    exit(1);
+  }
+  set_initial_proc(&proc, rootfd);
 
   int err;
   if ((err = do_exec(argv[0], argc, argv, envp)) < 0) {

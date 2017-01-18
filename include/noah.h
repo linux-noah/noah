@@ -85,7 +85,7 @@ struct proc {
   struct list_head tasks;
   pthread_rwlock_t lock;
   struct mm *mm;
-  char *root; /* FS root */
+  int root;                     /* FS root */
   atomic_sigbits_t sigpending;
   struct sighand sighand;
 };
@@ -93,7 +93,7 @@ struct proc {
 extern struct proc proc;
 _Thread_local extern struct task task;
 
-void set_initial_proc(struct proc *proc, char *root);
+void set_initial_proc(struct proc *proc, int rootfd);
 void init_signal(struct proc *);
 void flush_signal(struct proc *proc);
 

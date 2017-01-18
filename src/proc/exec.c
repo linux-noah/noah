@@ -21,6 +21,8 @@
 #include "linux/common.h"
 #include "linux/mman.h"
 #include "linux/misc.h"
+#include "linux/time.h"
+#include "linux/fs.h"
 
 void init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base);
 
@@ -33,7 +35,7 @@ load_elf_interp(const char *path, ulong load_addr)
   int fd;
   struct stat st;
 
-  if ((fd = do_open(path, O_RDONLY, 0)) < 0) {
+  if ((fd = do_open(path, LINUX_O_RDONLY, 0)) < 0) {
     fprintf(stderr, "load_elf_interp, could not open file: %s\n", path);
     return -1;
   }
@@ -375,7 +377,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   if ((err = do_access(elf_path, X_OK)) < 0) {
     return err;
   }
-  if ((fd = do_open(elf_path, O_RDONLY, 0)) < 0) {
+  if ((fd = do_open(elf_path, LINUX_O_RDONLY, 0)) < 0) {
     return fd;
   }
   if (proc.nr_tasks > 1) {

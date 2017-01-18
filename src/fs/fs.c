@@ -759,19 +759,64 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     return -LINUX_EINVAL;
   }
 
-  path->dir = malloc(sizeof(struct dir));
+  struct fs *fs = &darwinfs;
+
+  struct dir dir;
   if (dirfd == LINUX_AT_FDCWD) {
-    path->dir->fd = AT_FDCWD;
+    dir.fd = AT_FDCWD;
   } else {
-    path->dir->fd = dirfd;
+    dir.fd = dirfd;
   }
-  path->fs = &darwinfs;
-  if (strncmp(name, "/Users", sizeof "/Users" - 1) == 0 || strncmp(name, "/Volumes", sizeof "/Volumes" - 1) == 0 || strncmp(name, "/dev", sizeof "/dev" - 1) == 0) {
-    strcpy(path->subpath, name);
-  } else if (name[0] == '/') {
-    sprintf(path->subpath, "%s%s", proc.root, name);
+
+  /* resolve mountpoints */
+  bool need_dup = false;
+  if (name[0] == '/' && strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
+    dir.fd = proc.root;
+    need_dup = true;
+    name++;
+  }
+
+  /* resolve symlinks */
+  char *sp = path->subpath;
+  *sp = 0;
+  const char *c = name;
+  assert(*c);
+  while (*c) {
+    while (*c && *c != '/') {
+      *sp++ = *c++;
+    }
+    if (*c) {
+      *sp++ = *c++;
+    }
+    *sp = 0;
+    if ((flags & LOOKUP_NOFOLLOW) == 0) {
+      char buf[LINUX_PATH_MAX];
+      int n;
+      if ((n = fs->ops->readlinkat(fs, &dir, path->subpath, buf, sizeof buf)) > 0) {
+        strcpy(buf + n, c);
+        if (buf[0] == '/') {
+          return vfs_grab_dir(dirfd, buf, flags, path);
+        } else {
+          /* remove the last component */
+          while (*--sp != '/')
+            ;
+          *++sp = 0;
+          char buf2[LINUX_PATH_MAX];
+          strcpy(buf2, path->subpath);
+          strcat(buf2, buf);
+          return vfs_grab_dir(dir.fd, buf2, flags, path);
+        }
+      }
+    }
+  }
+  *sp = 0;
+
+  path->fs = fs;
+  path->dir = malloc(sizeof(struct dir));
+  if (need_dup) {
+    path->dir->fd = dup(dir.fd);
   } else {
-    strcpy(path->subpath, name);
+    path->dir->fd = dir.fd;
   }
   return 0;
 }
