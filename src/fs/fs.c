@@ -769,10 +769,8 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
   }
 
   /* resolve mountpoints */
-  bool need_dup = false;
   if (name[0] == '/' && strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
     dir.fd = proc.root;
-    need_dup = true;
     name++;
   }
 
@@ -813,11 +811,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
 
   path->fs = fs;
   path->dir = malloc(sizeof(struct dir));
-  if (need_dup) {
-    path->dir->fd = dup(dir.fd);
-  } else {
-    path->dir->fd = dir.fd;
-  }
+  path->dir->fd = dir.fd;
   return 0;
 }
 
