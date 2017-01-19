@@ -529,7 +529,6 @@ DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
   vmm_read_register(HV_X86_RSP, &rsp);
   l_stack_t ss, oss = task.sas;
   oss.ss_flags = sas_ss_flags(rsp);
-  printf("rsp:%llx, oss.ss_flags:%d\n", rsp, oss.ss_flags);
 
   if (uoss != 0) {
     if (copy_to_user(uoss, &oss, sizeof task.sas)) {
