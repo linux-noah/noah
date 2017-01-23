@@ -154,23 +154,9 @@ region_compare(struct mm_region *r1, struct mm_region *r2)
 
 RB_GENERATE(mm_region_tree, mm_region, tree, region_compare);
 
-/* Look up the first mm_region which gaddr in [mm_region->gaddr, +size) */
-struct mm_region*
-find_region(gaddr_t gaddr, struct mm *mm)
-{
-  struct mm_region *r;
-  list_for_each_entry (r, &mm->mm_regions, list) {
-    if (gaddr < r->gaddr)
-      break;
-    if (gaddr < r->gaddr + r->size && gaddr >= r->gaddr)
-      return r;
-  }
-  return NULL;
-}
-
 struct mm_region*
 /* Look up the mm_region which gaddr in [mm_region->gaddr, +size) */
-find_region_rb(gaddr_t gaddr, struct mm *mm)
+find_region(gaddr_t gaddr, struct mm *mm)
 {
   struct mm_region find = {.gaddr = gaddr, .size = 0};
   return RB_FIND(mm_region_tree, &mm->mm_region_tree, &find);
