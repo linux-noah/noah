@@ -29,8 +29,6 @@ struct list_head vcpus;
 int nr_vcpus;
 pthread_rwlock_t alloc_lock;
 
-uint64_t va_map[NR_PAGE_ENTRY], rva_map[NR_PAGE_ENTRY];
-
 _Thread_local static struct vcpu *vcpu;
 
 void
@@ -73,13 +71,6 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
   ulong perm = PTE_U | PTE_P;
   if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
   if ((prot & HV_MEMORY_EXEC) == 0) perm |= PTE_NX;
-
-  for (uint64_t i = 0; i < size / 0x1000; i++) {
-    page_map_help(va_map, (uint64_t) haddr, gaddr, perm);
-    page_map_help(rva_map, gaddr, (uint64_t) haddr, perm);
-    haddr = (char *) haddr + 0x1000;
-    gaddr += 0x1000;
-  }
 }
 
 void
@@ -88,11 +79,6 @@ vmm_munmap(gaddr_t gaddr, size_t size)
   assert(is_page_aligned((void *) size, PAGE_4KB));
 
   hv_vm_unmap(gaddr, size);
-  for (uint64_t i = 0; i < size / PAGE_SIZE(PAGE_4KB); i++) {
-    page_map_help(va_map, 0, gaddr, 0);
-    page_map_help(rva_map, gaddr, 0, 0);
-    gaddr += 0x1000;
-  }
 }
 
 bool
