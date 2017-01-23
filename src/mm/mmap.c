@@ -33,6 +33,42 @@ alloc_region(size_t len)
   return proc.mm->current_mmap_top - len;
 }
 
+int
+do_munmap(gaddr_t gaddr, size_t size)
+{
+  if (!is_page_aligned((void*)gaddr, PAGE_4KB)) {
+    return -LINUX_EINVAL;
+  }
+  size = roundup(size, PAGE_SIZE(PAGE_4KB)); // Linux kernel also does this
+
+  struct mm_region *overlapping = find_region_range(gaddr, size, proc.mm);
+  if (overlapping == NULL) {
+    return -LINUX_ENOMEM;
+  }
+
+  struct mm_region key = {.gaddr = gaddr, .size = size};
+  while (region_compare(&key, overlapping) == 0) {
+    if (overlapping->gaddr < gaddr) {
+      split_region(proc.mm, overlapping, gaddr);
+      overlapping = list_entry(overlapping->list.next, struct mm_region, list);
+    }
+    if (overlapping->gaddr + overlapping->size > gaddr + size) {
+      split_region(proc.mm, overlapping, gaddr + size);
+    }
+    struct list_head *next = overlapping->list.next;
+    list_del(&overlapping->list);
+    RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, overlapping);
+    hv_vm_unmap(overlapping->gaddr, overlapping->size);
+    munmap(overlapping->haddr, overlapping->size);
+    free(overlapping);
+    if (next == &proc.mm->mm_regions)
+      break;
+    overlapping = list_entry(next, struct mm_region, list);
+  }
+
+  return 0;
+}
+
 gaddr_t
 do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset)
 {
@@ -72,47 +108,12 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
     panic("mmap failed. addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
   }
 
+  do_munmap(addr, len);
   record_region(proc.mm, ptr, addr, len, l_prot, l_flags, fd, offset);
 
   vmm_mmap(addr, len, linux_mprot_to_hv_mflag(l_prot), ptr);
 
   return addr;
-}
-
-int
-do_munmap(gaddr_t gaddr, size_t size)
-{
-  if (!is_page_aligned((void*)gaddr, PAGE_4KB)) {
-    return -LINUX_EINVAL;
-  }
-  size = roundup(size, PAGE_SIZE(PAGE_4KB)); // Linux kernel also does this
-
-  struct mm_region *overlapping = find_region_range(gaddr, size, proc.mm);
-  if (overlapping == NULL) {
-    return -LINUX_ENOMEM;
-  }
-
-  struct mm_region key = {.gaddr = gaddr, .size = size};
-  while (region_compare(&key, overlapping) == 0) {
-    if (overlapping->gaddr < gaddr) {
-      split_region(proc.mm, overlapping, gaddr);
-      overlapping = list_entry(overlapping->list.next, struct mm_region, list);
-    }
-    if (overlapping->gaddr + overlapping->size > gaddr + size) {
-      split_region(proc.mm, overlapping, gaddr + size);
-    }
-    struct list_head *next = overlapping->list.next;
-    list_del(&overlapping->list);
-    RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, overlapping);
-    hv_vm_unmap(overlapping->gaddr, overlapping->size);
-    munmap(overlapping->haddr, overlapping->size);
-    free(overlapping);
-    if (next == &proc.mm->mm_regions)
-      break;
-    overlapping = list_entry(next, struct mm_region, list);
-  }
-
-  return 0;
 }
 
 DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd, off_t, offset)

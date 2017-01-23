@@ -48,7 +48,6 @@ int region_compare(struct mm_region *r1, struct mm_region *r2);
 struct mm_region *find_region(gaddr_t gaddr, struct mm *mm);
 struct mm_region *find_region_range(gaddr_t gaddr, size_t size, struct mm *mm);
 struct mm_region *record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);
-struct mm_region *record_region_rb(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff);
 void split_region(struct mm *mm, struct mm_region *region, gaddr_t gaddr);
 void destroy_mm(struct mm *mm);
 
