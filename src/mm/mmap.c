@@ -266,7 +266,7 @@ DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 out:
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
 
-  return 0;
+  return ret;
 }
 
 DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
