@@ -176,8 +176,8 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   if (!(region->mm_flags & LINUX_MAP_ANONYMOUS)) {
     /* A file is mapped to this region. We have to take the file permission into account */
     int d_prot = 0;
-    if (region->prot & HV_MEMORY_READ) d_prot |= PROT_READ;
-    if (region->prot & HV_MEMORY_WRITE) d_prot |= PROT_WRITE;
+    if (region->prot & LINUX_PROT_READ) d_prot |= PROT_READ;
+    if (region->prot & LINUX_PROT_WRITE) d_prot |= PROT_WRITE;
     mprotect(moved_to, new_size, d_prot);
   } else {
     /* Anonymous page. Copy contents to new area */
