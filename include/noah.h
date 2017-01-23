@@ -20,7 +20,6 @@ void elevate_privilege(void);
 
 /* interface to user memory */
 
-gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
 
 #define VERIFY_READ  LINUX_PROT_READ

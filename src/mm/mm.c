@@ -47,6 +47,7 @@ kmap(void *ptr, size_t size, hv_memory_flags_t flags)
 uint64_t pml4[NR_PAGE_ENTRY] __page_aligned = {
   [0] = PTE_U | PTE_W | PTE_P,
 };
+gaddr_t pml4_ptr;
 
 uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
   /* straight mapping */
@@ -56,11 +57,11 @@ uint64_t pdp[NR_PAGE_ENTRY] __page_aligned = {
 void
 init_page()
 {
-  kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
+  pml4_ptr = kmap(pml4, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
   pml4[0] |= kmap(pdp, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE) & 0x000ffffffffff000ul;
 
   vmm_write_vmcs(VMCS_GUEST_CR0, CR0_PG | CR0_PE | CR0_NE);
-  vmm_write_vmcs(VMCS_GUEST_CR3, host_to_guest(pml4));
+  vmm_write_vmcs(VMCS_GUEST_CR3, pml4_ptr);
 }
 
 uint64_t gdt[3] __page_aligned = {
@@ -68,13 +69,14 @@ uint64_t gdt[3] __page_aligned = {
   [SEG_CODE] = 0x0020980000000000, // CODE SEL
   [SEG_DATA] = 0x0000900000000000, // DATA SEL
 };
+gaddr_t gdt_ptr;
 
 void
 init_segment()
 {
   kmap(gdt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
-  vmm_write_vmcs(VMCS_GUEST_GDTR_BASE, host_to_guest(gdt));
+  vmm_write_vmcs(VMCS_GUEST_GDTR_BASE, gdt_ptr);
   vmm_write_vmcs(VMCS_GUEST_GDTR_LIMIT, 3 * 8 - 1);
 
   vmm_write_vmcs(VMCS_GUEST_TR_BASE, 0);

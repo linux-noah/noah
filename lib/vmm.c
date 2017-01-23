@@ -135,16 +135,6 @@ guest_to_host(gaddr_t gaddr)
   return (void *) haddr;
 }
 
-gaddr_t
-host_to_guest(void *haddr)
-{
-  uint64_t gaddr;
-  if (! page_walk(rva_map, (uint64_t) haddr, &gaddr, NULL)) {
-    return 0;
-  }
-  return gaddr;
-}
-
 bool
 vmm_mmap_entry(gaddr_t addr, uint64_t *haddr, int *prot)
 {

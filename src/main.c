@@ -282,13 +282,14 @@ init_special_regs()
 }
 
 struct gate_desc idt[256] __page_aligned;
+gaddr_t idt_ptr;
 
 void
 init_idt()
 {
-  kmap(idt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
+  idt_ptr = kmap(idt, 0x1000, HV_MEMORY_READ | HV_MEMORY_WRITE);
 
-  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, host_to_guest(idt));
+  vmm_write_vmcs(VMCS_GUEST_IDTR_BASE, idt_ptr);
   vmm_write_vmcs(VMCS_GUEST_IDTR_LIMIT, sizeof idt);
 }
 
