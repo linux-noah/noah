@@ -58,7 +58,7 @@ do_munmap(gaddr_t gaddr, size_t size)
     struct list_head *next = overlapping->list.next;
     list_del(&overlapping->list);
     RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, overlapping);
-    hv_vm_unmap(overlapping->gaddr, overlapping->size);
+    vmm_munmap(overlapping->gaddr, overlapping->size);
     munmap(overlapping->haddr, overlapping->size);
     free(overlapping);
     if (next == &proc.mm->mm_regions)
@@ -164,7 +164,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   /* new_size <= old_size. We can just shrink */
   if (new_size <= old_size) {
     munmap(region->haddr + new_size, region->size - new_size);
-    hv_vm_unmap(region->gaddr + new_size, region->size - new_size);
+    vmm_munmap(region->gaddr + new_size, region->size - new_size);
     region->size = new_size;
     goto out;
   }
@@ -193,7 +193,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   list_del(&region->list);
   RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, region);
   munmap(region->haddr, region->size);
-  hv_vm_unmap(region->gaddr, region->size);
+  vmm_munmap(region->gaddr, region->size);
 
   /* Map new one */
   ret = alloc_region(new_size);
