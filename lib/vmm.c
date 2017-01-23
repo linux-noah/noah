@@ -125,19 +125,6 @@ page_walk(uint64_t *table, uint64_t addr, uint64_t *res, uint64_t *perm)
   return false;
 }
 
-bool
-vmm_mmap_entry(gaddr_t addr, uint64_t *haddr, int *prot)
-{
-  uint64_t arch_perm;
-  if (!page_walk(va_map, addr, haddr, &arch_perm)) {
-    return false;
-  }
-  *prot = 0;
-  if (arch_perm & PTE_W) *prot |= HV_MEMORY_WRITE;
-  if ((arch_perm & PTE_NX) == 0) *prot |= HV_MEMORY_EXEC;
-  return true;
-}
-
 void
 vmm_write_fpstate(void *buffer, size_t size)
 {

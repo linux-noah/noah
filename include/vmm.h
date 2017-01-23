@@ -45,6 +45,5 @@ void vmm_enable_native_msr(uint32_t, bool);
 /* prot is obtained by or'ing HV_MEMORY_READ, HV_MEMORY_EXEC, HV_MEMORY_WRITE */
 void vmm_mmap(gaddr_t addr, size_t len, int prot, void *ptr);
 void vmm_munmap(gaddr_t addr, size_t len);
-bool vmm_mmap_entry(gaddr_t addr, uint64_t *haddr, int *prot);
 
 #endif
