@@ -158,7 +158,7 @@ struct mm_region*
 /* Look up the mm_region which gaddr in [mm_region->gaddr, +size) */
 find_region(gaddr_t gaddr, struct mm *mm)
 {
-  struct mm_region find = {.gaddr = gaddr, .size = 0};
+  struct mm_region find = {.gaddr = gaddr, .size = 1};
   return RB_FIND(mm_region_tree, &mm->mm_region_tree, &find);
 }
 
