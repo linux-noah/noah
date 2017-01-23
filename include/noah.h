@@ -7,6 +7,7 @@
 #include "types.h"
 #include "util/misc.h"
 #include "util/list.h"
+#include "linux/mman.h"
 #include "malloc.h"
 #include "version.h"
 
@@ -22,9 +23,9 @@ void elevate_privilege(void);
 gaddr_t host_to_guest(void *);
 void *guest_to_host(gaddr_t);
 
-#define VERIFY_READ  0
-#define VERIFY_WRITE HV_MEMORY_WRITE
-#define VERIFY_EXEC  HV_MEMORY_EXEC
+#define VERIFY_READ  LINUX_PROT_READ
+#define VERIFY_WRITE LINUX_PROT_WRITE
+#define VERIFY_EXEC  LINUX_PROT_EXEC
 bool addr_ok(gaddr_t, int verify);
 
 size_t copy_from_user(void *haddr, gaddr_t gaddr, size_t n); /* returns 0 on success */

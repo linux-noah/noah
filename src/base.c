@@ -15,12 +15,11 @@ addr_ok(gaddr_t addr, int access)
   if (addr >= user_addr_max) {
     return false;
   }
-  uint64_t haddr;
-  int prot;
-  if (!vmm_mmap_entry(addr, &haddr, &prot)) {
+  struct mm_region *region = find_region(addr, proc.mm);
+  if (!region) {
     return false;
   }
-  if (access & ~prot) {
+  if (access & ~region->prot) {
     return false;
   }
 
