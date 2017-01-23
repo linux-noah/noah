@@ -32,30 +32,6 @@ pthread_rwlock_t alloc_lock;
 _Thread_local static struct vcpu *vcpu;
 
 void
-page_map_help(uint64_t *table, uint64_t haddr, uint64_t gaddr, uint64_t perm)
-{
-  uint64_t index, entry;
-  int shift;
-
-  assert((gaddr & (1ul << 47)) == 0); /* FIXME */
-
-  for (shift = 39; shift > 12; shift -= 9) {
-    index = (gaddr >> shift) & 0x1ff;
-    entry = table[index];
-    if ((entry & PTE_P) == 0) {
-      void *ptr = valloc(4096);
-      bzero(ptr, 4096);
-      table[index] = (uint64_t) ptr & 0x000ffffffffff000ul;
-      table[index] |= perm;
-    }
-    table = (void *)(table[index] & 0x000ffffffffff000ul);
-  }
-  index = (gaddr >> shift) & 0x1ff;
-  entry = table[index];
-  table[index] = (haddr & 0x000ffffffffff000ul) | perm;
-}
-
-void
 vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 {
   assert(is_page_aligned(haddr, PAGE_4KB));
@@ -64,51 +40,15 @@ vmm_mmap(gaddr_t gaddr, size_t size, int prot, void *haddr)
 
   hv_vm_unmap(gaddr, size);
   if (hv_vm_map(haddr, gaddr, size, prot) != HV_SUCCESS) {
-    fprintf(stderr, "hv_vm_map failed\n");
-    exit(1);
+    panic("hv_vm_map failed\n");
   }
-
-  ulong perm = PTE_U | PTE_P;
-  if (prot & HV_MEMORY_WRITE) perm |= PTE_W;
-  if ((prot & HV_MEMORY_EXEC) == 0) perm |= PTE_NX;
 }
 
 void
 vmm_munmap(gaddr_t gaddr, size_t size)
 {
   assert(is_page_aligned((void *) size, PAGE_4KB));
-
   hv_vm_unmap(gaddr, size);
-}
-
-bool
-page_walk(uint64_t *table, uint64_t addr, uint64_t *res, uint64_t *perm)
-{
-  uint64_t entry, mask;
-  int shift;
-
-  for (shift = 39; ; shift -= 9) {
-    entry = table[(addr >> shift) & 0x1ff];
-    if ((entry & PTE_P) == 0)
-      goto fail;
-    if ((entry & PTE_PS) != 0 || shift == 12)
-      goto hit;
-    table = (void *)(entry & 0x000ffffffffff000);
-  }
-
- hit:
-  mask = (1ul << shift) - 1;
-  if (res != NULL) {
-    assert((entry & (1ul << 47)) == 0); /* FIXME */
-    *res = (entry & 0x000ffffffffff000) + (addr & mask);
-  }
-  if (perm != NULL) {
-    *perm = entry & mask;
-  }
-  return true;
-
- fail:
-  return false;
 }
 
 void
