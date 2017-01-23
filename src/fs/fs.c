@@ -771,7 +771,11 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
   /* resolve mountpoints */
   if (name[0] == '/' && strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
     dir.fd = proc.root;
-    name++;
+    if (name[1] == '\0') { /* When name is "/" */
+      name = ".";
+    } else {
+      name++;
+    }
   }
 
   /* resolve symlinks */
