@@ -87,32 +87,32 @@ do_munmap(gaddr_t gaddr, size_t size)
   }
   size = roundup(size, PAGE_SIZE(PAGE_4KB)); // Linux kernel also does this
 
-  int ret =0;
-
-  struct mm_region *region = find_region(gaddr + size, proc.mm);
-  if (region && region->gaddr < gaddr + size) {
-    split_region(proc.mm, region, gaddr + size);
-  }
-  region = find_region(gaddr, proc.mm);
-  if (region == NULL) {
+  struct mm_region *overlapping = find_region_range(gaddr, size, proc.mm);
+  if (overlapping == NULL) {
     return -LINUX_ENOMEM;
   }
-  if (region->gaddr < gaddr) {
-    split_region(proc.mm, region, gaddr);
-    region = list_entry(region->list.next, struct mm_region, list);
+
+  struct mm_region key = {.gaddr = gaddr, .size = size};
+  while (region_compare(&key, overlapping) == 0) {
+    if (overlapping->gaddr < gaddr) {
+      split_region(proc.mm, overlapping, gaddr);
+      overlapping = list_entry(overlapping->list.next, struct mm_region, list);
+    }
+    if (overlapping->gaddr + overlapping->size > gaddr + size) {
+      split_region(proc.mm, overlapping, gaddr + size);
+    }
+    struct list_head *next = overlapping->list.next;
+    list_del(&overlapping->list);
+    RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, overlapping);
+    hv_vm_unmap(overlapping->gaddr, overlapping->size);
+    munmap(overlapping->haddr, overlapping->size);
+    free(overlapping);
+    if (next == &proc.mm->mm_regions)
+      break;
+    overlapping = list_entry(next, struct mm_region, list);
   }
 
-  while (region->gaddr + region->size <= gaddr + size) {
-    struct mm_region *next = list_entry(region->list.next, struct mm_region, list);
-    list_del(&region->list);
-    munmap(region->haddr, region->size);
-    RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, region);
-    hv_vm_unmap(region->gaddr, region->size);
-    free(region);
-    region = next;
-  }
-
-  return ret;
+  return 0;
 }
 
 DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd, off_t, offset)
