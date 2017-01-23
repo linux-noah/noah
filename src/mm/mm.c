@@ -141,6 +141,20 @@ init_mm(struct mm *mm)
   pthread_rwlock_init(&mm->alloc_lock, NULL);
 }
 
+void *
+guest_to_host(gaddr_t gaddr)
+{
+  struct mm_region *region = find_region(gaddr, proc.mm);
+  if (!region) {
+    region = find_region(gaddr, &vkern_mm);
+  }
+  if (!region) {
+    return NULL;
+  }
+  return region->haddr + gaddr - region->gaddr;
+}
+
+
 int
 region_compare(struct mm_region *r1, struct mm_region *r2)
 {

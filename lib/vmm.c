@@ -125,16 +125,6 @@ page_walk(uint64_t *table, uint64_t addr, uint64_t *res, uint64_t *perm)
   return false;
 }
 
-void *
-guest_to_host(gaddr_t gaddr)
-{
-  uint64_t haddr;
-  if (! page_walk(va_map, gaddr, &haddr, NULL)) {
-    return NULL;
-  }
-  return (void *) haddr;
-}
-
 bool
 vmm_mmap_entry(gaddr_t addr, uint64_t *haddr, int *prot)
 {
