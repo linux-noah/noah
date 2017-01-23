@@ -135,9 +135,24 @@ init_mm(struct mm *mm)
   init_mmap(mm);
 
   INIT_LIST_HEAD(&mm->mm_regions);
+  RB_INIT(&mm->mm_regions2);
   pthread_rwlock_init(&mm->alloc_lock, NULL);
 }
 
+int
+region_compare(struct mm_region *r1, struct mm_region *r2)
+{
+  if (r1->gaddr >= r2->gaddr + r2->size) {
+    return 1;
+  }
+  if (r1->gaddr + r1->size <= r2->gaddr) {
+    return -1;
+  }
+  
+  return 0;
+}
+
+RB_GENERATE(mm_region_tree, mm_region, tree, region_compare);
 
 /* Look up the first mm_region which gaddr in [mm_region->gaddr, +size) */
 struct mm_region*
@@ -153,8 +168,29 @@ find_region(gaddr_t gaddr, struct mm *mm)
   return NULL;
 }
 
+struct mm_region*
+/* Look up the mm_region which gaddr in [mm_region->gaddr, +size) */
+find_region_rb(gaddr_t gaddr, struct mm *mm)
+{
+  struct mm_region find = {.gaddr = gaddr, .size = 0};
+  return RB_FIND(mm_region_tree, &mm->mm_regions2, &find);
+}
+
+struct mm_region*
+/* Look up the lowest mm_region that overlaps with the region */
+find_region_range(gaddr_t gaddr, size_t size, struct mm *mm)
+{
+  struct mm_region find = {.gaddr = gaddr, .size = size};
+  struct mm_region *leftmost = RB_FIND(mm_region_tree, &mm->mm_regions2, &find);
+  if (leftmost == NULL)
+    return NULL;
+  while (RB_LEFT(leftmost, tree) != NULL && region_compare(&find, RB_LEFT(leftmost, tree)) == 0)
+    leftmost = RB_LEFT(leftmost, tree);
+  return leftmost;
+}
+
 void
-split_region(struct mm_region *region, gaddr_t gaddr)
+split_region(struct mm *mm, struct mm_region *region, gaddr_t gaddr)
 {
   assert(is_page_aligned((void*)gaddr, PAGE_4KB));
 
@@ -170,6 +206,7 @@ split_region(struct mm_region *region, gaddr_t gaddr)
 
   region->size = offset;
   list_add(&tail->list, &region->list);
+  RB_INSERT(mm_region_tree, &mm->mm_regions2, tail);
 }
 
 struct mm_region*
@@ -189,6 +226,7 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
 
   if (list_empty(&mm->mm_regions)) { /* fast path */
     list_add(&region->list, &mm->mm_regions);
+    RB_INSERT(mm_region_tree, &mm->mm_regions2, region);
     return region;
   }
   /* unmap */
@@ -199,6 +237,7 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
     if (r->gaddr + r->size <= gaddr)
       continue;
     list_del(list);
+    RB_REMOVE(mm_region_tree, &proc.mm->mm_regions2, r);
     if (gaddr <= r->gaddr && r->gaddr + r->size <= gaddr + size) {
       free(r);
       continue;
@@ -214,6 +253,7 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
       s->mm_fd = r->mm_fd;
       s->pgoff = r->pgoff;
       list_add(&s->list, list->prev);
+      RB_INSERT(mm_region_tree, &mm->mm_regions2, s);
     }
     if (gaddr + size < r->gaddr + r->size) {
       uint64_t offset = gaddr + size - r->gaddr;
@@ -226,6 +266,7 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
       s->mm_fd = mm_fd;
       s->pgoff = pgoff;
       list_add_tail(&s->list, list->next);
+      RB_INSERT(mm_region_tree, &mm->mm_regions2, s);
     }
   }
   /* map */
@@ -234,11 +275,40 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
     r = list_entry(list, struct mm_region, list);
     if (prev <= gaddr && gaddr + size <= r->gaddr) {
       list_add(&region->list, list->prev);
+      RB_INSERT(mm_region_tree, &mm->mm_regions2, region);
       return region;
     }
     prev = r->gaddr + r->size;
   }
   list_add_tail(&region->list, list);
+  RB_INSERT(mm_region_tree, &mm->mm_regions2, region);
+
+  return region;
+}
+
+struct mm_region*
+record_region_rb(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff)
+{
+  struct mm_region *region = malloc(sizeof *region);
+  *region = (struct mm_region) {
+    .haddr = haddr,
+    .gaddr = gaddr,
+    .size = size,
+    .prot = prot,
+    .mm_flags = mm_flags,
+    .mm_fd = mm_fd,
+    .pgoff = pgoff
+  };
+
+  if (RB_INSERT(mm_region_tree, &mm->mm_regions2, region) != NULL) {
+    panic("recording overlapping regions\n");
+  }
+  struct mm_region *prev = RB_PREV(mm_region_tree, &mm->mm_regions2, region);
+  if (prev == NULL) {
+    list_add(&region->list, &mm->mm_regions);
+  } else {
+    list_add(&region->list, &prev->list);
+  }
 
   return region;
 }
@@ -249,11 +319,12 @@ destroy_mm(struct mm *mm)
   struct list_head *list, *t;
   list_for_each_safe (list, t, &mm->mm_regions) {
     struct mm_region *r = list_entry(list, struct mm_region, list);
-    list_del(list);
     munmap(r->haddr, r->size);
     vmm_munmap(r->gaddr, r->size);
     free(r);
   }
+  RB_INIT(&mm->mm_regions2);
+  INIT_LIST_HEAD(&mm->mm_regions);
 }
 
 DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)

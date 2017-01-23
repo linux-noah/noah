@@ -91,14 +91,14 @@ do_munmap(gaddr_t gaddr, size_t size)
 
   struct mm_region *region = find_region(gaddr + size, proc.mm);
   if (region && region->gaddr < gaddr + size) {
-    split_region(region, gaddr + size);
+    split_region(proc.mm, region, gaddr + size);
   }
   region = find_region(gaddr, proc.mm);
   if (region == NULL) {
     return -LINUX_ENOMEM;
   }
   if (region->gaddr < gaddr) {
-    split_region(region, gaddr);
+    split_region(proc.mm, region, gaddr);
     region = list_entry(region->list.next, struct mm_region, list);
   }
 
@@ -106,6 +106,7 @@ do_munmap(gaddr_t gaddr, size_t size)
     struct mm_region *next = list_entry(region->list.next, struct mm_region, list);
     list_del(&region->list);
     munmap(region->haddr, region->size);
+    RB_REMOVE(mm_region_tree, &proc.mm->mm_regions2, region);
     hv_vm_unmap(region->gaddr, region->size);
     free(region);
     region = next;
@@ -186,9 +187,10 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
 
   /* Unmap the old page */
   if (old_size < region->size) {
-    split_region(region, region->gaddr + old_size);
+    split_region(proc.mm, region, region->gaddr + old_size);
   }
   list_del(&region->list);
+  RB_REMOVE(mm_region_tree, &proc.mm->mm_regions2, region);
   munmap(region->haddr, region->size);
   hv_vm_unmap(region->gaddr, region->size);
 
@@ -230,7 +232,7 @@ DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
     goto out;
   }
   if (addr > region->gaddr) {
-    split_region(region, addr);
+    split_region(proc.mm, region, addr);
     region = list_entry(region->list.next, struct mm_region, list);
 
     hv_vm_protect(region->gaddr, region->size, hvprot);
@@ -254,7 +256,7 @@ DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
     region = next;
   }
   if (region->gaddr < end) {
-    split_region(region, end);
+    split_region(proc.mm, region, end);
     hv_vm_protect(region->gaddr, region->size, hvprot);
     mprotect(region->haddr, region->size, prot);
     region->prot = hvprot;
