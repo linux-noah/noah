@@ -106,7 +106,7 @@ do_munmap(gaddr_t gaddr, size_t size)
     struct mm_region *next = list_entry(region->list.next, struct mm_region, list);
     list_del(&region->list);
     munmap(region->haddr, region->size);
-    RB_REMOVE(mm_region_tree, &proc.mm->mm_regions2, region);
+    RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, region);
     hv_vm_unmap(region->gaddr, region->size);
     free(region);
     region = next;
@@ -190,7 +190,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
     split_region(proc.mm, region, region->gaddr + old_size);
   }
   list_del(&region->list);
-  RB_REMOVE(mm_region_tree, &proc.mm->mm_regions2, region);
+  RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, region);
   munmap(region->haddr, region->size);
   hv_vm_unmap(region->gaddr, region->size);
 

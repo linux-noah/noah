@@ -25,7 +25,7 @@ struct mm_region {
 };
 
 struct mm {
-  struct mm_region_tree mm_regions2;
+  struct mm_region_tree mm_region_tree;
   struct list_head mm_regions;
   uint64_t start_brk, current_brk;
   uint64_t current_mmap_top;
