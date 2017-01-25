@@ -787,9 +787,6 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     while (*c && *c != '/') {
       *sp++ = *c++;
     }
-    if (*c) {
-      *sp++ = *c++;
-    }
     *sp = 0;
     if ((flags & LOOKUP_NOFOLLOW) == 0) {
       char buf[LINUX_PATH_MAX];
@@ -809,6 +806,9 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
           return vfs_grab_dir(dir.fd, buf2, flags, path);
         }
       }
+    }
+    if (*c) {
+      *sp++ = *c++;
     }
   }
   *sp = 0;
