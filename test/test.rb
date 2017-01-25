@@ -18,7 +18,7 @@ def main
     ARGV.shift
     @verbose = true
   end
-  @noah = ARGV.shift
+  @noah = ARGV.shift + " --mnt=\"#{__dir__}/testing_root\""
   targets = ARGV.empty? ? nil : ARGV
   puts <<-"EOS"
 
@@ -108,7 +108,7 @@ def test_shell(targets = nil)
     puts_testname(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
-    _, err, status = Open3.capture3("NOAH=#{@noah} TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
+    _, err, status = Open3.capture3("NOAH=\"#{@noah}\" TARGET=#{relative(target).shellescape} /bin/bash #{relative(run).shellescape}")
 
     if status.success?
       @shell[:pass] += 1
