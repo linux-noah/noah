@@ -797,7 +797,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
           return vfs_grab_dir(dirfd, buf, flags, path);
         } else {
           /* remove the last component */
-          while (*--sp != '/')
+          while (sp >= path->subpath && *--sp != '/')
             ;
           *++sp = 0;
           char buf2[LINUX_PATH_MAX];
