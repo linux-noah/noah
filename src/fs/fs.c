@@ -704,9 +704,22 @@ darwinfs_fstatat(struct fs *fs, struct dir *dir, const char *path, struct l_news
 int
 darwinfs_statfs(struct fs *fs, struct dir *dir, const char *path, struct l_statfs *buf)
 {
-  assert(dir->fd == AT_FDCWD);
+  char full_path[LINUX_PATH_MAX];
+  const char *path_to_statfs;
+
+  if (dir->fd != AT_FDCWD) {
+    path_to_statfs = full_path;
+    char at_path[PATH_MAX];
+    assert(fcntl(dir->fd, F_GETPATH, at_path) == 0); // fd must be a regular directory to which fcntl should succeed
+    if (snprintf(full_path, PATH_MAX, "%s/%s", at_path, path) >= PATH_MAX) {
+      return -LINUX_ENAMETOOLONG;
+    }
+  } else {
+    path_to_statfs = path;
+  }
+
   struct statfs st;
-  int r = syswrap(statfs(path, &st));
+  int r = syswrap(statfs(path_to_statfs, &st));
   if (r < 0)
     return r;
   statfs_darwin_to_linux(&st, buf);
