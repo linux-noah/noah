@@ -266,7 +266,7 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
   case LINUX_F_SETFL:
     return syswrap(fcntl(file->fd, F_SETFL, linux_to_darwin_o_flags(arg)));
   default:
-    printk("unknown fcntl cmd: %d\n", cmd);
+    warnk("unknown fcntl cmd: %d\n", cmd);
     return -LINUX_EINVAL;
   }
 }
