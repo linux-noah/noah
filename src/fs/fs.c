@@ -127,10 +127,6 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
       close(i);
     }
   }
-  fd_set hoge;
-  FD_ZERO(&hoge);
-  FD_SET(4081, &hoge);
-  FD_SET(1023, &hoge);
 }
 
 int
