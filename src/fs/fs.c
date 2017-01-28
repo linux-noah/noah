@@ -82,6 +82,7 @@ struct file_operations {
   int (*fchmod)(struct file *f, l_mode_t mode);
 };
 
+static inline bool fd_ok(int fd);
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
 static void alloc_file(struct fdtable *table, int fd);
 
@@ -117,7 +118,7 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
     if (flag < 0) {
       continue;
     }
-    if (i < fileinfo->vkern_fdtable.start) {
+    if (fd_ok(i)) {
       set_fdbit(&fileinfo->fdtable, fileinfo->fdtable.open_fds, i);
       alloc_file(&fileinfo->fdtable, i);
     } else {
@@ -126,6 +127,10 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
       close(i);
     }
   }
+  fd_set hoge;
+  FD_ZERO(&hoge);
+  FD_SET(4081, &hoge);
+  FD_SET(1023, &hoge);
 }
 
 int
@@ -422,6 +427,12 @@ find_emptyfd(struct fdtable *table)
     ret = -1;
   }
   return table->start + ret - 1;
+}
+
+static inline bool
+fd_ok(int fd)
+{
+  return (fd >= 0 && fd < proc.fileinfo.vkern_fdtable.start);
 }
 
 static inline void
@@ -816,7 +827,7 @@ darwinfs_fchmodat(struct fs *fs, struct dir *dir, const char *path, l_mode_t mod
 #define LOOP_MAX 20
 
 int
-__vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct path *path, int loop)
+resolve_path(const struct dir *parent, const char *name, int flags, struct path *path, int loop)
 {
   static struct fs_operations ops = {
     darwinfs_openat,
@@ -832,19 +843,13 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
     darwinfs_fchownat,
     darwinfs_fchmodat,
   };
-
   static struct fs darwinfs = {
     .ops = &ops,
   };
-
-  if (flags & ~(LOOKUP_NOFOLLOW | LOOKUP_DIRECTORY)) {
-    return -LINUX_EINVAL;
-  }
+  struct fs *fs = &darwinfs;
 
   if (loop > LOOP_MAX)
     return -LINUX_ELOOP;
-
-  struct fs *fs = &darwinfs;
 
   struct dir dir = *parent;
 
@@ -877,7 +882,7 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
       if ((n = fs->ops->readlinkat(fs, &dir, path->subpath, buf, sizeof buf)) > 0) {
         strcpy(buf + n, c);
         if (buf[0] == '/') {
-          return __vfs_grab_dir(&dir, buf, flags, path, loop + 1);
+          return resolve_path(&dir, buf, flags, path, loop + 1);
         } else {
           /* remove the last component */
           while (sp >= path->subpath && *--sp != '/')
@@ -886,7 +891,7 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
           char buf2[LINUX_PATH_MAX];
           strcpy(buf2, path->subpath);
           strcat(buf2, buf);
-          return __vfs_grab_dir(&dir, buf2, flags, path, loop + 1);
+          return resolve_path(&dir, buf2, flags, path, loop + 1);
         }
       }
     }
@@ -908,6 +913,10 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
 {
   struct dir dir;
 
+  if (flags & ~(LOOKUP_NOFOLLOW | LOOKUP_DIRECTORY)) {
+    return -LINUX_EINVAL;
+  }
+
   if (*name == 0) {
     return -LINUX_ENOENT;
   }
@@ -916,8 +925,11 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     dir.fd = AT_FDCWD;
   } else {
     dir.fd = dirfd;
+    if (!fd_ok(dir.fd)) {
+      return -LINUX_EBADF;
+    }
   }
-  return __vfs_grab_dir(&dir, name, flags, path, 0);
+  return resolve_path(&dir, name, flags, path, 0);
 }
 
 void
@@ -1371,6 +1383,9 @@ vfs_getcwd(char *buf, size_t size)
 int
 vfs_fchdir(int fd)
 {
+  if (!fd_ok(fd)) {
+    return -LINUX_EBADF;
+  }
   return syswrap(fchdir(fd));
 }
 
@@ -1495,6 +1510,9 @@ fail_fcntl:
 
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 {
+  if (!fd_ok(fd1) || !fd_ok(fd2)) {
+    return -LINUX_EBADF;
+  }
   return syswrap(dup2(fd1, fd2));
 }
 
@@ -1519,6 +1537,11 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
 
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)
 {
+  //TODO no need to use vfs?
+  
+  if (!fd_ok(fd)) {
+    return -LINUX_EBADF;
+  }
   char buf[count];
   int r = syswrap(pread(fd, buf, count, pos));
   if (r < 0) {
@@ -1549,6 +1572,10 @@ DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, g
   fd_set readfds, writefds, errorfds;
   struct timeval *to;
   fd_set *rfds, *wfds, *efds;
+  
+  if (nfds - 1 >= proc.fileinfo.vkern_fdtable.start) {
+    return -LINUX_EBADF;
+  }
 
   if (timeout_ptr == 0) {
     to = NULL;
@@ -1600,6 +1627,10 @@ DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr,
   fd_set readfds, writefds, errorfds;
   struct timespec *to;
   fd_set *rfds, *wfds, *efds;
+  
+  if (nfds - 1 >= proc.fileinfo.vkern_fdtable.start) {
+    return -LINUX_EBADF;
+  }
 
   if (timeout_ptr == 0) {
     to = NULL;
@@ -1649,9 +1680,19 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
   /* FIXME! event numbers should be translated */
 
   struct pollfd fds[nfds];
+  
+  if (nfds > OPEN_MAX) {
+    return -LINUX_EINVAL;
+  }
 
   if (copy_from_user(fds, fds_ptr, sizeof fds))
     return -LINUX_EFAULT;
+  
+  for (int i = 0; i < nfds; i++) {
+    if (!fd_ok(fds[i].fd)) {
+      return -LINUX_EBADF;
+    }
+  }
 
   int r = syswrap(poll(fds, nfds, timeout));
   if (r < 0)
