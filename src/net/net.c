@@ -33,6 +33,8 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
     if (e < 0)
       return e;
   }
+  alloc_fd(fd, type & LINUX_SOCK_CLOEXEC);
+  
   return fd;
 }
 

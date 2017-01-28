@@ -44,6 +44,7 @@ int user_openat(int fd, const char *path, int flags, int mode);
 int vkern_openat(int fd, const char *path, int flags, int mode);
 int user_close(int fd);
 int vkern_close(int fd);
+void alloc_fd(int fd, bool is_cloexec);
 
 void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);
