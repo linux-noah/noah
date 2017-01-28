@@ -84,7 +84,7 @@ struct file_operations {
 
 static inline bool fd_ok(int fd);
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
-static void alloc_file(struct fdtable *table, int fd);
+void alloc_fd(int fd, bool is_cloexec);
 
 void
 init_fileinfo(struct fileinfo *fileinfo, int rootfd)
@@ -119,8 +119,7 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
       continue;
     }
     if (fd_ok(i)) {
-      set_fdbit(&fileinfo->fdtable, fileinfo->fdtable.open_fds, i);
-      alloc_file(&fileinfo->fdtable, i);
+      alloc_fd(i, flag & FD_CLOEXEC);
     } else {
       warnk("closing a file whose fd overlaps with vkern_fdtable, fd: %d\n", i);
       fprintf(stderr, "Noah uses high file descriptor numbers as the system file descriptors. fd[%d] is closed because it overlaps with the system area.\n", i);
@@ -386,29 +385,6 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
   return r;
 }
 
-static void
-alloc_file(struct fdtable *table, int fd)
-{
-  static struct file_operations ops = {
-    darwinfs_readv,
-    darwinfs_writev,
-    darwinfs_close,
-    darwinfs_ioctl,
-    darwinfs_lseek,
-    darwinfs_getdents,
-    darwinfs_fcntl,
-    darwinfs_fsync,
-    darwinfs_fstat,
-    darwinfs_fstatfs,
-    darwinfs_fchown,
-    darwinfs_fchmod,
-  };
-
-  struct file *file = table->files + (fd - table->start);
-  file->ops = &ops;
-  file->fd = fd;
-}
-
 static inline int
 find_emptyfd(struct fdtable *table)
 {
@@ -458,6 +434,41 @@ test_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
 #define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
 #define fdtable_user_lock(args) pthread_rwlock_rdlock(args)
 #define fdtable_unlock(args) pthread_rwlock_unlock(args)
+
+static void
+alloc_file(struct fdtable *table, int fd)
+{
+  static struct file_operations ops = {
+    darwinfs_readv,
+    darwinfs_writev,
+    darwinfs_close,
+    darwinfs_ioctl,
+    darwinfs_lseek,
+    darwinfs_getdents,
+    darwinfs_fcntl,
+    darwinfs_fsync,
+    darwinfs_fstat,
+    darwinfs_fstatfs,
+    darwinfs_fchown,
+    darwinfs_fchmod,
+  };
+
+  struct file *file = table->files + (fd - table->start);
+  file->ops = &ops;
+  file->fd = fd;
+}
+
+void
+alloc_fd(int fd, bool is_cloexec)
+{
+  set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
+  if (is_cloexec) {
+    set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  } else {
+    clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  }
+  alloc_file(&proc.fileinfo.fdtable, fd);
+}
 
 struct file *
 get_file(int fd)
@@ -1005,11 +1016,7 @@ user_openat(int atdirfd, const char *name, int flags, int mode)
   if (fd < 0) {
     goto out;
   }
-  set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
-  if (flags & LINUX_O_CLOEXEC) {
-    set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
-  }
-  alloc_file(&proc.fileinfo.fdtable, fd);
+  alloc_fd(fd, flags & LINUX_O_CLOEXEC);
 
 out:
   fdtable_unlock(&proc.fileinfo.fdtable_lock);
