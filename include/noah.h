@@ -43,7 +43,7 @@ int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);
 
 void die_with_forcedsig(int sig);
-void main_loop();
+void main_loop(int return_on_sigret);
 
 /* signal */
 
@@ -61,8 +61,8 @@ uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
 uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
 void sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set);
 
-void wake_sighandler();
-bool has_sigpending();
+void handle_signal(void);
+bool has_sigpending(void);
 int send_signal(pid_t pid, int sig);
 
 /* task related data */

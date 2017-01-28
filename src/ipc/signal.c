@@ -147,8 +147,7 @@ fetch_sig_to_deliver()
 bool
 has_sigpending()
 {
-  uint64_t mask = ~LINUX_SIGSET_TO_UI64(&task.sigmask);
-  return (proc.sigpending | task.sigpending) & mask;
+  return (proc.sigpending | task.sigpending) & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
 }
 
 static void
@@ -229,7 +228,7 @@ sas_ss_flags(uint64_t rsp)
   return task.sas.ss_flags;
 }
 
-int
+static int
 setup_sigframe(int signum)
 {
   struct l_rt_sigframe frame;
@@ -291,7 +290,7 @@ setup_sigframe(int signum)
   return 0;
 }
 
-void
+static void
 wake_sighandler()
 {
   pthread_rwlock_rdlock(&proc.sighand.lock);
@@ -321,6 +320,13 @@ wake_sighandler()
 
 out:
   pthread_rwlock_unlock(&proc.sighand.lock);
+}
+
+void
+handle_signal()
+{
+  wake_sighandler();
+  main_loop(1);
 }
 
 DEFINE_SYSCALL(alarm, unsigned int, seconds)
@@ -488,6 +494,35 @@ DEFINE_SYSCALL(rt_sigprocmask, int, how, gaddr_t, nset, gaddr_t, oset, size_t, s
   }
 
   return 0;
+}
+
+DEFINE_SYSCALL(rt_sigsuspend, gaddr_t, nset, size_t, size)
+{
+  if (size != sizeof(l_sigset_t)) {
+    return -LINUX_EINVAL;
+  }
+
+  l_sigset_t lnset, loset = task.sigmask;
+
+  if (copy_from_user(&lnset, nset, sizeof(l_sigset_t))) {
+    return -LINUX_EFAULT;
+  }
+  LINUX_SIGDELSET(&lnset, LINUX_SIGKILL);
+  LINUX_SIGDELSET(&lnset, LINUX_SIGSTOP);
+  task.sigmask = lnset;
+
+  while (1) {
+    /* NB: macOS's sleep is implemented using nanosleep. That's why we can use
+       sleep to implement sugsuspend without worrying about alarm(2). */
+    sleep(114514);
+    if (has_sigpending()) {
+      break;
+    }
+  }
+  handle_signal();
+  warnk("signal handled\n");
+  task.sigmask = loset;
+  return -LINUX_EINTR;          /* returns -EINTR when its execution ends NORMALLY */
 }
 
 DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)

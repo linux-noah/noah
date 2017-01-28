@@ -35,7 +35,7 @@ is_syscall(int instlen, uint64_t rip)
   return op == OP_SYSCALL;
 }
 
-static void
+static int
 handle_syscall(void)
 {
   uint64_t rax;
@@ -53,6 +53,11 @@ handle_syscall(void)
   vmm_read_register(HV_X86_R9, &r9);
   uint64_t retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
   vmm_write_register(HV_X86_RAX, retval);
+
+  if (rax == NR_rt_sigreturn) {
+    return -1;
+  }
+  return 0;
 }
 
 int
@@ -60,14 +65,17 @@ task_run()
 {
   /* handle pending signals */
   if (has_sigpending()) {
-    wake_sighandler();
+    handle_signal();
   }
   return vmm_run();
 }
 
 void
-main_loop()
+main_loop(int return_on_sigret)
 {
+  /* main_loop returns only if return_on_sigret == 1 && rt_sigreturn is invoked.
+     see also: rt_sigsuspend */
+
   while (task_run() == 0) {
 
     /* dump_instr(); */
@@ -116,9 +124,12 @@ main_loop()
         vmm_read_vmcs(VMCS_RO_VMEXIT_INSTR_LEN, &instlen);
         vmm_read_register(HV_X86_RIP, &rip);
         if (is_syscall(instlen, rip)) {
-          handle_syscall();
+          int r = handle_syscall();
           vmm_read_register(HV_X86_RIP, &rip); /* reload rip for execve */
           vmm_write_register(HV_X86_RIP, rip + 2);
+          if (return_on_sigret && r < 0) {
+            return;
+          }
           continue;
         }
         /* FIXME */
@@ -232,7 +243,7 @@ main_loop()
     }
   }
 
-  printk("exit...\n");
+  __builtin_unreachable();
 }
 
 void
@@ -482,7 +493,7 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   }
 
-  main_loop();
+  main_loop(0);
 
   vmm_destroy();
 

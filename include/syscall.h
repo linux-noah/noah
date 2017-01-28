@@ -131,7 +131,7 @@
   SYSCALL(127, rt_sigpending)                   \
   SYSCALL(128, unimplemented)                   \
   SYSCALL(129, unimplemented)                   \
-  SYSCALL(130, unimplemented)                   \
+  SYSCALL(130, rt_sigsuspend)                   \
   SYSCALL(131, sigaltstack)                     \
   SYSCALL(132, unimplemented)                   \
   SYSCALL(133, unimplemented)                   \

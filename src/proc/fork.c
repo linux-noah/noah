@@ -104,7 +104,7 @@ __start_thread(struct clone_thread_arg *arg)
   free(arg->vcpu_snapshot);
   free(arg);
 
-  main_loop();
+  main_loop(0);
 
   return NULL; // hv_vcpu_run failed for some reason
 }
