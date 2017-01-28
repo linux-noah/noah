@@ -567,3 +567,46 @@ darwin_to_linux_sigaction(struct sigaction *dsa, l_sigaction_t *lsa, gaddr_t han
   if (dsa->sa_flags & SA_NODEFER)
     lsa->lsa_flags |= LINUX_SA_NOMASK;
 }
+
+void
+linux_to_darwin_flock(struct l_flock *linux_flock, struct flock *darwin_flock)
+{
+  switch (linux_flock->l_type) {
+    case LINUX_F_RDLCK:
+      darwin_flock->l_type = F_RDLCK;
+      break;
+    case LINUX_F_WRLCK:
+      darwin_flock->l_type = F_WRLCK;
+      break;
+    case LINUX_F_UNLCK:
+      darwin_flock->l_type = F_UNLCK;
+      break;
+    default:
+      darwin_flock->l_type = -1;
+      break;
+  }
+  darwin_flock->l_whence = linux_flock->l_whence;
+  darwin_flock->l_start = (off_t)linux_flock->l_start;
+  darwin_flock->l_len = (off_t)linux_flock->l_len;
+  darwin_flock->l_pid = (pid_t)linux_flock->l_pid;
+}
+
+void
+darwin_to_linux_flock(struct flock *darwin_flock, struct l_flock *linux_flock)
+{
+  switch (darwin_flock->l_type) {
+    case F_RDLCK:
+      linux_flock->l_type = LINUX_F_RDLCK;
+      break;
+    case F_WRLCK:
+      linux_flock->l_type = LINUX_F_WRLCK;
+      break;
+    case F_UNLCK:
+      linux_flock->l_type = LINUX_F_UNLCK;
+      break;
+  }
+  linux_flock->l_whence = darwin_flock->l_whence;
+  linux_flock->l_start = (l_off_t)darwin_flock->l_start;
+  linux_flock->l_len = (l_off_t)darwin_flock->l_len;
+  linux_flock->l_pid = (l_pid_t)darwin_flock->l_pid;
+}

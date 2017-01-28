@@ -244,10 +244,17 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
   return pos;
 }
 
+void linux_to_darwin_flock(struct l_flock *linux_flock, struct flock *darwin_flock);
+
+void darwin_to_linux_flock(struct flock *darwin_flock, struct l_flock *linux_flock);
+
 int
 darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 {
   int r;
+  struct l_flock lflock;
+  struct flock dflock;
+  
   switch (cmd) {
   case LINUX_F_DUPFD:
     return syswrap(fcntl(file->fd, F_DUPFD, arg)); /* FIXME */
@@ -265,6 +272,26 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
     return darwin_to_linux_o_flags(r);
   case LINUX_F_SETFL:
     return syswrap(fcntl(file->fd, F_SETFL, linux_to_darwin_o_flags(arg)));
+  case LINUX_F_GETLK:
+    if (copy_from_user(&lflock, arg, sizeof lflock)) {
+      return -LINUX_EFAULT;
+    }
+    linux_to_darwin_flock(&lflock, &dflock);
+    r = syswrap(fcntl(file->fd, F_GETLK, &dflock));
+    if (r < 0) {
+      return r;
+    }
+    darwin_to_linux_flock(&dflock, &lflock);
+    if (copy_to_user(arg, &lflock, sizeof lflock)) {
+      return -LINUX_EFAULT;
+    }
+    return 0;
+  case LINUX_F_SETLK: case LINUX_F_SETLKW:
+    if (copy_from_user(&lflock, arg, sizeof lflock)) {
+      return -LINUX_EFAULT;
+    }
+    linux_to_darwin_flock(&lflock, &dflock);
+    return syswrap(fcntl(file->fd, (cmd == LINUX_F_SETLK) ? F_SETLK : F_SETLKW, &dflock));
   default:
     warnk("unknown fcntl cmd: %d\n", cmd);
     return -LINUX_EINVAL;

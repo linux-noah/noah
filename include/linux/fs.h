@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2016 Yuichi Nishiwaki
+ * Copyright (c) 2016 Yuichi Nishiwaki, Takaya Saeki
  * Copyright (c) 2007 Roman Divacky
  * All rights reserved.
  *
@@ -221,5 +221,16 @@ struct l_statfs {
 #define LINUX_FD_SETSIZE 1024
 
 typedef unsigned long l_fd_set[LINUX_FD_SETSIZE / (8 * sizeof(long))];
+
+/*
+ * flock
+ */
+struct l_flock {
+  l_short l_type;
+  l_short l_whence;
+  l_long  l_start;
+  l_long  l_len;
+  l_pid_t l_pid;
+};
 
 #endif	/* !_LINUX_FILE_H_ */
