@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eu
+
 sudo sh -c "./mkgroup.pl | sort | uniq > ~/.noah/tree/etc/group"
 sudo sh -c "./mkpasswd.pl | sort | uniq > ~/.noah/tree/etc/passwd"
 
