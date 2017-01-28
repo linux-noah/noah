@@ -107,8 +107,10 @@ should_deliver(int sig)
 static inline int
 fetch_sig_from_sigbits(atomic_sigbits_t *sigbits)
 {
-  uint64_t bits, sig = 1;
+  uint64_t bits, sig;
 
+ retry:
+  sig = 1;
   if ((bits = *sigbits) == 0) {
     return 0;
   }
@@ -120,10 +122,13 @@ fetch_sig_from_sigbits(atomic_sigbits_t *sigbits)
     }
     sig++;
   }
+  if (sig > 32) {
+    return 0;
+  }
 
   if (!(sigbits_delbit(sigbits, sig) & (1 << (sig - 1)))) {
-    // Other threads delivered the signal, retry
-    return fetch_sig_from_sigbits(sigbits);
+    // any other thread among the process took this signal
+    goto retry;
   }
 
   return sig;
@@ -142,7 +147,8 @@ fetch_sig_to_deliver()
 bool
 has_sigpending()
 {
-  return proc.sigpending || task.sigpending;
+  uint64_t mask = ~LINUX_SIGSET_TO_UI64(&task.sigmask);
+  return (proc.sigpending | task.sigpending) & mask;
 }
 
 static void

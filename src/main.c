@@ -58,6 +58,7 @@ handle_syscall(void)
 int
 task_run()
 {
+  /* handle pending signals */
   if (has_sigpending()) {
     wake_sighandler();
   }

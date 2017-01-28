@@ -20,6 +20,7 @@
 
 DEFINE_SYSCALL(ptrace, long, request, long, pid, unsigned long, addr, unsigned long, data)
 {
+  warnk("ptrace not implemented!: (request = %ld)", request);
   switch (request) {
   case LINUX_PTRACE_GETEVENTMSG:
     break;
