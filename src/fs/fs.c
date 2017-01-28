@@ -82,6 +82,9 @@ struct file_operations {
   int (*fchmod)(struct file *f, l_mode_t mode);
 };
 
+static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
+static void alloc_file(struct fdtable *table, int fd);
+
 void
 init_fileinfo(struct fileinfo *fileinfo, int rootfd)
 {
@@ -97,6 +100,8 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
     .open_fds = malloc(sizeof(uint64_t)),
     .cloexec_fds = malloc(sizeof(uint64_t))
   };
+  fileinfo->vkern_fdtable.open_fds[0] = 0;
+  fileinfo->vkern_fdtable.cloexec_fds[0] = 0;
   fileinfo->fdtable = (struct fdtable) {
     .start = 0,
     .size = 64,
@@ -104,6 +109,23 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
     .open_fds = malloc(sizeof(uint64_t)),
     .cloexec_fds = malloc(sizeof(uint64_t))
   };
+  fileinfo->fdtable.open_fds[0] = 0;
+  fileinfo->fdtable.cloexec_fds[0] = 0;
+  
+  for (int i = 0; i < (int) limit.rlim_cur; i++) {
+    int flag = fcntl(i, F_GETFD);
+    if (flag < 0) {
+      continue;
+    }
+    if (i < fileinfo->vkern_fdtable.start) {
+      set_fdbit(&fileinfo->fdtable, fileinfo->fdtable.open_fds, i);
+      alloc_file(&fileinfo->fdtable, i);
+    } else {
+      warnk("closing a file whose fd overlaps with vkern_fdtable, fd: %d\n", i);
+      fprintf(stderr, "Noah uses high file descriptor numbers as the system file descriptors. fd[%d] is closed because it overlaps with the system area.\n", i);
+      close(i);
+    }
+  }
 }
 
 int
@@ -363,8 +385,8 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
   return r;
 }
 
-struct file *
-vfs_acquire(int fd)
+static void
+alloc_file(struct fdtable *table, int fd)
 {
   static struct file_operations ops = {
     darwinfs_readv,
@@ -381,17 +403,72 @@ vfs_acquire(int fd)
     darwinfs_fchmod,
   };
 
-  struct file *file;
-  file = malloc(sizeof *file);
+  struct file *file = table->files + (fd - table->start);
   file->ops = &ops;
   file->fd = fd;
-  return file;
 }
 
-void
-vfs_release(struct file *file)
+static inline int
+find_emptyfd(struct fdtable *table)
 {
-  free(file);
+  int ret = -1;
+  for (unsigned i = 0; i < table->size / sizeof(uint64_t) + 1; i++) {
+    ret = ffs(~table->open_fds[i]);
+    if (ret > 0) {
+      break;
+    }
+  }
+  if (ret >= table->size) {
+    ret = -1;
+  }
+  return table->start + ret - 1;
+}
+
+static inline void
+set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
+{
+  int idx_table = (fd - table->start) / sizeof(uint64_t);
+  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
+  fdbits[idx_table] |= (1 << (idx_bit));
+}
+
+static inline void
+clear_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
+{
+  int idx_table = (fd - table->start) / sizeof(uint64_t);
+  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
+  fdbits[idx_table] &= ~(1 << (idx_bit));
+}
+
+static inline bool
+test_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
+{
+  int idx_table = (fd - table->start) / sizeof(uint64_t);
+  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
+  return fdbits[idx_table] & (1 << (idx_bit));
+}
+
+#define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
+#define fdtable_user_lock(args) pthread_rwlock_rdlock(args)
+#define fdtable_unlock(args) pthread_rwlock_unlock(args)
+
+struct file *
+get_file(int fd)
+{
+  if (fd < 0 || fd >= proc.fileinfo.fdtable.size) {
+    return NULL;
+  }
+  
+  struct file *ret = NULL;
+  fdtable_user_lock(&proc.fileinfo.fdtable_lock);
+  if (!test_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd)) {
+    goto out;
+  }
+  ret = &proc.fileinfo.fdtable.files[fd - proc.fileinfo.fdtable.start];
+  
+out:
+  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
@@ -400,43 +477,33 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
   if (copy_from_user(buf, buf_ptr, size)) {
     return -LINUX_EFAULT;
   }
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r;
   if (file->ops->writev == NULL) {
-    r = -LINUX_EBADF;
-    goto out;
+    return -LINUX_EBADF;
   }
   struct iovec iov = { buf, size };
-  r = file->ops->writev(file, &iov, 1);
- out:
-  vfs_release(file);
-  return r;
+  return file->ops->writev(file, &iov, 1);
 }
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
   char buf[size];
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r;
   if (file->ops->readv == NULL) {
-    r = -LINUX_EBADF;
-    goto out;
+    return -LINUX_EBADF;
   }
   struct iovec iov = { buf, size };
-  r = file->ops->readv(file, &iov, 1);
+  int r = file->ops->readv(file, &iov, 1);
   if (r < 0) {
-    goto out;
+    return r;
   }
   if (copy_to_user(buf_ptr, buf, r)) {
-    r = -LINUX_EFAULT;
-    goto out;
+    return -LINUX_EFAULT;
   }
- out:
-  vfs_release(file);
   return r;
 }
 
@@ -455,18 +522,13 @@ DEFINE_SYSCALL(writev, int, fd, gaddr_t, iov_ptr, int, iovcnt)
       return -LINUX_EFAULT;
   }
 
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r;
   if (file->ops->writev == NULL) {
-    r = -LINUX_EBADF;
-    goto out;
+    return -LINUX_EBADF;
   }
-  r = file->ops->writev(file, iov, iovcnt);
- out:
-  vfs_release(file);
-  return r;
+  return file->ops->writev(file, iov, iovcnt);
 }
 
 DEFINE_SYSCALL(readv, int, fd, gaddr_t, iov_ptr, int, iovcnt)
@@ -482,142 +544,101 @@ DEFINE_SYSCALL(readv, int, fd, gaddr_t, iov_ptr, int, iovcnt)
     iov[i].iov_len = liov[i].iov_len;
   }
 
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r;
   if (file->ops->readv == NULL) {
-    r = -LINUX_EBADF;
-    goto out;
+    return -LINUX_EBADF;
   }
-  r = file->ops->readv(file, iov, iovcnt);
+  int r = file->ops->readv(file, iov, iovcnt);
   if (r < 0) {
-    goto out;
+    return r;
   }
   size_t size = r;
   for (int i = 0; i < iovcnt; ++i) {
     size_t s = MIN(size, iov[i].iov_len);
     if (copy_to_user(liov[i].iov_base, iov[i].iov_base, s)) {
-      r = -LINUX_EFAULT;
-      goto out;
+      return -LINUX_EFAULT;
     }
     size -= s;
     if (size == 0)
       break;
   }
- out:
-  vfs_release(file);
   return r;
-}
-
-int
-do_close(int fd)
-{
-  /* FIXME: free fd slot */
-  struct file *file = vfs_acquire(fd);
-  if (file == NULL)
-    return -LINUX_EBADF;
-  int n = file->ops->close(file);
-  vfs_release(file);
-  return n;
-}
-
-DEFINE_SYSCALL(close, int, fd)
-{
-  return do_close(fd);
 }
 
 DEFINE_SYSCALL(fstat, int, fd, gaddr_t, st_ptr)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   struct l_newstat st;
   int n = file->ops->fstat(file, &st);
   if (n < 0)
-    goto out;
+    return n;
   if (copy_to_user(st_ptr, &st, sizeof st)) {
-    n = -LINUX_EFAULT;
-    goto out;
+    return -LINUX_EFAULT;
   }
- out:
-  vfs_release(file);
   return n;
 }
 
 DEFINE_SYSCALL(fchown, int, fd, l_uid_t, uid, l_gid_t, gid)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int n = file->ops->fchown(file, uid, gid);
-  vfs_release(file);
-  return n;
+  return file->ops->fchown(file, uid, gid);
 }
 
 DEFINE_SYSCALL(fchmod, int, fd, l_mode_t, mode)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int n = file->ops->fchmod(file, mode);
-  vfs_release(file);
-  return n;
+  return file->ops->fchmod(file, mode);
 }
 
 DEFINE_SYSCALL(ioctl, int, fd, int, cmd, uint64_t, val0)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r;
   if (file->ops->ioctl == NULL) {
-    r = -LINUX_ENOTTY;
-    goto out;
+    return -LINUX_ENOTTY;
   }
-  r = file->ops->ioctl(file, cmd, val0);
- out:
-  vfs_release(file);
-  return r;
+  return file->ops->ioctl(file, cmd, val0);
 }
 
 DEFINE_SYSCALL(lseek, int, fd, off_t, offset, int, whence)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r = file->ops->lseek(file, offset, whence);
-  vfs_release(file);
-  return r;
+  return file->ops->lseek(file, offset, whence);
 }
 
 DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   char buf[count];
   int r = file->ops->getdents(file, buf, count);
   if (r < 0) {
-    goto out;
+    return r;
   }
   if (copy_to_user(dirent_ptr, buf, count)) {
-    r = -LINUX_EFAULT;
-    goto out;
+    return -LINUX_EFAULT;
   }
- out:
-  vfs_release(file);
   return r;
 }
 
 DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r = file->ops->fcntl(file, cmd, arg);
-  vfs_release(file);
-  return r;
+  return file->ops->fcntl(file, cmd, arg);
 }
 
 DEFINE_SYSCALL(dup, unsigned int, fd)
@@ -627,30 +648,25 @@ DEFINE_SYSCALL(dup, unsigned int, fd)
 
 DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   struct l_statfs st;
   int n = file->ops->fstatfs(file, &st);
   if (n < 0)
-    goto out;
+    return n;
   if (copy_to_user(buf_ptr, &st, sizeof st)) {
-    n = -LINUX_EFAULT;
-    goto out;
+    return -LINUX_EFAULT;
   }
- out:
-  vfs_release(file);
   return n;
 }
 
 DEFINE_SYSCALL(fsync, int, fd)
 {
-  struct file *file = vfs_acquire(fd);
+  struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  int r = file->ops->fsync(file);
-  vfs_release(file);
-  return r;
+  return file->ops->fsync(file);
 }
 
 struct dir {
@@ -937,35 +953,6 @@ do_open(const char *path, int l_flags, int mode)
   return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
-
-#define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
-#define fdtable_user_lock(args) pthread_rwlock_rdlock(args)
-#define fdtable_unlock(args) pthread_rwlock_unlock(args)
-
-static inline int
-find_emptyfd(struct fdtable *table)
-{
-  int ret = -1;
-  for (unsigned i = 0; i < table->size / sizeof(uint64_t) + 1; i++) {
-    ret = ffs(~table->open_fds[i]);
-    if (ret > 0) {
-      break;
-    }
-  }
-  if (ret >= table->size) {
-    ret = -1;
-  }
-  return table->start + ret - 1;
-}
-
-static inline void
-set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
-{
-  int idx_table = (fd - table->start) / sizeof(uint64_t);
-  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
-  fdbits[idx_table] |= (1 << (idx_bit));
-}
-
 int
 vkern_openat(int atdirfd, const char *name, int flags, int mode)
 {
@@ -982,11 +969,12 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
     panic("Too many files opened in the kernel space");
   }
   dup2(fd, vkern_fd);
-  do_close(fd);
+  close(fd);
   set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
   if (flags & LINUX_O_CLOEXEC) {
     set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);
   }
+  alloc_file(&proc.fileinfo.vkern_fdtable, vkern_fd);
   ret = vkern_fd;
   
 out:
@@ -1013,6 +1001,7 @@ user_openat(int atdirfd, const char *name, int flags, int mode)
   if (flags & LINUX_O_CLOEXEC) {
     set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
   }
+  alloc_file(&proc.fileinfo.fdtable, fd);
 
 out:
   fdtable_unlock(&proc.fileinfo.fdtable_lock);
@@ -1025,16 +1014,50 @@ user_open(const char *path, int l_flags, int mode)
   return user_openat(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
+int
+user_close(int fd)
+{
+  struct file *file = get_file(fd);
+  if (file == NULL) {
+    return -LINUX_EBADF;
+  }
+  int n = file->ops->close(file);
+  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
+  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  return n;
+}
+
+int
+vkern_close(int fd)
+{
+  if (fd < proc.fileinfo.vkern_fdtable.start || fd >= proc.fileinfo.vkern_fdtable.start + proc.fileinfo.vkern_fdtable.size) {
+    return -LINUX_EBADF;
+  }
+  struct file *file = &proc.fileinfo.vkern_fdtable.files[fd - proc.fileinfo.vkern_fdtable.start];
+  if (file == NULL) {
+    return -LINUX_EBADF;
+  }
+  int n = file->ops->close(file);
+  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.open_fds, fd);
+  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, fd);
+  return n;
+}
+
 DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  return do_openat(dirfd, path, flags, mode);
+  return user_openat(dirfd, path, flags, mode);
 }
 
 DEFINE_SYSCALL(open, gstr_t, path_ptr, int, flags, int, mode)
 {
   return sys_openat(LINUX_AT_FDCWD, path_ptr, flags, mode);
+}
+
+DEFINE_SYSCALL(close, int, fd)
+{
+  return user_close(fd);
 }
 
 DEFINE_SYSCALL(creat, gstr_t, path_ptr, int, mode)
@@ -1390,11 +1413,11 @@ DEFINE_SYSCALL(chdir, gstr_t, path_ptr)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(LINUX_AT_FDCWD, path, LINUX_O_DIRECTORY, 0);
+  int fd = user_openat(LINUX_AT_FDCWD, path, LINUX_O_DIRECTORY, 0);
   if (fd < 0)
     return fd;
   int r = sys_fchdir(fd);
-  do_close(fd);
+  user_close(fd);
   return r;
 }
 

@@ -44,7 +44,7 @@ load_elf_interp(const char *path, ulong load_addr)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  do_close(fd);
+  vkern_close(fd);
 
   h = (Elf64_Ehdr *)data;
 
@@ -417,7 +417,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  do_close(fd);
+  vkern_close(fd);
 
   drop_privilege();
 

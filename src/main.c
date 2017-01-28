@@ -476,10 +476,9 @@ main(int argc, char *argv[], char **envp)
   if (argc == 0) {
     abort();
   }
-
+  
   vmm_create();
   init_vkernel();
-
   int rootfd = open(root, O_RDONLY | O_DIRECTORY);
   if (rootfd < 0) {
     perror("could not open initial root directory");

@@ -134,7 +134,7 @@ DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int
   r = syswrap(futimes(fd, tp));
  out:
   if (fd != dirfd) {
-    do_close(fd);
+    vkern_close(fd);
   }
   return r;
 }

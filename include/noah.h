@@ -35,7 +35,6 @@ ssize_t strnlen_user(gaddr_t gaddr, size_t n);
 /* linux emulation */
 
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
-int do_close(int fd);
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
 int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);
@@ -43,6 +42,8 @@ int user_open(const char *path, int flags, int mode);
 int vkern_open(const char *path, int flags, int mode);
 int user_openat(int fd, const char *path, int flags, int mode);
 int vkern_openat(int fd, const char *path, int flags, int mode);
+int user_close(int fd);
+int vkern_close(int fd);
 
 void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);
