@@ -235,7 +235,7 @@ DECLARE_CSTR_FUNC(sa_family, LINUX_AF);
 
 /* Supported socket types */
 
-#define	sLINUX_SOCK_STREAM	1
+#define	LINUX_SOCK_STREAM	1
 #define	LINUX_SOCK_DGRAM	2
 #define	LINUX_SOCK_RAW		3
 #define	LINUX_SOCK_RDM		4
