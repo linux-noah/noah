@@ -22,7 +22,6 @@
 
 #include <mach-o/dyld.h>
 
-
 static bool
 is_syscall(int instlen, uint64_t rip)
 {

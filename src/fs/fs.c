@@ -389,7 +389,7 @@ static inline int
 find_emptyfd(struct fdtable *table)
 {
   int ret = -1;
-  for (unsigned i = 0; i < table->size / sizeof(uint64_t) + 1; i++) {
+  for (int i = 0; i < table->size / 64; i++) {
     ret = ffs(~table->open_fds[i]);
     if (ret > 0) {
       break;
@@ -410,25 +410,25 @@ fd_ok(int fd)
 static inline void
 set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
 {
-  int idx_table = (fd - table->start) / sizeof(uint64_t);
-  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
-  fdbits[idx_table] |= (1 << (idx_bit));
+  int idx_table = (fd - table->start) / 64;
+  int idx_bit = (fd - table->start) - idx_table * 64;
+  fdbits[idx_table] |= (1ULL << (idx_bit));
 }
 
 static inline void
 clear_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
 {
-  int idx_table = (fd - table->start) / sizeof(uint64_t);
-  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
-  fdbits[idx_table] &= ~(1 << (idx_bit));
+  int idx_table = (fd - table->start) / 64;
+  int idx_bit = (fd - table->start) - idx_table * 64;
+  fdbits[idx_table] &= ~(1ULL << (idx_bit));
 }
 
 static inline bool
 test_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
 {
-  int idx_table = (fd - table->start) / sizeof(uint64_t);
-  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
-  return fdbits[idx_table] & (1 << (idx_bit));
+  int idx_table = (fd - table->start) / 64;
+  int idx_bit = (fd - table->start) - idx_table * 64;
+  return fdbits[idx_table] & (1ULL << (idx_bit));
 }
 
 #define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
@@ -461,13 +461,26 @@ alloc_file(struct fdtable *table, int fd)
 void
 alloc_fd(int fd, bool is_cloexec)
 {
-  set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
-  if (is_cloexec) {
-    set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
-  } else {
-    clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  struct fdtable *fdtable = &proc.fileinfo.fdtable;
+  if (proc.fileinfo.fdtable.size <= fd) {
+    // Expand table
+    int new_size = roundup(fd, sizeof(uint64_t));
+    size_t old_nunits = proc.fileinfo.fdtable.size / 64;
+    size_t new_nunits = new_size / 64;
+    fdtable->files = realloc(fdtable->files, new_size * sizeof(struct file));
+    fdtable->open_fds = realloc(fdtable->open_fds, sizeof(uint64_t) * new_nunits);
+    fdtable->cloexec_fds = realloc(fdtable->cloexec_fds, sizeof(uint64_t) * new_nunits);
+    bzero(fdtable->open_fds + old_nunits, (new_nunits - old_nunits) * sizeof(uint64_t));
+    bzero(fdtable->cloexec_fds + old_nunits, (new_nunits - old_nunits) * sizeof(uint64_t));
+    fdtable->size = new_size;
   }
-  alloc_file(&proc.fileinfo.fdtable, fd);
+  set_fdbit(fdtable, fdtable->open_fds, fd);
+  if (is_cloexec) {
+    set_fdbit(fdtable, fdtable->cloexec_fds, fd);
+  } else {
+    clear_fdbit(fdtable, fdtable->cloexec_fds, fd);
+  }
+  alloc_file(fdtable, fd);
 }
 
 struct file *
@@ -1051,6 +1064,22 @@ vkern_close(int fd)
   clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.open_fds, fd);
   clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, fd);
   return n;
+}
+
+void
+close_cloexec()
+{
+  struct fdtable *fdtable = &proc.fileinfo.fdtable;
+  for (int i = 0; i < fdtable->size / 64; i++) {
+    for (int j = 0; j < 64; j++) {
+      if (fdtable->cloexec_fds[i] == 0) {
+        break;
+      }
+      if ((fdtable->cloexec_fds[i] >> j) & 1) {
+        user_close(fdtable->files[j + i * 64].fd);
+      }
+    }
+  }
 }
 
 DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)

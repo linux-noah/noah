@@ -376,6 +376,7 @@ prepare_newproc(void)
   // TODO: destroy LDT if it is implemented
 
   task.clear_child_tid = task.set_child_tid = 0;
+  close_cloexec();
 }
 
 int
@@ -398,19 +399,6 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   }
 
   prepare_newproc();
-
-  // Handle close-on-exec by bruteforce now. FIXME after introducing vfs
-  struct rlimit rlimit;
-  getrlimit(RLIMIT_NOFILE, &rlimit);
-  for (size_t i = 0; i < rlimit.rlim_cur; i++) {
-    int flag = fcntl(i, F_GETFD);
-    if (flag < 0) {
-      continue;
-    }
-    if (flag & FD_CLOEXEC) {
-      close(i);
-    }
-  }
 
   /* Now do exec */
   fstat(fd, &st);
