@@ -659,11 +659,6 @@ DEFINE_SYSCALL(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
   return file->ops->fcntl(file, cmd, arg);
 }
 
-DEFINE_SYSCALL(dup, unsigned int, fd)
-{
-  return sys_fcntl(fd, LINUX_F_DUPFD, 0);
-}
-
 DEFINE_SYSCALL(fstatfs, int, fd, gaddr_t, buf_ptr)
 {
   struct file *file = get_file(fd);
@@ -987,7 +982,7 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
   if (vkern_fd == -1) {
     panic("Too many files opened in the kernel space");
   }
-  dup2(fd, vkern_fd);
+  dup2(fd, vkern_fd); // FIXME flags
   close(fd);
   set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
   if (flags & LINUX_O_CLOEXEC) {
@@ -1458,6 +1453,8 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
   if (copy_to_user(fildes_ptr, fd, sizeof fd)) {
     return -LINUX_EFAULT;
   }
+  alloc_fd(fd[0], false);
+  alloc_fd(fd[1], false);
   return 0;
 }
 
@@ -1502,6 +1499,8 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
   if (copy_to_user(fildes_ptr, fildes, sizeof(fildes))) {
     return -LINUX_EFAULT;
   }
+  alloc_fd(fildes[0], flags & LINUX_O_CLOEXEC);
+  alloc_fd(fildes[1], flags & LINUX_O_CLOEXEC);
 
   return 0;
 
@@ -1511,12 +1510,27 @@ fail_fcntl:
   return (err0 < 0) ? err0 : err1;
 }
 
+DEFINE_SYSCALL(dup, unsigned int, fd)
+{
+  int dup_fd = sys_fcntl(fd, LINUX_F_DUPFD, 0);
+  if (dup_fd < 0) {
+    return dup_fd;
+  }
+  alloc_fd(dup_fd, false);
+  return dup_fd;
+}
+
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 {
   if (!fd_ok(fd1) || !fd_ok(fd2)) {
     return -LINUX_EBADF;
   }
-  return syswrap(dup2(fd1, fd2));
+  int dup_fd = syswrap(dup2(fd1, fd2));
+  if (dup_fd < 0) {
+    return dup_fd;
+  }
+  alloc_fd(dup_fd, false);
+  return dup_fd;
 }
 
 DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
@@ -1530,12 +1544,20 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
 
   // TODO: This implementation does not prevent race condition
   //       Make sure that exec closes fds after robust fd control is implemented (i.e. VFS)
-  int ret = syswrap(dup2(oldfd, newfd));
-  if (ret == 0 && (flags & LINUX_O_CLOEXEC)) {
-    ret = syswrap(fcntl(newfd, F_SETFD, FD_CLOEXEC));
+  int dup_fd = syswrap(dup2(oldfd, newfd));
+  if (dup_fd < 0) {
+    return dup_fd;
   }
+  if (flags & LINUX_O_CLOEXEC) {
+    int fcntl_err = syswrap(fcntl(newfd, F_SETFD, FD_CLOEXEC));
+    if (fcntl_err < 0) {
+      close(dup_fd);
+      return fcntl_err;
+    }
+  }
+  alloc_fd(dup_fd, flags & LINUX_O_CLOEXEC);
 
-  return ret;
+  return dup_fd;
 }
 
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)
