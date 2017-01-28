@@ -82,6 +82,30 @@ struct file_operations {
   int (*fchmod)(struct file *f, l_mode_t mode);
 };
 
+void
+init_fileinfo(struct fileinfo *fileinfo, int rootfd)
+{
+  struct rlimit limit;
+  
+  fileinfo->rootfd = rootfd;
+  pthread_rwlock_init(&fileinfo->fdtable_lock, NULL);
+  getrlimit(RLIMIT_NOFILE, &limit);
+  fileinfo->vkern_fdtable = (struct fdtable) {
+    .start = limit.rlim_cur - 64,
+    .size = 64,
+    .files = malloc(sizeof(struct file) * 64),
+    .open_fds = malloc(sizeof(uint64_t)),
+    .cloexec_fds = malloc(sizeof(uint64_t))
+  };
+  fileinfo->fdtable = (struct fdtable) {
+    .start = 0,
+    .size = 64,
+    .files = malloc(sizeof(struct file) * 64),
+    .open_fds = malloc(sizeof(uint64_t)),
+    .cloexec_fds = malloc(sizeof(uint64_t))
+  };
+}
+
 int
 darwinfs_writev(struct file *file, const struct iovec *iov, size_t iovcnt)
 {
@@ -886,7 +910,7 @@ vfs_ungrab_dir(struct path *path)
   free(path->dir);
 }
 
-int
+static int
 do_openat(int dirfd, const char *name, int flags, int mode)
 {
   int lkflag = 0;
@@ -907,10 +931,98 @@ do_openat(int dirfd, const char *name, int flags, int mode)
   return r;
 }
 
-int
+static int
 do_open(const char *path, int l_flags, int mode)
 {
   return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
+}
+
+
+#define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
+#define fdtable_user_lock(args) pthread_rwlock_rdlock(args)
+#define fdtable_unlock(args) pthread_rwlock_unlock(args)
+
+static inline int
+find_emptyfd(struct fdtable *table)
+{
+  int ret = -1;
+  for (unsigned i = 0; i < table->size / sizeof(uint64_t) + 1; i++) {
+    ret = ffs(~table->open_fds[i]);
+    if (ret > 0) {
+      break;
+    }
+  }
+  if (ret >= table->size) {
+    ret = -1;
+  }
+  return table->start + ret - 1;
+}
+
+static inline void
+set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
+{
+  int idx_table = (fd - table->start) / sizeof(uint64_t);
+  int idx_bit = fd - idx_table * sizeof(uint64_t);
+  fdbits[idx_table] |= (1 << (idx_bit));
+}
+
+int
+vkern_openat(int atdirfd, const char *name, int flags, int mode)
+{
+  int ret;
+  
+  fdtable_kernel_lock(&proc.fileinfo.fdtable_lock);
+  int fd = do_openat(atdirfd, name, flags, mode);
+  if (fd < 0) {
+    ret = fd;
+    goto out;
+  }
+  int vkern_fd = find_emptyfd(&proc.fileinfo.vkern_fdtable);
+  if (vkern_fd == -1) {
+    panic("Too many files opened in the kernel space");
+  }
+  dup2(fd, vkern_fd);
+  do_close(fd);
+  set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
+  if (flags & LINUX_O_CLOEXEC) {
+    set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);
+  }
+  ret = vkern_fd;
+  
+out:
+  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  return ret;
+}
+
+int
+vkern_open(const char *path, int l_flags, int mode)
+{
+  return vkern_openat(LINUX_AT_FDCWD, path, l_flags, mode);
+}
+
+int
+user_openat(int atdirfd, const char *name, int flags, int mode)
+{
+  int fd;
+  fdtable_user_lock(&proc.fileinfo.fdtable_lock);
+  fd = do_openat(atdirfd, name, flags, mode);
+  if (fd < 0) {
+    goto out;
+  }
+  set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
+  if (flags & LINUX_O_CLOEXEC) {
+    set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  }
+
+out:
+  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  return fd;
+}
+
+int
+user_open(const char *path, int l_flags, int mode)
+{
+  return user_openat(LINUX_AT_FDCWD, path, l_flags, mode);
 }
 
 DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)

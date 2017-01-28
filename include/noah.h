@@ -35,12 +35,14 @@ ssize_t strnlen_user(gaddr_t gaddr, size_t n);
 /* linux emulation */
 
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
-int do_open(const char *path, int flags, int mode);
-int do_openat(int fd, const char *path, int flags, int mode);
 int do_close(int fd);
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
 int do_access(const char *path, int l_mode);
 int do_futex_wake(gaddr_t uaddr, int count);
+int user_open(const char *path, int flags, int mode);
+int vkern_open(const char *path, int flags, int mode);
+int user_openat(int fd, const char *path, int flags, int mode);
+int vkern_openat(int fd, const char *path, int flags, int mode);
 
 void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);
@@ -76,6 +78,23 @@ struct task {
   l_stack_t sas;
 };
 
+struct fdtable {
+  int start; // First fd number of this table
+  int size;  // Current table size expressed in number of bits
+  struct file *files;
+  uint64_t *open_fds;
+  uint64_t *cloexec_fds;
+};
+
+typedef pthread_rwlock_t fdtable_lock_t;
+
+struct fileinfo {
+  int rootfd;                      // FS root
+  struct fdtable fdtable;          // File descriptors for the user space
+  struct fdtable vkern_fdtable;    // File descriptors for the kernel space
+  fdtable_lock_t fdtable_lock;     // Lock to prevent kernel fds from being visible from the user space
+};
+
 struct proc {
   int nr_tasks;
   struct list_head tasks;
@@ -86,6 +105,7 @@ struct proc {
     pthread_rwlock_t sig_lock;
     l_sigaction_t sigaction[LINUX_NSIG];
   };
+  struct fileinfo fileinfo;
 };
 
 extern struct proc proc;
@@ -93,6 +113,7 @@ _Thread_local extern struct task task;
 
 void init_signal(void);
 void reset_signal_state(void);
+void init_fileinfo(struct fileinfo *fileinfo, int rootfd);
 
 void init_fpu(void);
 

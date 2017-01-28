@@ -89,7 +89,7 @@ DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int
     if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
       lflags |= LINUX_O_NOFOLLOW | LINUX_O_PATH;
     }
-    fd = do_openat(dirfd, name, lflags, 0);
+    fd = vkern_openat(dirfd, name, lflags, 0);
     if (fd < 0)
       return fd;
   }
