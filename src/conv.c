@@ -544,7 +544,7 @@ linux_to_darwin_sigaction(l_sigaction_t *lsa, struct sigaction *dsa, void *handl
     dsa->sa_flags |= SA_NODEFER;
 }
 
-  void
+void
 darwin_to_linux_sigaction(struct sigaction *dsa, l_sigaction_t *lsa, gaddr_t handler)
 {
 
