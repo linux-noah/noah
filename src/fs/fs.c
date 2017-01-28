@@ -962,7 +962,7 @@ static inline void
 set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
 {
   int idx_table = (fd - table->start) / sizeof(uint64_t);
-  int idx_bit = fd - idx_table * sizeof(uint64_t);
+  int idx_bit = (fd - table->start) - idx_table * sizeof(uint64_t);
   fdbits[idx_table] |= (1 << (idx_bit));
 }
 
