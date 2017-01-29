@@ -368,7 +368,7 @@ init_fpu()
   vmm_write_fpstate(&fx, sizeof fx);
 }
 
-void
+static void
 init_vkernel()
 {
   init_mm(&vkern_mm);
@@ -384,15 +384,18 @@ init_vkernel()
 }
 
 static void
-default_mnt(char *path)
+init_first_proc(int rootfd)
 {
-  uint32_t bufsize;
-  _NSGetExecutablePath(NULL, &bufsize);
-  char abs_self[bufsize];
-  _NSGetExecutablePath(abs_self, &bufsize);
-  realpath(abs_self, path);
-  char *dir = dirname(path);
-  sprintf(path, "%s/../mnt", dir);
+  proc = (struct proc) {
+    .nr_tasks = 1,
+    .lock = PTHREAD_RWLOCK_INITIALIZER,
+    .mm = malloc(sizeof(struct mm)),
+    .root = rootfd,
+  };
+  INIT_LIST_HEAD(&proc.tasks);
+  list_add(&task.tasks, &proc.tasks);
+  init_mm(proc.mm);
+  init_signal();
 }
 
 void
@@ -476,15 +479,12 @@ main(int argc, char *argv[], char **envp)
   vmm_create();
   init_vkernel();
 
-  if (root[0] == 0) {
-    default_mnt(root);
-  }
   int rootfd = open(root, O_RDONLY | O_DIRECTORY);
   if (rootfd < 0) {
     perror("could not open initial root directory");
     exit(1);
   }
-  set_initial_proc(&proc, rootfd);
+  init_first_proc(rootfd);
 
   int err;
   if ((err = do_exec(argv[0], argc, argv, envp)) < 0) {

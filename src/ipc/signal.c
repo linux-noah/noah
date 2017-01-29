@@ -32,7 +32,7 @@ send_signal(pid_t pid, int signum)
 }
 
 void
-init_signal(struct proc *proc)
+init_signal(void)
 {
 #ifndef ATOMIC_INT_LOCK_FREE // Workaround of the incorrect atomic macro name bug of Clang
 #define __GCC_ATOMIC_INT_T_LOCK_FREE __GCC_ATOMIC_INT_LOCK_FREE
@@ -48,21 +48,21 @@ init_signal(struct proc *proc)
     }
     assert(oact.sa_handler == SIG_IGN || oact.sa_handler == SIG_DFL);
     // flags, restorer, and mask will be flushed in execve, so just leave them 0
-    proc->sighand.sigaction[i] = (l_sigaction_t) {
+    proc.sighand.sigaction[i] = (l_sigaction_t) {
       .lsa_handler = (gaddr_t) oact.sa_handler,
       .lsa_flags = 0,
       .lsa_restorer= 0,
       .lsa_mask = {0}
     };
   }
-  assert(proc->nr_tasks == 1);
-  struct task *t = list_entry(proc->tasks.next, struct task, tasks);
+  assert(proc.nr_tasks == 1);
+  struct task *t = list_entry(proc.tasks.next, struct task, tasks);
   sigset_t set;
   sigprocmask(0, NULL, &set);
   darwin_to_linux_sigset(&set, &t->sigmask);
   sigbits_emptyset(&t->sigpending);
   sigpending(&set);
-  sigset_to_sigbits(&proc->sigpending, &set);
+  sigset_to_sigbits(&proc.sigpending, &set);
 }
 
 static void
@@ -76,20 +76,20 @@ reset_sas()
 }
 
 void
-flush_signal(struct proc *proc)
+flush_signal()
 {
   for (int i = 0; i < NSIG; i++) {
-    if (proc->sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_DFL || proc->sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_IGN) {
+    if (proc.sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_DFL || proc.sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_IGN) {
       continue;
     }
-    proc->sighand.sigaction[i] = (l_sigaction_t) {
+    proc.sighand.sigaction[i] = (l_sigaction_t) {
       .lsa_handler = (l_handler_t) SIG_DFL,
       .lsa_flags = 0,
       .lsa_restorer= 0,
       .lsa_mask = {0}
     };
     struct sigaction dact;
-    linux_to_darwin_sigaction(&proc->sighand.sigaction[i], &dact, SIG_DFL);
+    linux_to_darwin_sigaction(&proc.sighand.sigaction[i], &dact, SIG_DFL);
     sigaction(i + 1, &dact, NULL);
   }
   reset_sas();

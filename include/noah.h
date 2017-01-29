@@ -93,11 +93,10 @@ struct proc {
 extern struct proc proc;
 _Thread_local extern struct task task;
 
-void set_initial_proc(struct proc *proc, int rootfd);
-void init_signal(struct proc *);
-void flush_signal(struct proc *proc);
+void init_signal(void);
+void flush_signal(void);
 
-void init_fpu();
+void init_fpu(void);
 
 /* Linux kernel constants */
 
