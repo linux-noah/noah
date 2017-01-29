@@ -84,14 +84,12 @@ struct file_operations {
 
 static inline bool fd_ok(int fd);
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
-void alloc_fd(int fd, bool is_cloexec);
 
 void
 init_fileinfo(struct fileinfo *fileinfo, int rootfd)
 {
   struct rlimit limit;
   
-  fileinfo->rootfd = rootfd;
   pthread_rwlock_init(&fileinfo->fdtable_lock, NULL);
   getrlimit(RLIMIT_NOFILE, &limit);
   fileinfo->vkern_fdtable = (struct fdtable) {
@@ -114,18 +112,22 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
   fileinfo->fdtable.cloexec_fds[0] = 0;
   
   for (int i = 0; i < (int) limit.rlim_cur; i++) {
+    if (i == rootfd) {
+      continue;
+    }
     int flag = fcntl(i, F_GETFD);
     if (flag < 0) {
       continue;
     }
     if (fd_ok(i)) {
-      alloc_fd(i, flag & FD_CLOEXEC);
+      register_fd(i, flag & FD_CLOEXEC);
     } else {
       warnk("closing a file whose fd overlaps with vkern_fdtable, fd: %d\n", i);
       fprintf(stderr, "Noah uses high file descriptor numbers as the system file descriptors. fd[%d] is closed because it overlaps with the system area.\n", i);
       close(i);
     }
   }
+  fileinfo->rootfd = vkern_dup_fd(rootfd, false);
 }
 
 int
@@ -459,7 +461,7 @@ alloc_file(struct fdtable *table, int fd)
 }
 
 void
-alloc_fd(int fd, bool is_cloexec)
+register_fd(int fd, bool is_cloexec)
 {
   struct fdtable *fdtable = &proc.fileinfo.fdtable;
   if (proc.fileinfo.fdtable.size <= fd) {
@@ -481,6 +483,25 @@ alloc_fd(int fd, bool is_cloexec)
     clear_fdbit(fdtable, fdtable->cloexec_fds, fd);
   }
   alloc_file(fdtable, fd);
+}
+
+// The caller must lock lock fdtable properly if necessary
+int
+vkern_dup_fd(int fd, bool is_cloexec)
+{
+  int vkern_fd = find_emptyfd(&proc.fileinfo.vkern_fdtable);
+  if (vkern_fd == -1) {
+    panic("Too many files opened in the kernel space");
+  }
+  dup2(fd, vkern_fd); // FIXME flags
+  set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
+  if (is_cloexec) {
+    set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);
+  } else {
+    clear_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);
+  }
+  alloc_file(&proc.fileinfo.vkern_fdtable, vkern_fd);
+  return vkern_fd;
 }
 
 struct file *
@@ -871,12 +892,12 @@ resolve_path(const struct dir *parent, const char *name, int flags, struct path 
   /* resolve mountpoints */
   if (*name == '/') {
     if (name[1] == '\0') {
-      dir.fd = proc.root;
+      dir.fd = proc.fileinfo.rootfd;
       strcpy(path->subpath, ".");
       goto out;
     }
     if (strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1) && strncmp(name, "/tmp", sizeof "/tmp" - 1)) {
-      dir.fd = proc.root;
+      dir.fd = proc.fileinfo.rootfd;
       name++;
     }
   }
@@ -991,18 +1012,8 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
     ret = fd;
     goto out;
   }
-  int vkern_fd = find_emptyfd(&proc.fileinfo.vkern_fdtable);
-  if (vkern_fd == -1) {
-    panic("Too many files opened in the kernel space");
-  }
-  dup2(fd, vkern_fd); // FIXME flags
+  ret = vkern_dup_fd(fd, flags & LINUX_O_CLOEXEC);
   close(fd);
-  set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
-  if (flags & LINUX_O_CLOEXEC) {
-    set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);
-  }
-  alloc_file(&proc.fileinfo.vkern_fdtable, vkern_fd);
-  ret = vkern_fd;
   
 out:
   fdtable_unlock(&proc.fileinfo.fdtable_lock);
@@ -1024,7 +1035,7 @@ user_openat(int atdirfd, const char *name, int flags, int mode)
   if (fd < 0) {
     goto out;
   }
-  alloc_fd(fd, flags & LINUX_O_CLOEXEC);
+  register_fd(fd, flags & LINUX_O_CLOEXEC);
 
 out:
   fdtable_unlock(&proc.fileinfo.fdtable_lock);
@@ -1482,8 +1493,8 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
   if (copy_to_user(fildes_ptr, fd, sizeof fd)) {
     return -LINUX_EFAULT;
   }
-  alloc_fd(fd[0], false);
-  alloc_fd(fd[1], false);
+  register_fd(fd[0], false);
+  register_fd(fd[1], false);
   return 0;
 }
 
@@ -1528,8 +1539,8 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
   if (copy_to_user(fildes_ptr, fildes, sizeof(fildes))) {
     return -LINUX_EFAULT;
   }
-  alloc_fd(fildes[0], flags & LINUX_O_CLOEXEC);
-  alloc_fd(fildes[1], flags & LINUX_O_CLOEXEC);
+  register_fd(fildes[0], flags & LINUX_O_CLOEXEC);
+  register_fd(fildes[1], flags & LINUX_O_CLOEXEC);
 
   return 0;
 
@@ -1545,7 +1556,7 @@ DEFINE_SYSCALL(dup, unsigned int, fd)
   if (dup_fd < 0) {
     return dup_fd;
   }
-  alloc_fd(dup_fd, false);
+  register_fd(dup_fd, false);
   return dup_fd;
 }
 
@@ -1558,7 +1569,7 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
   if (dup_fd < 0) {
     return dup_fd;
   }
-  alloc_fd(dup_fd, false);
+  register_fd(dup_fd, false);
   return dup_fd;
 }
 
@@ -1584,7 +1595,7 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
       return fcntl_err;
     }
   }
-  alloc_fd(dup_fd, flags & LINUX_O_CLOEXEC);
+  register_fd(dup_fd, flags & LINUX_O_CLOEXEC);
 
   return dup_fd;
 }

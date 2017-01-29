@@ -12,6 +12,8 @@
 
 #include "noah.h"
 #include "vmm.h"
+#include "linux/time.h"
+#include "linux/fs.h"
 
 static FILE *printk_sink, *warnk_sink;
 pthread_mutex_t printk_sync = PTHREAD_MUTEX_INITIALIZER;
@@ -23,7 +25,9 @@ init_sink(const char *fn, FILE **sinkp, const char *name)
   if (! fn) {
     fn = "/dev/null";
   }
-  *sinkp = fopen(fn, "w");
+  int fd = open(fn, O_RDWR | O_CREAT, 0644);
+  *sinkp = fdopen(vkern_dup_fd(fd, false), "w");
+  close(fd);
 
   char buf[1000];
   time_t now = time(0);

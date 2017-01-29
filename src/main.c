@@ -438,26 +438,29 @@ main(int argc, char *argv[], char **envp)
 {
   drop_privilege();
 
-  static struct option long_options[] = {
-    { "output", required_argument, NULL, 'o' },
-    { "strace", required_argument, NULL, 's' },
+  char root[PATH_MAX] = {};
+
+  int c;
+  enum {PRINTK_PATH, WARNK_PATH, STRACE_PATH, MAX_DEBUG_PATH};
+  char debug_paths[3][PATH_MAX] = {};
+  struct option long_options[] = {
+    { "output", required_argument, NULL, 'o'},
+    { "strace", required_argument, NULL, 's'},
+    { "warning", required_argument, NULL, 'w'},
     { "mnt", required_argument, NULL, 'm' },
     { 0, 0, 0, 0 }
   };
-  int c, option_index = 0;
 
-  char root[PATH_MAX] = {0};
-
-  while ((c = getopt_long(argc, argv, "+o:w:s:m:", long_options, &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "+o:w:s:m:", long_options, NULL)) != -1) {
     switch (c) {
     case 'o':
-      init_printk(optarg);
+      strncpy(debug_paths[PRINTK_PATH], optarg, PATH_MAX);
       break;
     case 'w':
-      init_warnk(optarg);
+      strncpy(debug_paths[WARNK_PATH], optarg, PATH_MAX);
       break;
     case 's':
-      init_meta_strace(optarg);
+      strncpy(debug_paths[STRACE_PATH], optarg, PATH_MAX);
       break;
     case 'm':
       if (realpath(optarg, root) == NULL) {
@@ -484,6 +487,18 @@ main(int argc, char *argv[], char **envp)
     exit(1);
   }
   init_first_proc(rootfd);
+  close(rootfd);
+  
+  for (int i = PRINTK_PATH; i < MAX_DEBUG_PATH; i++) {
+    static void (* init_funcs[3])(const char *path) = {
+      [PRINTK_PATH] = init_printk,
+      [STRACE_PATH] = init_meta_strace,
+      [WARNK_PATH]  = init_warnk
+    };
+    if (debug_paths[i][0] != '\0') {
+      init_funcs[i](debug_paths[i]);
+    }
+  }
 
   int err;
   if ((err = do_exec(argv[0], argc, argv, envp)) < 0) {
