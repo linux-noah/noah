@@ -171,7 +171,7 @@ to_host_sockopt_name(int name)
   case LINUX_SO_ACCEPTCONN:
     return SO_ACCEPTCONN;
   default:
-    printk("Unsupported sockopt name: 0x%x\n", name);
+    warnk("Unsupported sockopt name: 0x%x\n", name);
     return -1;
   }
 }
@@ -257,7 +257,7 @@ linux_to_darwin_msg_flags(l_int flags)
   }
 
   if (flags) {
-    printk("unsupported msg_flags: 0x%x", flags);
+    warnk("unsupported msg_flags: 0x%x", flags);
     return -LINUX_EOPNOTSUPP;
   }
 
