@@ -104,7 +104,6 @@ struct proc {
   struct list_head tasks;
   pthread_rwlock_t lock;
   struct mm *mm;
-  int root;                     /* FS root */
   struct {
     pthread_rwlock_t sig_lock;
     l_sigaction_t sigaction[LINUX_NSIG];

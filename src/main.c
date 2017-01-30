@@ -389,7 +389,6 @@ init_first_proc(int rootfd)
     .nr_tasks = 1,
     .lock = PTHREAD_RWLOCK_INITIALIZER,
     .mm = malloc(sizeof(struct mm)),
-    .root = rootfd,
   };
   INIT_LIST_HEAD(&proc.tasks);
   list_add(&task.tasks, &proc.tasks);
