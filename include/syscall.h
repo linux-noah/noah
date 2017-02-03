@@ -240,7 +240,7 @@
   SYSCALL(236, vserver)                         \
   SYSCALL(237, unimplemented)                   \
   SYSCALL(238, unimplemented)                   \
-  SYSCALL(239, unimplemented)                   \
+  SYSCALL(239, get_mempolicy)                   \
   SYSCALL(240, unimplemented)                   \
   SYSCALL(241, unimplemented)                   \
   SYSCALL(242, unimplemented)                   \

@@ -297,3 +297,22 @@ out:
 
   return ret;
 }
+
+DEFINE_SYSCALL(get_mempolicy, gaddr_t, policy, gaddr_t, nmask, unsigned long, maxnode, unsigned long, addr, unsigned long, flags)
+{
+  maxnode = roundup(maxnode, sizeof(unsigned long));
+  if (flags != 0) {
+    printk("get_mempolicy: unsupported flags: 0x%lx\n", flags);
+    return -LINUX_ENOSYS;
+  }
+  assert(addr == 0);
+  int policy_val = LINUX_MPOL_DEFAULT;
+  if (copy_to_user(policy, &policy_val, sizeof policy_val))
+    return -LINUX_EFAULT;
+  size_t size = maxnode / 64;
+  unsigned long mask[size];
+  memset(mask, 0, sizeof mask);
+  if (copy_to_user(nmask, mask, sizeof mask))
+    return -LINUX_EFAULT;
+  return 0;
+}

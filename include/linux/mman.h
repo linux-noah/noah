@@ -26,4 +26,20 @@
 #define LINUX_MREMAP_MAYMOVE	1
 #define LINUX_MREMAP_FIXED	2
 
+/* NUMA policies & flags */
+
+#define LINUX_MPOL_DEFAULT    0
+#define LINUX_MPOL_PREFERRED  1
+#define LINUX_MPOL_BIND       2
+#define LINUX_MPOL_INTERLEAVE 3
+
+#define LINUX_MPOL_F_NODE         1
+#define LINUX_MPOL_F_ADDR         2
+#define LINUX_MPOL_F_MEMS_ALLOWED 4
+
+#define LINUX_MPOL_MF_STRICT   1
+#define LINUX_MPOL_MF_MOVE     2
+#define LINUX_MPOL_MF_MOVE_ALL 4
+#define LINUX_MPOL_MF_INTERNAL 8
+
 #endif
