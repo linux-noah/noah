@@ -15,3 +15,4 @@ void dump_instr(void);
 void meta_strace_pre(int syscall_num, char *syscall_name, ...);
 void meta_strace_post(int syscall_num, char *syscall_name, uint64_t ret, ...);
 void meta_strace_sigdeliver(int signum);
+void meta_strace_info(const char *fmt, ...) __attribute__((format(printf, 1, 2)));

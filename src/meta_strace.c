@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 #include "common.h"
 #include "syscall.h"
@@ -111,6 +112,21 @@ do_meta_strace(int syscall_num, char *syscall_name, meta_strace_hook def, meta_s
   } else {
     def(syscall_num, argc, argnames, typenames, vals, ret);
   }
+}
+
+void
+meta_strace_info(const char *fmt, ...)
+{
+  va_list ap;
+  va_start(ap, fmt);
+  char *mes;
+
+  vasprintf(&mes, fmt, ap);
+
+  fprintf(strace_sink, "INFO: %s", mes);
+
+  free(mes);
+  va_end(ap);
 }
 
 /*
