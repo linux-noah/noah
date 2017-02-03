@@ -24,7 +24,7 @@
 #include "linux/time.h"
 #include "linux/fs.h"
 
-void init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base);
+void init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t global_offset, uint64_t interp_base);
 
 int
 load_elf_interp(const char *path, ulong load_addr)
@@ -142,7 +142,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     copy_to_user(vaddr + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
     if (! load_base_set) {
-      load_base = p_vaddr - p[i].p_offset;
+      load_base = p[i].p_vaddr - p[i].p_offset + global_offset;
       load_base_set = true;
     }
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
@@ -168,11 +168,11 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     }
   }
   else {
-    vmm_write_vmcs(VMCS_GUEST_RIP, ehdr->e_entry);
+    vmm_write_vmcs(VMCS_GUEST_RIP, ehdr->e_entry + global_offset);
     proc.mm->start_brk = map_top;
   }
 
-  init_userstack(argc, argv, envp, load_base, ehdr, interp ? map_top : 0);
+  init_userstack(argc, argv, envp, load_base, ehdr, global_offset, interp ? map_top : 0);
 
   return 1;
 }
@@ -248,7 +248,7 @@ push(const void *data, size_t n)
 }
 
 void
-init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t interp_base)
+init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf64_Ehdr *ehdr, uint64_t global_offset, uint64_t interp_base)
 {
   static const uint64_t zero = 0;
 
@@ -295,7 +295,7 @@ init_userstack(int argc, char *argv[], char **envp, uint64_t exe_base, const Elf
 
   Elf64_Auxv aux[] = {
     { AT_BASE, interp_base },
-    { AT_ENTRY, ehdr->e_entry },
+    { AT_ENTRY, ehdr->e_entry + global_offset },
     { AT_PHDR, exe_base + ehdr->e_phoff },
     { AT_PHENT, ehdr->e_phentsize },
     { AT_PHNUM, ehdr->e_phnum },
