@@ -214,6 +214,8 @@ split_region(struct mm *mm, struct mm_region *region, gaddr_t gaddr)
 struct mm_region*
 record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, int mm_flags, int mm_fd, int pgoff)
 {
+  assert(gaddr != 0);
+
   struct mm_region *region = malloc(sizeof *region);
   *region = (struct mm_region) {
     .haddr = haddr,

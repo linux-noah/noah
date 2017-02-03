@@ -76,6 +76,7 @@ load_elf_interp(const char *path, ulong load_addr)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
+    assert(vaddr != 0);
     do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     copy_to_user(vaddr + offset, data + p[i].p_offset, p[i].p_filesz);
@@ -112,14 +113,22 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
   uint64_t load_base = 0;
   bool load_base_set = false;
 
+  ulong global_offset = 0;
+  if (ehdr->e_type == ET_DYN) {
+    /* NB: Program headers in elf files of ET_DYN can have 0 as their own p_vaddr. */
+    global_offset = 0x400000;   /* default base address */
+  }
+
   for (int i = 0; i < ehdr->e_phnum; i++) {
     if (p[i].p_type != PT_LOAD) {
       continue;
     }
 
+    ulong p_vaddr = p[i].p_vaddr + global_offset;
+
     ulong mask = PAGE_SIZE(PAGE_4KB) - 1;
-    ulong vaddr = p[i].p_vaddr & ~mask;
-    ulong offset = p[i].p_vaddr & mask;
+    ulong vaddr = p_vaddr & ~mask;
+    ulong offset = p_vaddr & mask;
     ulong size = roundup(p[i].p_memsz + offset, PAGE_SIZE(PAGE_4KB));
 
     int prot = 0;
@@ -127,12 +136,13 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     if (p[i].p_flags & PF_W) prot |= LINUX_PROT_WRITE;
     if (p[i].p_flags & PF_R) prot |= LINUX_PROT_READ;
 
+    assert(vaddr != 0);
     do_mmap(vaddr, size, PROT_READ | PROT_WRITE, prot, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
 
     copy_to_user(vaddr + offset, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
 
     if (! load_base_set) {
-      load_base = p[i].p_vaddr - p[i].p_offset;
+      load_base = p_vaddr - p[i].p_offset;
       load_base_set = true;
     }
     map_top = MAX(map_top, roundup(vaddr + size, PAGE_SIZE(PAGE_4KB)));
