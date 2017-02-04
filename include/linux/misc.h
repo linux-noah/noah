@@ -174,4 +174,11 @@ struct l_sysinfo {
   char			_f[20-2*sizeof(l_long)-sizeof(l_int)];	/* padding */
 };
 
+#define	LINUX_WNOHANG		0x00000001
+#define	LINUX_WUNTRACED		0x00000002
+#define	LINUX_WSTOPPED		LINUX_WUNTRACED
+#define	LINUX_WEXITED		0x00000004
+#define	LINUX_WCONTINUED	0x00000008
+#define	LINUX_WNOWAIT		0x01000000
+
 #endif /* !_AMD64_LINUX_H_ */

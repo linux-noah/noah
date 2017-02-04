@@ -317,12 +317,29 @@ DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
   return 0;
 }
 
+int linux_to_darwin_waitopts(int options)
+{
+  int opts = 0;
+  if (options & LINUX_WNOHANG) {
+    opts |= WNOHANG;
+    options &= ~LINUX_WNOHANG;
+  }
+  if (options & LINUX_WUNTRACED) {
+    opts |= WUNTRACED;
+    options &= ~LINUX_WUNTRACED;
+  }
+  if (options != 0) {
+    warnk("unknown options given to wait4: 0x%x\n", options);
+  }
+  return opts;
+}
+
 DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusage_ptr)
 {
   int status;
   struct rusage rusage;
 
-  int ret = syswrap(wait4(pid, &status, options, &rusage));
+  int ret = syswrap(wait4(pid, &status, linux_to_darwin_waitopts(options), &rusage));
   if (ret < 0) {
     return ret;
   }
@@ -333,8 +350,26 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusa
     }
   }
 
-  if (copy_to_user(status_ptr, &status, sizeof status)) {
-    return -LINUX_EFAULT;
+  if (status_ptr != 0) {
+    /*
+     *  SSSS SSSS -000 0000 -> exited. S is return status
+     *  .... .... CYYY YYYY -> signaled if Y != 0. Y is the signal number
+     *  SSSS SSSS 0111 1111 -> stopped. S is the sigal number
+     */
+    int st = 0;
+    if (WIFEXITED(status)) {
+      st = WEXITSTATUS(status) << 8;
+    } else if (WIFSIGNALED(status)) {
+      st = darwin_to_linux_signum(WTERMSIG(status));
+      if (WCOREDUMP(status))
+        st |= 0x80;
+    } else if (WIFSTOPPED(status)) {
+      st = (darwin_to_linux_signum(WSTOPSIG(status)) << 8) | 0x7f;
+    }
+    warnk("wait4 status %d -> %d\n", status, st);
+    if (copy_to_user(status_ptr, &st, sizeof st)) {
+      return -LINUX_EFAULT;
+    }
   }
 
   return ret;
