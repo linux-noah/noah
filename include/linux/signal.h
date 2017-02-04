@@ -131,6 +131,10 @@ typedef struct {
   l_sigset_t	lsa_mask;
 } l_sigaction_t;
 
+#define LINUX_SIG_DFL ((l_handler_t)0)
+#define LINUX_SIG_IGN ((l_handler_t)1)
+#define LINUX_SIG_ERR ((l_handler_t)-1)
+
 void linux_to_darwin_sigaction(l_sigaction_t *, struct sigaction *, void *);
 void darwin_to_linux_sigaction(struct sigaction *, l_sigaction_t *, gaddr_t);
 

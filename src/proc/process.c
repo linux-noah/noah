@@ -360,13 +360,12 @@ DEFINE_SYSCALL(wait4, int, pid, gaddr_t, status_ptr, int, options, gaddr_t, rusa
     if (WIFEXITED(status)) {
       st = WEXITSTATUS(status) << 8;
     } else if (WIFSIGNALED(status)) {
-      st = darwin_to_linux_signum(WTERMSIG(status));
+      st = darwin_to_linux_signal(WTERMSIG(status));
       if (WCOREDUMP(status))
         st |= 0x80;
     } else if (WIFSTOPPED(status)) {
-      st = (darwin_to_linux_signum(WSTOPSIG(status)) << 8) | 0x7f;
+      st = (darwin_to_linux_signal(WSTOPSIG(status)) << 8) | 0x7f;
     }
-    warnk("wait4 status %d -> %d\n", status, st);
     if (copy_to_user(status_ptr, &st, sizeof st)) {
       return -LINUX_EFAULT;
     }

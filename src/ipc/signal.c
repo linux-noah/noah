@@ -13,16 +13,15 @@
 #include <pthread.h>
 
 static void
-set_sigpending(int signum, siginfo_t *info, ucontext_t *context)
+__host_signal_handler(int signum, siginfo_t *info, ucontext_t *context)
 {
-  int l_signum = darwin_to_linux_signal(signum);
-  sigbits_addbit(&task.sigpending, l_signum);
+  /* actually no need to do it atomically */
+  sigbits_addbit(&task.sigpending, darwin_to_linux_signal(signum));
 }
 
 int
 send_signal(pid_t pid, int signum)
 {
-  // Currently, just kill it to them
   if (signum >= LINUX_SIGRTMIN) {
     warnk("RT signal is raised: %d\n", signum);
     return 0;
@@ -31,6 +30,7 @@ send_signal(pid_t pid, int signum)
   return syswrap(kill(pid, dsignum));
 }
 
+/* called only once at the boot time */
 void
 init_signal(void)
 {
@@ -40,6 +40,7 @@ init_signal(void)
 #endif
   static_assert(ATOMIC_INT_LOCK_FREE == 2, "The compiler must support lock-free atomic int");
 
+  /* import signal handlers registered on the host */
   for (int i = 0; i < NSIG; i++) {
     struct sigaction oact;
     sigaction(i + 1, NULL, &oact);
@@ -48,19 +49,18 @@ init_signal(void)
     }
     assert(oact.sa_handler == SIG_IGN || oact.sa_handler == SIG_DFL);
     // flags, restorer, and mask will be flushed in execve, so just leave them 0
-    proc.sighand.sigaction[i] = (l_sigaction_t) {
-      .lsa_handler = (gaddr_t) oact.sa_handler,
+    proc.sigaction[i] = (l_sigaction_t) {
+      .lsa_handler = oact.sa_handler == SIG_IGN ? LINUX_SIG_IGN : LINUX_SIG_DFL,
       .lsa_flags = 0,
       .lsa_restorer= 0,
       .lsa_mask = {0}
     };
   }
   assert(proc.nr_tasks == 1);
-  struct task *t = list_entry(proc.tasks.next, struct task, tasks);
   sigset_t set;
   sigprocmask(0, NULL, &set);
-  darwin_to_linux_sigset(&set, &t->sigmask);
-  sigbits_emptyset(&t->sigpending);
+  darwin_to_linux_sigset(&set, &task.sigmask);
+  sigbits_emptyset(&task.sigpending);
   sigpending(&set);
   sigset_to_sigbits(&proc.sigpending, &set);
 }
@@ -76,20 +76,20 @@ reset_sas()
 }
 
 void
-flush_signal()
+reset_signal_state()
 {
   for (int i = 0; i < NSIG; i++) {
-    if (proc.sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_DFL || proc.sighand.sigaction[i].lsa_handler == (l_handler_t) SIG_IGN) {
+    if (proc.sigaction[i].lsa_handler == LINUX_SIG_DFL || proc.sigaction[i].lsa_handler == LINUX_SIG_IGN) {
       continue;
     }
-    proc.sighand.sigaction[i] = (l_sigaction_t) {
-      .lsa_handler = (l_handler_t) SIG_DFL,
+    proc.sigaction[i] = (l_sigaction_t) {
+      .lsa_handler = LINUX_SIG_DFL,
       .lsa_flags = 0,
       .lsa_restorer= 0,
       .lsa_mask = {0}
     };
     struct sigaction dact;
-    linux_to_darwin_sigaction(&proc.sighand.sigaction[i], &dact, SIG_DFL);
+    linux_to_darwin_sigaction(&proc.sigaction[i], &dact, SIG_DFL);
     sigaction(i + 1, &dact, NULL);
   }
   reset_sas();
@@ -238,13 +238,13 @@ setup_sigframe(int signum)
 
   uint64_t rsp;
   vmm_read_register(HV_X86_RSP, &rsp);
-  if ((proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_ONSTACK) && (sas_ss_flags(rsp) & ~LINUX_SS_AUTODISARM) == 0) {
+  if ((proc.sigaction[signum - 1].lsa_flags & LINUX_SA_ONSTACK) && (sas_ss_flags(rsp) & ~LINUX_SS_AUTODISARM) == 0) {
     rsp = task.sas.ss_sp + task.sas.ss_size;
   }
 
   /* Setup sigframe */
-  if (proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
-    frame.sf_pretcode = (gaddr_t) proc.sighand.sigaction[signum - 1].lsa_restorer;
+  if (proc.sigaction[signum - 1].lsa_flags & LINUX_SA_RESTORER) {
+    frame.sf_pretcode = (gaddr_t) proc.sigaction[signum - 1].lsa_restorer;
   } else {
     // x86_64 should always use SA_RESTORER
     return -LINUX_EFAULT;
@@ -264,8 +264,8 @@ setup_sigframe(int signum)
 
   sigset_t dset;
   frame.sf_sc.uc_mcontext.sc_mask = task.sigmask;
-  l_sigset_t newmask = proc.sighand.sigaction[signum - 1].lsa_mask;
-  if (!(proc.sighand.sigaction[signum - 1].lsa_flags & LINUX_SA_NOMASK)) {
+  l_sigset_t newmask = proc.sigaction[signum - 1].lsa_mask;
+  if (!(proc.sigaction[signum - 1].lsa_flags & LINUX_SA_NOMASK)) {
     LINUX_SIGADDSET(&newmask, signum);
   }
   task.sigmask = newmask;
@@ -285,7 +285,7 @@ setup_sigframe(int signum)
   vmm_write_register(HV_X86_RDX, rsp + offsetof(struct l_rt_sigframe, sf_sc));
 
   vmm_write_register(HV_X86_RAX, 0);
-  vmm_write_register(HV_X86_RIP, proc.sighand.sigaction[signum - 1].lsa_handler);
+  vmm_write_register(HV_X86_RIP, proc.sigaction[signum - 1].lsa_handler);
 
   return 0;
 }
@@ -293,25 +293,25 @@ setup_sigframe(int signum)
 static void
 wake_sighandler()
 {
-  pthread_rwlock_rdlock(&proc.sighand.lock);
+  pthread_rwlock_rdlock(&proc.sig_lock);
 
   int sig;
   while ((sig = fetch_sig_to_deliver()) != 0) {
 
     meta_strace_sigdeliver(sig);
-    switch (proc.sighand.sigaction[sig - 1].lsa_handler) {
-      case (l_handler_t) SIG_DFL:
+    switch (proc.sigaction[sig - 1].lsa_handler) {
+      case LINUX_SIG_DFL:
         warnk("Handling default signal in Noah is not implemented yet\n");
         /* fall through */
-      case (l_handler_t) SIG_IGN:
+      case LINUX_SIG_IGN:
         continue;
 
       default:
         if (setup_sigframe(sig) < 0) {
           die_with_forcedsig(LINUX_SIGSEGV);
         }
-        if (proc.sighand.sigaction[sig - 1].lsa_flags & LINUX_SA_ONESHOT) {
-          proc.sighand.sigaction[sig - 1].lsa_handler = (l_handler_t) SIG_DFL;
+        if (proc.sigaction[sig - 1].lsa_flags & LINUX_SA_ONESHOT) {
+          proc.sigaction[sig - 1].lsa_handler = LINUX_SIG_DFL;
           // Host signal handler must be set to SIG_DFL already by Darwin kernel
         }
         goto out;
@@ -319,7 +319,7 @@ wake_sighandler()
   }
 
 out:
-  pthread_rwlock_unlock(&proc.sighand.lock);
+  pthread_rwlock_unlock(&proc.sig_lock);
 }
 
 void
@@ -406,7 +406,7 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   int dsig;
 
   if (oact != 0) {
-    int n = copy_to_user(oact, &proc.sighand.sigaction[sig - 1], sizeof(l_sigaction_t));
+    int n = copy_to_user(oact, &proc.sigaction[sig - 1], sizeof(l_sigaction_t));
     if (n > 0)
       return -LINUX_EFAULT;
   }
@@ -424,25 +424,25 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
   }
 
   void *handler;
-  if ((void *) lact.lsa_handler == SIG_DFL || (void *) lact.lsa_handler == SIG_IGN) {
-    handler = (void *) lact.lsa_handler;
+  if (lact.lsa_handler == LINUX_SIG_DFL || lact.lsa_handler == LINUX_SIG_IGN) {
+    handler = lact.lsa_handler == LINUX_SIG_DFL ? SIG_DFL : SIG_IGN;
   } else {
     lact.lsa_flags |= LINUX_SA_SIGINFO;
-    handler = set_sigpending;
+    handler = __host_signal_handler;
   }
   linux_to_darwin_sigaction(&lact, &dact, handler);
   dsig = linux_to_darwin_signal(sig);
   // TODO: make handlings of linux specific signals consistent
 
   int err = 0;
-  pthread_rwlock_wrlock(&proc.sighand.lock);
+  pthread_rwlock_wrlock(&proc.sig_lock);
   
   err = syswrap(sigaction(dsig, &dact, &doact));
   if (err >= 0) {
-    proc.sighand.sigaction[sig - 1] = lact;
+    proc.sigaction[sig - 1] = lact;
   }
 
-  pthread_rwlock_unlock(&proc.sighand.lock);
+  pthread_rwlock_unlock(&proc.sig_lock);
 
   return err;
 }
@@ -532,11 +532,11 @@ DEFINE_SYSCALL(rt_sigpending, gaddr_t, set, size_t, size)
   }
   int ret = 0;
 
-  pthread_rwlock_rdlock(&proc.sighand.lock);
+  pthread_rwlock_rdlock(&proc.sig_lock);
   if (copy_to_user(set, &task.sigpending, size) > 0) {
     ret = -LINUX_EFAULT;
   }
-  pthread_rwlock_unlock(&proc.sighand.lock);
+  pthread_rwlock_unlock(&proc.sig_lock);
 
   return ret;
 }

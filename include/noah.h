@@ -67,10 +67,6 @@ int send_signal(pid_t pid, int sig);
 
 /* task related data */
 
-struct sighand {
-  pthread_rwlock_t lock;
-  l_sigaction_t sigaction[LINUX_NSIG];
-};
 
 struct task {
   struct list_head tasks; /* Threads in the current proc */
@@ -87,14 +83,17 @@ struct proc {
   struct mm *mm;
   int root;                     /* FS root */
   atomic_sigbits_t sigpending;
-  struct sighand sighand;
+  struct {
+    pthread_rwlock_t sig_lock;
+    l_sigaction_t sigaction[LINUX_NSIG];
+  };
 };
 
 extern struct proc proc;
 _Thread_local extern struct task task;
 
 void init_signal(void);
-void flush_signal(void);
+void reset_signal_state(void);
 
 void init_fpu(void);
 

@@ -695,7 +695,7 @@ int
 darwinfs_unlinkat(struct fs *fs, struct dir *dir, const char *path, int l_flags)
 {
   int flags = linux_to_darwin_at_flags(l_flags);
-  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */\
+  /* You must treat E_ACCESS as E_REMOVEDIR in unlinkat */
   if (flags & AT_EACCESS) {
     flags &= ~AT_EACCESS;
     flags |= AT_REMOVEDIR;
@@ -1375,13 +1375,13 @@ DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t,
 
 DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, size_t, size)
 {
-  printk("getxattr is unimplemented\n");
+  warnk("getxattr is unimplemented\n");
   return -LINUX_ENOTSUP;
 }
 
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 {
-  printk("fadvise is unimplemented\n");
+  warnk("fadvise is unimplemented\n");
   return 0;
 }
 

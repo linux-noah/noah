@@ -370,7 +370,7 @@ prepare_newproc(void)
   destroy_mm(proc.mm); // munlock is also done by unmapping mm
   init_mm(proc.mm);
   init_reg_state();
-  flush_signal();
+  reset_signal_state();
   // TODO: destroy LDT if it is implemented
 
   task.clear_child_tid = task.set_child_tid = 0;
