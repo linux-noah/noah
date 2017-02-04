@@ -30,6 +30,12 @@ send_signal(pid_t pid, int signum)
   return syswrap(kill(pid, dsignum));
 }
 
+bool
+has_sigpending()
+{
+  return task.sigpending & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
+}
+
 /* called only once at the boot time */
 void
 init_signal(void)
@@ -41,7 +47,7 @@ init_signal(void)
   static_assert(ATOMIC_INT_LOCK_FREE == 2, "The compiler must support lock-free atomic int");
 
   /* import signal handlers registered on the host */
-  for (int i = 0; i < NSIG; i++) {
+  for (int i = 0; i < LINUX_NSIG; i++) {
     struct sigaction oact;
     sigaction(i + 1, NULL, &oact);
     if (!(oact.sa_handler == SIG_IGN || oact.sa_handler == SIG_DFL)) {
@@ -95,54 +101,16 @@ reset_signal_state()
 }
 
 static inline int
-should_deliver(int sig)
+pop_signal()
 {
-  if (sig == 0) {
+  uint64_t pending = task.sigpending;
+  pending &= ~LINUX_SIGSET_TO_UI64(&task.sigmask);
+  if (pending == 0)
     return 0;
-  }
-  return (1 << (sig - 1)) & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
-}
-
-static inline int
-fetch_sig_from_sigbits(atomic_sigbits_t *sigbits)
-{
-  uint64_t bits, sig;
-
- retry:
-  sig = 1;
-  if ((bits = *sigbits) == 0) {
-    return 0;
-  }
-  assert(bits < (1UL << 32));
-
-  while (sig <= 32){
-    if (((bits >> (sig - 1)) & 1) && should_deliver(sig)) {
-      break;
-    }
-    sig++;
-  }
-  if (sig > 32) {
-    return 0;
-  }
-
-  if (!(sigbits_delbit(sigbits, sig) & (1 << (sig - 1)))) {
-    // any other thread among the process took this signal
-    goto retry;
-  }
-
+  int sig = __builtin_ffs(pending);
+  assert(0 < sig && sig < 32);
+  sigbits_delbit(&task.sigpending, sig);
   return sig;
-}
-
-static inline int
-fetch_sig_to_deliver()
-{
-  return fetch_sig_from_sigbits(&task.sigpending);
-}
-
-bool
-has_sigpending()
-{
-  return task.sigpending & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
 }
 
 static void
@@ -291,7 +259,7 @@ wake_sighandler()
   pthread_rwlock_rdlock(&proc.sig_lock);
 
   int sig;
-  while ((sig = fetch_sig_to_deliver()) != 0) {
+  while ((sig = pop_signal()) != 0) {
 
     meta_strace_sigdeliver(sig);
     switch (proc.sigaction[sig - 1].lsa_handler) {
