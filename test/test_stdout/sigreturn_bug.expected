@@ -1,0 +1,3 @@
+child pid
+sigchld arrived
+dead pid equals pid!

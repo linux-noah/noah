@@ -524,7 +524,9 @@ DEFINE_SYSCALL(rt_sigreturn)
   vmm_read_register(HV_X86_RIP, &rip);
   vmm_write_register(HV_X86_RIP, rip - 2); // Because syshandler add 2 when returning to guest
 
-  return 0;
+  uint64_t ret;
+  vmm_read_register(HV_X86_RAX, &ret);
+  return ret;
 }
 
 DEFINE_SYSCALL(sigaltstack, gaddr_t, uss, gaddr_t, uoss)
