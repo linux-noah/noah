@@ -37,7 +37,7 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 }
 
 int
-to_host_sockaddr(struct sockaddr **sockaddr, struct l_sockaddr *l_sockaddr, size_t l_sockaddr_len)
+linux_to_darwin_sockaddr(struct sockaddr **sockaddr, const struct l_sockaddr *l_sockaddr, size_t l_sockaddr_len)
 {
   if (l_sockaddr == NULL) {
     return -1;
@@ -94,24 +94,25 @@ err:
 }
 
 void
-to_linux_sockaddr(struct l_sockaddr *l_sockaddr, struct sockaddr *sockaddr, socklen_t *l_sockaddr_len)
+darwin_to_linux_sockaddr(struct l_sockaddr *l_sockaddr, const struct sockaddr *sockaddr)
 {
-  if (sockaddr == NULL || l_sockaddr == NULL || *l_sockaddr_len < sizeof(struct sockaddr)) {
+  if (sockaddr == NULL || l_sockaddr == NULL) {
     return;
   }
-
-  if ((void*)l_sockaddr != (void*)sockaddr) {
-    memmove(l_sockaddr, sockaddr, MIN(*l_sockaddr_len, sockaddr->sa_len));
-  }
-
-  int family = sockaddr->sa_family;
-  l_sockaddr->sa_family = darwin_to_linux_sa_family(family);
+  assert((void*)l_sockaddr != (void*)sockaddr);
+  memcpy(l_sockaddr, sockaddr, sockaddr->sa_len);
+  l_sockaddr->sa_family = darwin_to_linux_sa_family(sockaddr->sa_family);
 }
 
-DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
+DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr_ptr, uint64_t, addrlen)
 {
+  char addr[addrlen];
+
+  if (copy_from_user(addr, addr_ptr, addrlen))
+    return -LINUX_EFAULT;
+
   struct sockaddr *sockaddr;
-  if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
+  if (linux_to_darwin_sockaddr(&sockaddr, (struct l_sockaddr *) addr, addrlen) < 0) {
     return -1;
   }
 
@@ -121,7 +122,7 @@ DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr, uint64_t, addrlen)
 }
 
 int
-to_host_sockopt_level(int level)
+linux_to_darwin_sockopt_level(int level)
 {
   switch (level) {
   case LINUX_SOL_SOCKET: return SOL_SOCKET;
@@ -173,16 +174,33 @@ to_host_sockopt_name(int name)
   }
 }
 
-DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval, uint, opt_len)
+DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval_ptr, uint, opt_len)
 {
+  char optval[opt_len];
+  if (copy_from_user(optval, optval_ptr, opt_len))
+    return -LINUX_EFAULT;
+
   // Darwin's optval is compatible with that of Linux
-  return syswrap(setsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), opt_len));
+  return syswrap(setsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, opt_len));
 }
 
-DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval, gaddr_t, opt_len)
+DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval_ptr, gaddr_t, optlen_ptr)
 {
+  l_socklen_t len;
+  if (copy_from_user(&len, optlen_ptr, sizeof len))
+    return -LINUX_EFAULT;
+  char optval[len];
+  unsigned int optlen;
   // Darwin's optval is compatible with that of Linux
-  return syswrap(getsockopt(fd, to_host_sockopt_level(level), to_host_sockopt_name(optname), guest_to_host(optval), guest_to_host(opt_len)));
+  int r = syswrap(getsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, &optlen));
+  if (r >= 0) {
+    if (copy_to_user(optval_ptr, optval, optlen))
+      return -LINUX_EFAULT;
+    l_socklen_t tmp = optlen;
+    if (copy_to_user(optlen_ptr, &tmp, sizeof tmp))
+      return -LINUX_EFAULT;
+  }
+  return r;
 }
 
 DEFINE_SYSCALL(shutdown, int, socket, int, how)
@@ -190,9 +208,13 @@ DEFINE_SYSCALL(shutdown, int, socket, int, how)
   return syswrap(shutdown(socket, how));
 }
 
-DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
+DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf_ptr, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
 {
-  return syswrap(sendto(socket, guest_to_host(buf), length, flags, NULL, 0));
+  warnk("sendto: dest_addr is not used! (dest_addr = 0x%llx, dest_len = %d)\n", dest_addr, dest_len);
+  char buf[length];
+  if (copy_from_user(buf, buf_ptr, sizeof buf))
+    return -LINUX_EFAULT;
+  return syswrap(sendto(socket, buf, length, flags, NULL, 0));
 }
 
 int
@@ -240,88 +262,94 @@ linux_to_darwin_msg_flags(l_int flags)
   return ret;
 }
 
-void
-linux_to_darwin_msg_iovec(struct l_iovec *liovec, struct iovec *diovec)
+DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf_ptr, int, length, int, flags, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
 {
-  diovec->iov_base = guest_to_host(liovec->iov_base);
-  diovec->iov_len = liovec->iov_len;
-}
-
-int
-linux_to_darwin_msghdr(const struct l_msghdr *lhdr, struct iovec *diovec, struct msghdr *dhdr)
-{
-  if (lhdr->msg_controllen > INT_MAX) {
-    return -LINUX_ENOBUFS;
+  socklen_t *socklen_ptr = NULL;
+  struct sockaddr *sock_ptr = NULL;
+  if (addr_ptr != 0) {
+    l_socklen_t addrbuflen;
+    if (copy_from_user(&addrbuflen, addrlen_ptr, sizeof addrbuflen))
+      return -LINUX_EFAULT;
+    socklen_ptr = alloca(sizeof *socklen_ptr);
+    *socklen_ptr = addrbuflen;
+    sock_ptr = alloca(addrbuflen);
   }
-
-  dhdr->msg_name = guest_to_host(lhdr->msg_name);
-  dhdr->msg_namelen = lhdr->msg_namelen;
-  linux_to_darwin_msg_iovec(guest_to_host(lhdr->msg_iov), diovec);
-  dhdr->msg_iov = diovec;
-  dhdr->msg_iovlen = lhdr->msg_iovlen;
-  dhdr->msg_control = guest_to_host(lhdr->msg_control);
-  dhdr->msg_flags = linux_to_darwin_msg_flags(lhdr->msg_flags);
-
-  if (dhdr->msg_flags < 0) {
-    // unsupported flags found
-    return dhdr->msg_flags;
+  char *buf = alloca(length);
+  int ret = syswrap(recvfrom(socket, buf, length, flags, sock_ptr, socklen_ptr));
+  if (copy_to_user(buf_ptr, buf, length))
+    return -LINUX_EFAULT;
+  if (addr_ptr != 0) {
+    char addr[sock_ptr->sa_len];
+    darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
+    if (copy_to_user(addr_ptr, addr, sizeof addr))
+      return -LINUX_EFAULT;
+    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr))
+      return -LINUX_EFAULT;
   }
-
-  if (LINUX_CMSG_FIRSTHDR(lhdr) != NULL) {
-    printk("we do not support ancillary data yet\n");
-    return -LINUX_EINVAL;
-  }
-  dhdr->msg_controllen = 0;
-
-  return 0;
-}
-
-DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf, int, length, int, flags, gaddr_t, addr, gaddr_t, addrlen)
-{
-  int ret;
-  socklen_t *socklen = guest_to_host(addrlen);
-  struct l_sockaddr *sockaddr = guest_to_host(addr);
-
-  ret = syswrap(recvfrom(socket, guest_to_host(buf), length, flags, (void*)sockaddr, socklen));
-  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
-
   return ret;
 }
 
-int
+static int
 do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
 {
-  struct msghdr dhdr;
-  struct iovec diovec;
-  
-  int err = linux_to_darwin_msghdr(msg, &diovec, &dhdr);
-  if (err < 0) {
-    return err;
+  struct msghdr hdr;
+
+  if (msg->msg_controllen > INT_MAX)
+    return -LINUX_ENOBUFS;
+
+  hdr.msg_namelen = msg->msg_namelen;
+  hdr.msg_name = alloca(hdr.msg_namelen);
+  if (strncpy_from_user(hdr.msg_name, msg->msg_name, hdr.msg_namelen) < 0)
+    return -LINUX_EFAULT;
+  hdr.msg_iovlen = msg->msg_iovlen;
+  hdr.msg_iov = alloca(sizeof(struct iovec) * hdr.msg_iovlen);
+  struct l_iovec *liov = alloca(sizeof(struct l_iovec) * hdr.msg_iovlen);
+  if (copy_from_user(liov, msg->msg_iov, sizeof(struct l_iovec) * hdr.msg_iovlen))
+    return -LINUX_EFAULT;
+  for (int i = 0; i < hdr.msg_iovlen; ++i) {
+    hdr.msg_iov[i].iov_len = liov[i].iov_len;
+    hdr.msg_iov[i].iov_base = alloca(liov[i].iov_len);
+    if (copy_from_user(hdr.msg_iov[i].iov_base, liov[i].iov_base, hdr.msg_iov[i].iov_len))
+      return -LINUX_EFAULT;
   }
-
-  return syswrap(sendmsg(sockfd, &dhdr, flags));
+  hdr.msg_flags = linux_to_darwin_msg_flags(msg->msg_flags);
+  if (hdr.msg_flags < 0) {
+    return hdr.msg_flags;       // unsupported flags found
+  }
+  if (LINUX_CMSG_FIRSTHDR(msg) != 0) {
+    warnk("we do not support ancillary data yet\n");
+    return -LINUX_EINVAL;
+  }
+  hdr.msg_control = NULL;
+  hdr.msg_controllen = 0;
+  return syswrap(sendmsg(sockfd, &hdr, flags));
 }
 
-DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg, int, flags)
+DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
 {
-  return do_sendmsg(sockfd, (struct l_msghdr*)guest_to_host(msg), flags);
+  struct l_msghdr msg;
+  if (copy_from_user(&msg, msg_ptr, sizeof msg))
+    return -LINUX_EFAULT;
+  return do_sendmsg(sockfd, &msg, flags);
 }
 
-DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec, unsigned int, vlen, unsigned int, flags)
+DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec_ptr, unsigned int, vlen, unsigned int, flags)
 {
-  struct l_mmsghdr *msg = guest_to_host(msgvec);
-  int i = 0;
-
+  struct l_mmsghdr msg[vlen];
+  if (copy_from_user(msg, msgvec_ptr, sizeof msg))
+    return -LINUX_EFAULT;
+  uint i = 0;
   while (i < vlen) {
-    int err = do_sendmsg(sockfd, &msg->msg_hdr, flags);
+    int err = do_sendmsg(sockfd, &msg[i].msg_hdr, flags);
     if (err < 0) {
       return err;
     }
-    msg->msg_len = err;
+    msg[i].msg_len = err;
 
     i++;
-    msg++;
   }
+  if (copy_to_user(msgvec_ptr, msg, sizeof msg))
+    return -LINUX_EFAULT;
 
   return i;
 }
@@ -383,57 +411,99 @@ DEFINE_SYSCALL(listen, int, socket, int, backlog)
   return syswrap(listen(socket, backlog));
 }
 
-DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
 {
-  int ret;
-  socklen_t *socklen = guest_to_host(addrlen);
-  struct l_sockaddr *sockaddr = guest_to_host(addr);
-
-  ret = syswrap(accept(sockfd, (void*)sockaddr, socklen));
-  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
-
+  socklen_t *socklen_ptr = NULL;
+  struct sockaddr *sock_ptr = NULL;
+  if (addr_ptr != 0) {
+    l_socklen_t addrbuflen;
+    if (copy_from_user(&addrbuflen, addrlen_ptr, sizeof addrbuflen))
+      return -LINUX_EFAULT;
+    socklen_ptr = alloca(sizeof *socklen_ptr);
+    *socklen_ptr = addrbuflen;
+    sock_ptr = alloca(addrbuflen);
+  }
+  int ret = syswrap(accept(sockfd, sock_ptr, socklen_ptr));
+  if (addr_ptr != 0) {
+    char addr[sock_ptr->sa_len];
+    darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
+    if (copy_to_user(addr_ptr, addr, sizeof addr))
+      return -LINUX_EFAULT;
+    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr))
+      return -LINUX_EFAULT;
+  }
   return ret;
 }
 
-DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr, int, addrlen)
+DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr_ptr, int, addrlen)
 {
-  int ret;
   struct sockaddr *sockaddr;
+  char addr[addrlen];
+  if (copy_from_user(addr, addr_ptr, addrlen))
+    return -LINUX_EFAULT;
 
-  if (to_host_sockaddr(&sockaddr, guest_to_host(addr), addrlen) < 0) {
+  if (linux_to_darwin_sockaddr(&sockaddr, (struct l_sockaddr *) addr, addrlen) < 0) {
     return -LINUX_EINVAL;
   }
-  ret = syswrap(bind(sockfd, sockaddr, addrlen));
+  int ret = syswrap(bind(sockfd, sockaddr, addrlen));
 
   free(sockaddr);
   return ret;
 }
 
-DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
 {
-  int ret;
-  socklen_t *socklen = guest_to_host(addrlen);
-  struct l_sockaddr *sockaddr = guest_to_host(addr);
-
-  ret = syswrap(getsockname(sockfd, (void*)sockaddr, socklen));
-  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
-
+  socklen_t *socklen_ptr = NULL;
+  struct sockaddr *sock_ptr = NULL;
+  if (addr_ptr != 0) {
+    l_socklen_t addrbuflen;
+    if (copy_from_user(&addrbuflen, addrlen_ptr, sizeof addrbuflen))
+      return -LINUX_EFAULT;
+    socklen_ptr = alloca(sizeof *socklen_ptr);
+    *socklen_ptr = addrbuflen;
+    sock_ptr = alloca(addrbuflen);
+  }
+  int ret = syswrap(getsockname(sockfd, sock_ptr, socklen_ptr));
+  if (addr_ptr != 0) {
+    char addr[sock_ptr->sa_len];
+    darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
+    if (copy_to_user(addr_ptr, addr, sizeof addr))
+      return -LINUX_EFAULT;
+    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr))
+      return -LINUX_EFAULT;
+  }
   return ret;
 }
 
-DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr, gaddr_t, addrlen)
+DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
 {
-  int ret;
-  socklen_t *socklen = guest_to_host(addrlen);
-  struct l_sockaddr *sockaddr = guest_to_host(addr);
-
-  ret = syswrap(getpeername(sockfd, (void*)sockaddr, socklen));
-  to_linux_sockaddr(sockaddr, (struct sockaddr*)sockaddr, socklen);
-
+  socklen_t *socklen_ptr = NULL;
+  struct sockaddr *sock_ptr = NULL;
+  if (addr_ptr != 0) {
+    l_socklen_t addrbuflen;
+    if (copy_from_user(&addrbuflen, addrlen_ptr, sizeof addrbuflen))
+      return -LINUX_EFAULT;
+    socklen_ptr = alloca(sizeof *socklen_ptr);
+    *socklen_ptr = addrbuflen;
+    sock_ptr = alloca(addrbuflen);
+  }
+  int ret = syswrap(getpeername(sockfd, sock_ptr, socklen_ptr));
+  if (addr_ptr != 0) {
+    char addr[sock_ptr->sa_len];
+    darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
+    if (copy_to_user(addr_ptr, addr, sizeof addr))
+      return -LINUX_EFAULT;
+    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr))
+      return -LINUX_EFAULT;
+  }
   return ret;
 }
 
 DEFINE_SYSCALL(socketpair, int, family, int, type, int, protocol, gaddr_t, usockvec_ptr)
 {
-  return syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, guest_to_host(usockvec_ptr)));
+  int fds[2];
+  int r = syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, fds));
+  if (copy_to_user(usockvec_ptr, fds, sizeof fds))
+    return -LINUX_EFAULT;
+  return r;
 }

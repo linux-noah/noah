@@ -195,12 +195,10 @@ struct l_cmsghdr {
 				    LINUX_CMSG_ALIGN(len))
 #define LINUX_CMSG_LEN(len)	(LINUX_CMSG_ALIGN(sizeof(struct l_cmsghdr)) + \
 				    (len))
-#define LINUX_CMSG_FIRSTHDR(msg) \
-				((msg)->msg_controllen >= \
-				    sizeof(struct l_cmsghdr) ? \
-				    (struct l_cmsghdr *) \
-				        guest_to_host((msg)->msg_control) : \
-				    (struct l_cmsghdr *)(NULL))
+#define LINUX_CMSG_FIRSTHDR(msg)                \
+  ((gaddr_t)((msg)->msg_controllen >= sizeof(struct l_cmsghdr)  \
+             ? (msg)->msg_control                               \
+             : 0))
 #define LINUX_CMSG_NXTHDR(msg, cmsg) \
 				((((char *)(cmsg) + \
 				    LINUX_CMSG_ALIGN((cmsg)->cmsg_len) + \
