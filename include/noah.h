@@ -82,7 +82,6 @@ struct proc {
   pthread_rwlock_t lock;
   struct mm *mm;
   int root;                     /* FS root */
-  atomic_sigbits_t sigpending;
   struct {
     pthread_rwlock_t sig_lock;
     l_sigaction_t sigaction[LINUX_NSIG];

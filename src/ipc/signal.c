@@ -56,13 +56,12 @@ init_signal(void)
       .lsa_mask = {0}
     };
   }
+  /* import signal mask from the hsot */
   assert(proc.nr_tasks == 1);
   sigset_t set;
   sigprocmask(0, NULL, &set);
   darwin_to_linux_sigset(&set, &task.sigmask);
   sigbits_emptyset(&task.sigpending);
-  sigpending(&set);
-  sigset_to_sigbits(&proc.sigpending, &set);
 }
 
 static void
@@ -137,17 +136,13 @@ fetch_sig_from_sigbits(atomic_sigbits_t *sigbits)
 static inline int
 fetch_sig_to_deliver()
 {
-  int sig = fetch_sig_from_sigbits(&proc.sigpending);
-  if (sig) {
-    return sig;
-  }
   return fetch_sig_from_sigbits(&task.sigpending);
 }
 
 bool
 has_sigpending()
 {
-  return (proc.sigpending | task.sigpending) & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
+  return task.sigpending & ~LINUX_SIGSET_TO_UI64(&task.sigmask);
 }
 
 static void
