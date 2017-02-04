@@ -773,8 +773,10 @@ darwinfs_fchmodat(struct fs *fs, struct dir *dir, const char *path, l_mode_t mod
 /* #define LOOKUP_PARENT     0x0010 */
 /* #define LOOKUP_REVAL      0x0020 */
 
+#define LOOP_MAX 20
+
 int
-vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
+__vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct path *path, int loop)
 {
   static struct fs_operations ops = {
     darwinfs_openat,
@@ -799,14 +801,12 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     return -LINUX_EINVAL;
   }
 
+  if (loop > LOOP_MAX)
+    return -LINUX_ELOOP;
+
   struct fs *fs = &darwinfs;
 
-  struct dir dir;
-  if (dirfd == LINUX_AT_FDCWD) {
-    dir.fd = AT_FDCWD;
-  } else {
-    dir.fd = dirfd;
-  }
+  struct dir dir = *parent;
 
   /* resolve mountpoints */
   if (name[0] == '/' && strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
@@ -834,7 +834,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
       if ((n = fs->ops->readlinkat(fs, &dir, path->subpath, buf, sizeof buf)) > 0) {
         strcpy(buf + n, c);
         if (buf[0] == '/') {
-          return vfs_grab_dir(dirfd, buf, flags, path);
+          return __vfs_grab_dir(&dir, buf, flags, path, loop + 1);
         } else {
           /* remove the last component */
           while (sp >= path->subpath && *--sp != '/')
@@ -843,20 +843,33 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
           char buf2[LINUX_PATH_MAX];
           strcpy(buf2, path->subpath);
           strcat(buf2, buf);
-          return vfs_grab_dir(dir.fd, buf2, flags, path);
+          return __vfs_grab_dir(&dir, buf2, flags, path, loop + 1);
         }
       }
     }
     if (*c) {
       *sp++ = *c++;
     }
+    *sp = 0;
   }
-  *sp = 0;
 
   path->fs = fs;
   path->dir = malloc(sizeof(struct dir));
   path->dir->fd = dir.fd;
   return 0;
+}
+
+int
+vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
+{
+  struct dir dir;
+
+  if (dirfd == LINUX_AT_FDCWD) {
+    dir.fd = AT_FDCWD;
+  } else {
+    dir.fd = dirfd;
+  }
+  return __vfs_grab_dir(&dir, name, flags, path, 0);
 }
 
 void
@@ -1158,7 +1171,7 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
 
   struct path path;
   int r;
-  if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, name, LOOKUP_NOFOLLOW, &path)) < 0) {
     return r;
   }
   char buf[bufsize];
