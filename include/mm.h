@@ -52,6 +52,7 @@ void split_region(struct mm *mm, struct mm_region *region, gaddr_t gaddr);
 void destroy_mm(struct mm *mm);
 
 gaddr_t do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset);
+int do_munmap(gaddr_t gaddr, size_t size);
 
 int hv_mflag_to_linux_mprot(hv_memory_flags_t mflag);
 hv_memory_flags_t linux_mprot_to_hv_mflag(int mprot);

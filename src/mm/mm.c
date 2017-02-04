@@ -285,12 +285,12 @@ DEFINE_SYSCALL(brk, unsigned long, brk)
   }
 
   if (brk < proc.mm->current_brk) {
+    do_munmap(brk, proc.mm->current_brk - brk);
     ret = proc.mm->current_brk = brk;
-    goto out;
+  } else {
+    do_mmap(proc.mm->current_brk, brk - proc.mm->current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
+    ret = proc.mm->current_brk = brk;
   }
-
-  do_mmap(proc.mm->current_brk, brk - proc.mm->current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
-  ret = proc.mm->current_brk = brk;
 
 out:
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
