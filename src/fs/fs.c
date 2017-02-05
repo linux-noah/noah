@@ -809,11 +809,14 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
   struct dir dir = *parent;
 
   /* resolve mountpoints */
-  if (name[0] == '/' && strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
-    dir.fd = proc.root;
-    if (name[1] == '\0') { /* When name is "/" */
-      name = ".";
-    } else {
+  if (*name == '/') {
+    if (name[1] == '\0') {
+      dir.fd = proc.root;
+      strcpy(path->subpath, ".");
+      goto out;
+    }
+    if (strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
+      dir.fd = proc.root;
       name++;
     }
   }
@@ -853,6 +856,7 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
     *sp = 0;
   }
 
+ out:
   path->fs = fs;
   path->dir = malloc(sizeof(struct dir));
   path->dir->fd = dir.fd;
@@ -863,6 +867,10 @@ int
 vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
 {
   struct dir dir;
+
+  if (*name == 0) {
+    return -LINUX_ENOENT;
+  }
 
   if (dirfd == LINUX_AT_FDCWD) {
     dir.fd = AT_FDCWD;
@@ -1060,7 +1068,8 @@ int do_access(const char *path, int mode)
 DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path_ptr, int, mode)
 {
   char path[LINUX_PATH_MAX];
-  strncpy_from_user(path, path_ptr, sizeof path);
+  if (strncpy_from_user(path, path_ptr, sizeof path) < 0)
+    return -LINUX_EFAULT;
   return do_faccessat(dirfd, path, mode);
 }
 
