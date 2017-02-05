@@ -815,7 +815,7 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
       strcpy(path->subpath, ".");
       goto out;
     }
-    if (strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1)) {
+    if (strncmp(name, "/Users", sizeof "/Users" - 1) && strncmp(name, "/Volumes", sizeof "/Volumes" - 1) && strncmp(name, "/dev", sizeof "/dev" - 1) && strncmp(name, "/tmp", sizeof "/tmp" - 1)) {
       dir.fd = proc.root;
       name++;
     }
