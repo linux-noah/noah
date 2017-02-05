@@ -290,7 +290,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf_ptr, int, length, int, flags,
 }
 
 static int
-do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
+do_sendmsg(int sockfd, const struct l_msghdr *msg, int flags)
 {
   struct msghdr hdr;
 
@@ -298,9 +298,12 @@ do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
     return -LINUX_ENOBUFS;
 
   hdr.msg_namelen = msg->msg_namelen;
-  hdr.msg_name = alloca(hdr.msg_namelen);
-  if (strncpy_from_user(hdr.msg_name, msg->msg_name, hdr.msg_namelen) < 0)
-    return -LINUX_EFAULT;
+  hdr.msg_name = NULL;
+  if (hdr.msg_namelen > 0) {
+    hdr.msg_name = alloca(hdr.msg_namelen);
+    if (strncpy_from_user(hdr.msg_name, msg->msg_name, hdr.msg_namelen) < 0)
+      return -LINUX_EFAULT;
+  }
   hdr.msg_iovlen = msg->msg_iovlen;
   hdr.msg_iov = alloca(sizeof(struct iovec) * hdr.msg_iovlen);
   struct l_iovec *liov = alloca(sizeof(struct l_iovec) * hdr.msg_iovlen);
@@ -314,7 +317,8 @@ do_sendmsg(int sockfd, struct l_msghdr *msg, int flags)
   }
   hdr.msg_flags = linux_to_darwin_msg_flags(msg->msg_flags);
   if (hdr.msg_flags < 0) {
-    return hdr.msg_flags;       // unsupported flags found
+    warnk("do_sendmsg: unsupported flags\n");
+    return hdr.msg_flags;
   }
   if (LINUX_CMSG_FIRSTHDR(msg) != 0) {
     warnk("we do not support ancillary data yet\n");
@@ -338,19 +342,15 @@ DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec_ptr, unsigned int, vlen, u
   struct l_mmsghdr msg[vlen];
   if (copy_from_user(msg, msgvec_ptr, sizeof msg))
     return -LINUX_EFAULT;
-  uint i = 0;
-  while (i < vlen) {
+  uint i;
+  for (i = 0; i < vlen; ++i) {
     int err = do_sendmsg(sockfd, &msg[i].msg_hdr, flags);
     if (err < 0) {
       return err;
     }
-    msg[i].msg_len = err;
-
-    i++;
+    if (copy_to_user(msgvec_ptr + sizeof msg[0] * i + offsetof(struct l_mmsghdr, msg_len), &err, sizeof err))
+      return -LINUX_EFAULT;
   }
-  if (copy_to_user(msgvec_ptr, msg, sizeof msg))
-    return -LINUX_EFAULT;
-
   return i;
 }
 
