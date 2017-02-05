@@ -45,6 +45,11 @@ int do_futex_wake(gaddr_t uaddr, int count);
 void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);
 
+__attribute__ ((deprecated)) void vfs_expose_darwinfs_fd(int fd);
+struct file;
+void file_incref(struct file *file);
+int file_decref(struct file *file);
+
 /* signal */
 
 #include "linux/signal.h"
@@ -81,20 +86,33 @@ struct proc {
   struct list_head tasks;
   pthread_rwlock_t lock;
   struct mm *mm;
-  int root;                     /* FS root */
+  struct {
+    int vfs_root;               /* FS root */
+    pthread_rwlock_t vfs_lock;
+    struct file **fdtab;
+    size_t nr_fdtab;
+  };
   struct {
     pthread_rwlock_t sig_lock;
     l_sigaction_t sigaction[LINUX_NSIG];
   };
 };
 
+struct vkern {
+  struct {
+    struct file_operations *darwinfs_ops;
+  };
+};
+
+extern struct vkern *vkern;
 extern struct proc proc;
 _Thread_local extern struct task task;
 
 void init_signal(void);
 void reset_signal_state(void);
-
 void init_fpu(void);
+
+void init_vfs(void);
 
 /* Linux kernel constants */
 

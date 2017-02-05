@@ -364,7 +364,7 @@ init_reg_state(void)
 }
 
 static void
-prepare_newproc(void)
+reset_process_state(void)
 {
   /* Reinitialize proc and task structures */
   /* Not handling locks seriously now because multi-thread execve is not implemented yet */
@@ -376,6 +376,17 @@ prepare_newproc(void)
   // TODO: destroy LDT if it is implemented
 
   task.clear_child_tid = task.set_child_tid = 0;
+
+  // TODO: use a smarter algorithm than bruteforce...
+  for (size_t i = 0; i < proc.nr_fdtab; i++) {
+    int flag = fcntl(i, F_GETFD);
+    if (flag < 0) {
+      continue;
+    }
+    if (flag & FD_CLOEXEC) {
+      do_close(i);
+    }
+  }
 }
 
 int
@@ -397,20 +408,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     return -LINUX_EINVAL;
   }
 
-  prepare_newproc();
-
-  // Handle close-on-exec by bruteforce now. FIXME after introducing vfs
-  struct rlimit rlimit;
-  getrlimit(RLIMIT_NOFILE, &rlimit);
-  for (size_t i = 0; i < rlimit.rlim_cur; i++) {
-    int flag = fcntl(i, F_GETFD);
-    if (flag < 0) {
-      continue;
-    }
-    if (flag & FD_CLOEXEC) {
-      close(i);
-    }
-  }
+  reset_process_state();
 
   /* Now do exec */
   fstat(fd, &st);
