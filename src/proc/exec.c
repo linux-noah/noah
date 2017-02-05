@@ -101,10 +101,12 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
   if (ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN) {
     fprintf(stderr, "not an executable file");
+    fflush(stderr);
     return -LINUX_ENOEXEC;
   }
   if (ehdr->e_machine != EM_X86_64) {
     fprintf(stderr, "not an x64 executable");
+    fflush(stderr);
     return -LINUX_ENOEXEC;
   }
 

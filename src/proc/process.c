@@ -196,7 +196,8 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
 
 DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 {
-  return 0;
+  warnk("setrlimit is not implemented\n");
+  return -LINUX_ENOSYS;
 }
 
 DEFINE_SYSCALL(exit, int, reason)

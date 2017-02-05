@@ -276,6 +276,8 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf_ptr, int, length, int, flags,
   }
   char *buf = alloca(length);
   int ret = syswrap(recvfrom(socket, buf, length, flags, sock_ptr, socklen_ptr));
+  if (ret < 0)
+    return ret;
   if (copy_to_user(buf_ptr, buf, length))
     return -LINUX_EFAULT;
   if (addr_ptr != 0) {
@@ -424,6 +426,9 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
     sock_ptr = alloca(addrbuflen);
   }
   int ret = syswrap(accept(sockfd, sock_ptr, socklen_ptr));
+  if (ret < 0) {
+    return ret;
+  }
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
     darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
@@ -464,6 +469,9 @@ DEFINE_SYSCALL(getsockname, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr
     sock_ptr = alloca(addrbuflen);
   }
   int ret = syswrap(getsockname(sockfd, sock_ptr, socklen_ptr));
+  if (ret < 0) {
+    return ret;
+  }
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
     darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
@@ -488,6 +496,9 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr
     sock_ptr = alloca(addrbuflen);
   }
   int ret = syswrap(getpeername(sockfd, sock_ptr, socklen_ptr));
+  if (ret < 0) {
+    return ret;
+  }
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
     darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
@@ -503,6 +514,8 @@ DEFINE_SYSCALL(socketpair, int, family, int, type, int, protocol, gaddr_t, usock
 {
   int fds[2];
   int r = syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, fds));
+  if (r < 0)
+    return r;
   if (copy_to_user(usockvec_ptr, fds, sizeof fds))
     return -LINUX_EFAULT;
   return r;
