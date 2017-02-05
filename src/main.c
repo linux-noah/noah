@@ -409,7 +409,6 @@ init_first_proc(int rootfd)
   vfs_expose_darwinfs_fd(0);
   vfs_expose_darwinfs_fd(1);
   vfs_expose_darwinfs_fd(2);
-  vfs_expose_darwinfs_fd(rootfd);
 }
 
 void

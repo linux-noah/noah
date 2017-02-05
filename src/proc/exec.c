@@ -35,16 +35,16 @@ load_elf_interp(const char *path, ulong load_addr)
   int fd;
   struct stat st;
 
-  if ((fd = do_open(path, LINUX_O_RDONLY, 0)) < 0) {
-    fprintf(stderr, "load_elf_interp, could not open file: %s\n", path);
-    return -1;
+  if ((fd = openat_darwinfs(LINUX_AT_FDCWD, path, LINUX_O_RDONLY)) < 0) {
+    warnk("load_elf_interp, could not open file: %s\n", path);
+    return fd;
   }
 
   fstat(fd, &st);
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  do_close(fd);
+  close(fd);
 
   h = (Elf64_Ehdr *)data;
 
@@ -165,8 +165,9 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
     memcpy(interp_path, (char *)ehdr + p[i].p_offset, p[i].p_filesz);
     interp_path[p[i].p_filesz] = 0;
 
-    if (load_elf_interp(interp_path, map_top) < 0) {
-      return -1;
+    int err;
+    if ((err = load_elf_interp(interp_path, map_top)) < 0) {
+      return err;
     }
   }
   else {
@@ -176,7 +177,7 @@ load_elf(Elf64_Ehdr *ehdr, int argc, char *argv[], char **envp)
 
   init_userstack(argc, argv, envp, load_base, ehdr, global_offset, interp ? map_top : 0);
 
-  return 1;
+  return 0;
 }
 
 #define SB_ARGC_MAX 2
@@ -396,26 +397,26 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   int fd;
   struct stat st;
   char *data;
-  
-  if ((err = do_access(elf_path, X_OK)) < 0) {
-    return err;
-  }
-  if ((fd = do_open(elf_path, LINUX_O_RDONLY, 0)) < 0) {
-    return fd;
-  }
+
   if (proc.nr_tasks > 1) {
     warnk("Multi-thread execve is not implemented yet\n");
     return -LINUX_EINVAL;
   }
 
-  reset_process_state();
-
-  /* Now do exec */
+  if ((fd = openat_darwinfs(LINUX_AT_FDCWD, elf_path, LINUX_O_RDONLY)) < 0) {
+    return fd;
+  }
   fstat(fd, &st);
+  if ((st.st_mode & S_IXUSR) == 0) {
+    warnk("FIXME: more strict permission check\n");
+    return -LINUX_EACCES;
+  }
+
+  reset_process_state();
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  do_close(fd);
+  close(fd);
 
   drop_privilege();
 

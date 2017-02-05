@@ -963,6 +963,34 @@ vfs_expose_darwinfs_fd(int fd)
 }
 
 int
+openat_darwinfs(int dirfd, const char *name, int flags)
+{
+  int lkflag = 0;
+  if (flags & LINUX_O_NOFOLLOW) {
+    lkflag |= LOOKUP_NOFOLLOW;
+  }
+  if (flags & LINUX_O_DIRECTORY) {
+    lkflag |= LOOKUP_DIRECTORY;
+  }
+
+  struct path path;
+  int r = vfs_grab_dir(dirfd, name, lkflag, &path);
+  if (r < 0) {
+    return r;
+  }
+  assert(path.fs->ops->openat == darwinfs_openat);
+  r = syswrap(openat(path.dir->fd, path.subpath, linux_to_darwin_o_flags(flags), 0));
+  if (r < 0) {
+    return r;
+  }
+  vfs_ungrab_dir(&path);
+  if (r < 0) {
+    return r;
+  }
+  return r;
+}
+
+int
 vfs_openat(int dirfd, const char *name, int flags, int mode)
 {
   int lkflag = 0;
@@ -991,21 +1019,11 @@ vfs_openat(int dirfd, const char *name, int flags, int mode)
   return file->fd;
 }
 
-int do_openat(int dirfd, const char *name, int flags, int mode) {
-  return vfs_openat(dirfd, name, flags, mode);
-}
-
-int
-do_open(const char *path, int l_flags, int mode)
-{
-  return do_openat(LINUX_AT_FDCWD, path, l_flags, mode);
-}
-
 DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  return do_openat(dirfd, path, flags, mode);
+  return vfs_openat(dirfd, path, flags, mode);
 }
 
 DEFINE_SYSCALL(open, gstr_t, path_ptr, int, flags, int, mode)
@@ -1135,9 +1153,12 @@ DEFINE_SYSCALL(statfs, gstr_t, path_ptr, gaddr_t, buf_ptr)
   return r;
 }
 
-int
-do_faccessat(int dirfd, const char *name, int mode)
+DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path_ptr, int, mode)
 {
+  char name[LINUX_PATH_MAX];
+  if (strncpy_from_user(name, path_ptr, sizeof name) < 0) {
+    return -LINUX_EFAULT;
+  }
   struct path path;
   int r = vfs_grab_dir(dirfd, name, 0, &path);
   if (r < 0) {
@@ -1146,19 +1167,6 @@ do_faccessat(int dirfd, const char *name, int mode)
   r = path.fs->ops->faccessat(path.fs, path.dir, path.subpath, mode);
   vfs_ungrab_dir(&path);
   return r;
-}
-
-int do_access(const char *path, int mode)
-{
-  return do_faccessat(LINUX_AT_FDCWD, path, mode);
-}
-
-DEFINE_SYSCALL(faccessat, int, dirfd, gstr_t, path_ptr, int, mode)
-{
-  char path[LINUX_PATH_MAX];
-  if (strncpy_from_user(path, path_ptr, sizeof path) < 0)
-    return -LINUX_EFAULT;
-  return do_faccessat(dirfd, path, mode);
 }
 
 DEFINE_SYSCALL(access, gstr_t, path_ptr, int, mode)
@@ -1366,7 +1374,7 @@ DEFINE_SYSCALL(chdir, gstr_t, path_ptr)
 {
   char path[LINUX_PATH_MAX];
   strncpy_from_user(path, path_ptr, sizeof path);
-  int fd = do_openat(LINUX_AT_FDCWD, path, LINUX_O_DIRECTORY, 0);
+  int fd = vfs_openat(LINUX_AT_FDCWD, path, LINUX_O_DIRECTORY, 0);
   if (fd < 0)
     return fd;
   int r = sys_fchdir(fd);
