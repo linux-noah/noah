@@ -12,4 +12,4 @@ Noah is installed via homebrew. On the first run, noah automatically downloads a
 
 ## LICENSE
 
-2-clause BSD
+GPLv3
