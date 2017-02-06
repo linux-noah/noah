@@ -1072,8 +1072,8 @@ vkern_close(int fd)
     return -LINUX_EBADF;
   }
   int n = file->ops->close(file);
-  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.open_fds, fd);
-  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, fd);
+  clear_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, fd);
+  clear_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, fd);
   return n;
 }
 
