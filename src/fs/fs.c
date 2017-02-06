@@ -356,7 +356,7 @@ int file_decref(struct file *file) {
   return atomic_fetch_sub(&file->ref, 1);
 }
 
-struct file *
+static struct file *
 vfs_acquire(int fd)
 {
   struct file *file = NULL;
@@ -373,13 +373,15 @@ vfs_acquire(int fd)
   return file;
 }
 
-void
+static int
 vfs_release(struct file *file)
 {
+  int r = 0;
   if (file_decref(file) == 1) {
-    file->ops->close(file); /* FIXME!: check the return value of file->ops->close */
+    r = file->ops->close(file);
     shm_free(file);
   }
+  return r;
 }
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
@@ -512,6 +514,17 @@ vfs_close(int fd)
     ret = -LINUX_EBADF;
     goto out;
   }
+  /* Always do close the fd. The following code exposes the corner case:
+   *
+   *  pipe(fds);
+   *  if (fork() == 0) {
+   *    close(fd[0]);
+   *    close(fd[1]);
+   *  } else {
+   *    read(fd[0]);            // stuck!
+   *  }
+   *
+   */
   if ((ret = file->ops->close(file)) < 0) {
     goto out;
   }
@@ -836,7 +849,7 @@ init_vfs(void)
 
 #define LOOP_MAX 20
 
-int
+static int
 __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct path *path, int loop)
 {
   static struct fs_operations ops = {
@@ -924,7 +937,7 @@ __vfs_grab_dir(const struct dir *parent, const char *name, int flags, struct pat
   return 0;
 }
 
-int
+static int
 vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
 {
   struct dir dir;
@@ -941,7 +954,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
   return __vfs_grab_dir(&dir, name, flags, path, 0);
 }
 
-void
+static void
 vfs_ungrab_dir(struct path *path)
 {
   free(path->dir);
@@ -990,7 +1003,7 @@ openat_darwinfs(int dirfd, const char *name, int flags)
   return r;
 }
 
-int
+static int
 vfs_openat(int dirfd, const char *name, int flags, int mode)
 {
   int lkflag = 0;
@@ -1318,7 +1331,7 @@ DEFINE_SYSCALL(mkdir, gstr_t, path_ptr, int, mode)
   return sys_mkdirat(LINUX_AT_FDCWD, path_ptr, mode);
 }
 
-int
+static int
 vfs_getcwd(char *buf, size_t size)
 {
   errno = 0;
@@ -1329,13 +1342,13 @@ vfs_getcwd(char *buf, size_t size)
   return 0;
 }
 
-int
+static int
 vfs_fchdir(int fd)
 {
   return syswrap(fchdir(fd));
 }
 
-int
+static int
 vfs_umask(int mask)
 {
   return syswrap(umask(mask));
