@@ -82,7 +82,7 @@ struct file_operations {
   int (*fchmod)(struct file *f, l_mode_t mode);
 };
 
-static inline bool fd_ok(int fd);
+static inline bool in_userfd(int fd);
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
 
 void
@@ -118,7 +118,7 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
     if (flag < 0) {
       continue;
     }
-    if (fd_ok(i)) {
+    if (in_userfd(i)) {
       register_fd(i, flag & FD_CLOEXEC);
     } else {
       warnk("closing a file whose fd overlaps with vkern_fdtable, fd: %d\n", i);
@@ -403,7 +403,7 @@ find_emptyfd(struct fdtable *table)
 }
 
 static inline bool
-fd_ok(int fd)
+in_userfd(int fd)
 {
   return (fd >= 0 && fd < proc.fileinfo.vkern_fdtable.start);
 }
@@ -964,7 +964,7 @@ vfs_grab_dir(int dirfd, const char *name, int flags, struct path *path)
     dir.fd = AT_FDCWD;
   } else {
     dir.fd = dirfd;
-    if (!fd_ok(dir.fd)) {
+    if (!in_userfd(dir.fd)) {
       return -LINUX_EBADF;
     }
   }
@@ -1436,7 +1436,7 @@ vfs_getcwd(char *buf, size_t size)
 int
 vfs_fchdir(int fd)
 {
-  if (!fd_ok(fd)) {
+  if (!in_userfd(fd)) {
     return -LINUX_EBADF;
   }
   return syswrap(fchdir(fd));
@@ -1601,7 +1601,7 @@ DEFINE_SYSCALL(dup, unsigned int, fd)
 
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
 {
-  if (!fd_ok(fd1) || !fd_ok(fd2)) {
+  if (!in_userfd(fd1) || !in_userfd(fd2)) {
     return -LINUX_EBADF;
   }
   pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
@@ -1654,7 +1654,7 @@ DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t,
 {
   //TODO no need to use vfs?
   
-  if (!fd_ok(fd)) {
+  if (!in_userfd(fd)) {
     return -LINUX_EBADF;
   }
   char buf[count];
@@ -1804,7 +1804,7 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
     return -LINUX_EFAULT;
   
   for (int i = 0; i < nfds; i++) {
-    if (!fd_ok(fds[i].fd)) {
+    if (!in_userfd(fds[i].fd)) {
       return -LINUX_EBADF;
     }
   }
