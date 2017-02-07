@@ -438,18 +438,26 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
     *socklen_ptr = addrbuflen;
     sock_ptr = alloca(addrbuflen);
   }
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int ret = syswrap(accept(sockfd, sock_ptr, socklen_ptr));
   if (ret < 0) {
-    return ret;
+    goto err;
   }
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
     darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
-    if (copy_to_user(addr_ptr, addr, sizeof addr))
-      return -LINUX_EFAULT;
-    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr))
-      return -LINUX_EFAULT;
+    if (copy_to_user(addr_ptr, addr, sizeof addr)) {
+      ret = -LINUX_EFAULT;
+      goto err;
+    }
+    if (copy_to_user(addrlen_ptr, socklen_ptr, sizeof *socklen_ptr)) {
+      ret = -LINUX_EFAULT;
+      goto err;
+    }
   }
+  
+err:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
 }
 
