@@ -23,8 +23,9 @@ DEFINE_SYSCALL(sysinfo, gaddr_t, info_ptr)
   info.uptime = boottime.tv_sec;
 
   double loadavg[3];
-  if (getloadavg(loadavg, sizeof loadavg / sizeof loadavg[0]) < 0)
-    abort();
+  if (getloadavg(loadavg, sizeof loadavg / sizeof loadavg[0]) < 0) {
+    panic("sysinfo");
+  }
 
   info.loads[0] = loadavg[0] * LINUX_SYSINFO_LOADS_SCALE;
   info.loads[1] = loadavg[1] * LINUX_SYSINFO_LOADS_SCALE;

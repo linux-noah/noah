@@ -149,6 +149,7 @@ linux_to_darwin_clockid(l_clockid_t id)
 {
   switch (id) {
   case LINUX_CLOCK_REALTIME:
+  case LINUX_CLOCK_REALTIME_HR:
     return CLOCK_REALTIME;
   case LINUX_CLOCK_MONOTONIC:
   case LINUX_CLOCK_MONOTONIC_COARSE:
@@ -158,8 +159,7 @@ linux_to_darwin_clockid(l_clockid_t id)
   case LINUX_CLOCK_THREAD_CPUTIME_ID:
     return CLOCK_THREAD_CPUTIME_ID;
   default:
-    printk("unsupported clockid\n");
-    abort();
+    panic("linux_to_darwin_clockid: %d", id);
   }
 }
 

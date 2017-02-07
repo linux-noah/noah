@@ -402,7 +402,7 @@ void
 drop_privilege(void)
 {
   if (seteuid(getuid()) != 0) {
-    abort();
+    panic("drop_privilege");
   }
 }
 
@@ -410,7 +410,7 @@ void
 elevate_privilege(void)
 {
   if (seteuid(0) != 0) {
-    abort();
+    panic("elevate_privilege");
   }
 }
 
