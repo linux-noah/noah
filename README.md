@@ -12,4 +12,6 @@ Noah is installed via homebrew. On the first run, noah automatically downloads a
 
 ## LICENSE
 
-GPLv3
+We are seeking for ways to keep our development continuous. To protect our rights until then, we as of now license our product under CC-NC-ND, which is stricter than usual software licenses found on github. If you are willing to support us, please get in touch with us via e-mail.
+
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-nd/3.0/"><img alt="Creative Commons License" style="border-width:0" src="https://i.creativecommons.org/l/by-nc-nd/3.0/88x31.png" /></a><br />This work is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-nd/3.0/">Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Unported License</a>.
