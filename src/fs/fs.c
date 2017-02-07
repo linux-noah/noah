@@ -459,9 +459,13 @@ alloc_file(struct fdtable *table, int fd)
  * The caller of register_fd and vkern_dup_fd must acquire the lock properly if necessary
  */
 
-void
+int
 register_fd(int fd, bool is_cloexec)
 {
+  if (fd >= proc.fileinfo.vkern_fdtable.start) {
+    // Relocation of vkern_fdtable is not implemented currently
+    return -LINUX_EMFILE;
+  }
   struct fdtable *fdtable = &proc.fileinfo.fdtable;
   if (proc.fileinfo.fdtable.size <= fd) {
     // Expand table
@@ -482,6 +486,7 @@ register_fd(int fd, bool is_cloexec)
     clear_fdbit(fdtable, fdtable->cloexec_fds, fd);
   }
   alloc_file(fdtable, fd);
+  return 0;
 }
 
 int
@@ -1033,7 +1038,11 @@ user_openat(int atdirfd, const char *name, int flags, int mode)
   if (fd < 0) {
     goto out;
   }
-  register_fd(fd, flags & LINUX_O_CLOEXEC);
+  int err = register_fd(fd, flags & LINUX_O_CLOEXEC);
+  if (err < 0) {
+    fd = err;
+    close(fd);
+  }
 
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
@@ -1501,13 +1510,18 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
     r = -LINUX_EFAULT;
     goto out;
   }
-  register_fd(fd[0], false);
-  register_fd(fd[1], false);
+  int err0 = register_fd(fd[0], false);
+  int err1 = register_fd(fd[1], false);
+  if (err0 < 0 || err1 < 0) {
+    r = (err0 < 0) ? err0 : err1;
+    close(err0);
+    close(err1);
+  }
   
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   
-  return 0;
+  return r;
 }
 
 DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
@@ -1529,34 +1543,37 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
     err0 = syswrap(fcntl(fildes[0], F_SETFD, FD_CLOEXEC));
     err1 = syswrap(fcntl(fildes[1], F_SETFD, FD_CLOEXEC));
     if (err0 < 0 || err1 < 0) {
-      goto fail_fcntl;
+      goto close_by_fail;
     }
   }
   if (flags & LINUX_O_NONBLOCK) {
     err0 = syswrap(fcntl(fildes[0], F_SETFL, O_NONBLOCK));
     err1 = syswrap(fcntl(fildes[1], F_SETFL, O_NONBLOCK));
     if (err0 < 0 || err1 < 0) {
-      goto fail_fcntl;
+      goto close_by_fail;
     }
   }
   if (flags & LINUX_O_DIRECT) {
     err0 = syswrap(fcntl(fildes[0], F_NOCACHE, 1));
     err1 = syswrap(fcntl(fildes[1], F_NOCACHE, 1));
     if (err0 < 0 || err1 < 0) {
-      goto fail_fcntl;
+      goto close_by_fail;
     }
+  }
+  
+  err0 = register_fd(fildes[0], flags & LINUX_O_CLOEXEC);
+  err1 = register_fd(fildes[1], flags & LINUX_O_CLOEXEC);
+  if (err0 < 0 || err1 < 0) {
+    goto close_by_fail;
   }
 
   if (copy_to_user(fildes_ptr, fildes, sizeof(fildes))) {
     ret = -LINUX_EFAULT;
-    goto out;
   }
-  register_fd(fildes[0], flags & LINUX_O_CLOEXEC);
-  register_fd(fildes[1], flags & LINUX_O_CLOEXEC);
 
   goto out;
 
-fail_fcntl:
+close_by_fail:
   close(fildes[0]);
   close(fildes[1]);
   ret = (err0 < 0) ? err0 : err1;
@@ -1569,14 +1586,17 @@ out:
 
 DEFINE_SYSCALL(dup, unsigned int, fd)
 {
-  
   pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
-  int dup_fd = sys_fcntl(fd, LINUX_F_DUPFD, 0);
-  if (dup_fd >= 0) {
-    register_fd(dup_fd, false);
+  int ret = sys_fcntl(fd, LINUX_F_DUPFD, 0);
+  if (ret >= 0) {
+    int err = register_fd(ret, false);
+    if (err < 0) {
+      close(ret);
+      ret = err;
+    }
   }
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
-  return dup_fd;
+  return ret;
 }
 
 DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
@@ -1585,12 +1605,16 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
     return -LINUX_EBADF;
   }
   pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
-  int dup_fd = syswrap(dup2(fd1, fd2));
-  if (dup_fd >= 0) {
-    register_fd(dup_fd, false);
+  int ret = syswrap(dup2(fd1, fd2));
+  if (ret >= 0) {
+    int err = register_fd(ret, false);
+    if (err < 0) {
+      close(ret);
+      ret = err;
+    }
   }
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
-  return dup_fd;
+  return ret;
 }
 
 DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
@@ -1615,7 +1639,11 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
       goto out;
     }
   }
-  register_fd(ret, flags & LINUX_O_CLOEXEC);
+  int err = register_fd(ret, flags & LINUX_O_CLOEXEC);
+  if (err < 0) {
+    close(ret);
+    ret = err;
+  }
   
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);

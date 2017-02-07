@@ -45,7 +45,7 @@ int vkern_openat(int fd, const char *path, int flags, int mode);
 int user_close(int fd);
 int vkern_close(int fd);
 void close_cloexec();
-void register_fd(int fd, bool is_cloexec);
+int register_fd(int fd, bool is_cloexec);
 int vkern_dup_fd(int fd, bool is_cloexec);
 
 void die_with_forcedsig(int sig);

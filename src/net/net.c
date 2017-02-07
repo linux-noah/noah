@@ -27,21 +27,26 @@ DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
     goto err;
   }
 
+  int e;
   if (type & LINUX_SOCK_NONBLOCK) {
-    int e = syswrap(fcntl(fd, F_SETFL, O_NONBLOCK));
+    e = syswrap(fcntl(fd, F_SETFL, O_NONBLOCK));
     if (e < 0) {
       ret = e;
       goto err;
     }
   }
   if (type & LINUX_SOCK_CLOEXEC) {
-    int e = syswrap(fcntl(fd, F_SETFD, FD_CLOEXEC));
+    e = syswrap(fcntl(fd, F_SETFD, FD_CLOEXEC));
     if (e < 0) {
       ret = e;
       goto err;
     }
   }
-  register_fd(fd, type & LINUX_SOCK_CLOEXEC);
+  e = register_fd(fd, type & LINUX_SOCK_CLOEXEC);
+  if (e < 0) {
+    close(fd);
+    ret = e;
+  }
   
 err:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
