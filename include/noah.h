@@ -135,6 +135,7 @@ struct linux_termios;
 struct l_statfs;
 struct winsize;
 struct linux_winsize;
+struct rlimit; struct l_rlimit;
 
 int linux_to_darwin_at_flags(int flags);
 int linux_to_darwin_o_flags(int l_flags);
@@ -147,6 +148,8 @@ void darwin_to_linux_winsize(struct winsize *ws, struct linux_winsize *lws);
 void linux_to_darwin_winsize(struct winsize *ws, struct linux_winsize *lws);
 int linux_to_darwin_signal(int signum);
 int darwin_to_linux_signal(int signum);
+void darwin_to_linux_rlimit(int resource, struct rlimit *darwin_rlimit, struct l_rlimit *linux_rlimit);
+void darwin_to_linux_rlimit_nofile(struct rlimit *darwin_rlimit, struct l_rlimit *linux_rlimit);
 
 
 /* debug */

@@ -168,6 +168,7 @@ DEFINE_SYSCALL(setsid)
 DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
 {
   struct rlimit rl;
+  struct l_rlimit l_rl;
 
   int resource = 0;
   switch (l_resource) {
@@ -187,7 +188,7 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   if (r < 0)
     return r;
 
-  struct l_rlimit l_rl = { rl.rlim_cur, rl.rlim_max };
+  darwin_to_linux_rlimit(resource, &rl, &l_rl);
   if (copy_to_user(rl_ptr, &l_rl, sizeof l_rl))
     return -LINUX_EFAULT;
 

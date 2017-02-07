@@ -132,6 +132,13 @@ init_fileinfo(int rootfd)
   fileinfo->rootfd = vkern_dup_fd(rootfd, false);
 }
 
+void
+darwin_to_linux_rlimit_nofile(struct rlimit *darwin_rlimit, struct l_rlimit *linux_rlimit)
+{
+  linux_rlimit->rlim_cur = darwin_rlimit->rlim_cur;
+  linux_rlimit->rlim_max = darwin_rlimit->rlim_max - vkern_fdtable_maxsize;
+}
+
 int
 darwinfs_writev(struct file *file, const struct iovec *iov, size_t iovcnt)
 {

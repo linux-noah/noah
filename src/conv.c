@@ -610,3 +610,18 @@ darwin_to_linux_flock(struct flock *darwin_flock, struct l_flock *linux_flock)
   linux_flock->l_len = (l_off_t)darwin_flock->l_len;
   linux_flock->l_pid = (l_pid_t)darwin_flock->l_pid;
 }
+
+void
+darwin_to_linux_rlimit(int resource, struct rlimit *darwin_rlimit, struct l_rlimit *linux_rlimit)
+{
+  switch (resource) {
+    case RLIMIT_NOFILE:
+      darwin_to_linux_rlimit_nofile(darwin_rlimit, linux_rlimit);
+      break;
+    default:
+      *linux_rlimit = (struct l_rlimit) {
+        .rlim_cur = darwin_rlimit->rlim_cur,
+        .rlim_max = darwin_rlimit->rlim_max
+      };
+  }
+}
