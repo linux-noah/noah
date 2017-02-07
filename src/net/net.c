@@ -19,23 +19,34 @@
 
 DEFINE_SYSCALL(socket, int, family, int, type, int, protocol)
 {
+  int ret;
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int fd = syswrap(socket(linux_to_darwin_sa_family(family), type & ~(LINUX_SOCK_NONBLOCK | LINUX_SOCK_CLOEXEC), protocol));
-  if (fd < 0)
-    return fd;
+  ret = fd;
+  if (fd < 0) {
+    goto err;
+  }
 
   if (type & LINUX_SOCK_NONBLOCK) {
     int e = syswrap(fcntl(fd, F_SETFL, O_NONBLOCK));
-    if (e < 0)
-      return e;
+    if (e < 0) {
+      ret = e;
+      goto err;
+    }
   }
   if (type & LINUX_SOCK_CLOEXEC) {
     int e = syswrap(fcntl(fd, F_SETFD, FD_CLOEXEC));
-    if (e < 0)
-      return e;
+    if (e < 0) {
+      ret = e;
+      goto err;
+    }
   }
   register_fd(fd, type & LINUX_SOCK_CLOEXEC);
   
-  return fd;
+err:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  
+  return ret;
 }
 
 int

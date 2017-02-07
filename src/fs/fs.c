@@ -90,7 +90,6 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
 {
   struct rlimit limit;
   
-  pthread_rwlock_init(&fileinfo->fdtable_lock, NULL);
   getrlimit(RLIMIT_NOFILE, &limit);
   fileinfo->vkern_fdtable = (struct fdtable) {
     .start = limit.rlim_cur - 64,
@@ -433,10 +432,6 @@ test_fdbit(struct fdtable *table, uint64_t *fdbits, int fd)
   return fdbits[idx_table] & (1ULL << (idx_bit));
 }
 
-#define fdtable_kernel_lock(args) pthread_rwlock_wrlock(args)
-#define fdtable_user_lock(args) pthread_rwlock_rdlock(args)
-#define fdtable_unlock(args) pthread_rwlock_unlock(args)
-
 static void
 alloc_file(struct fdtable *table, int fd)
 {
@@ -459,6 +454,10 @@ alloc_file(struct fdtable *table, int fd)
   file->ops = &ops;
   file->fd = fd;
 }
+
+/*
+ * The caller of register_fd and vkern_dup_fd must acquire the lock properly if necessary
+ */
 
 void
 register_fd(int fd, bool is_cloexec)
@@ -485,7 +484,6 @@ register_fd(int fd, bool is_cloexec)
   alloc_file(fdtable, fd);
 }
 
-// The caller must lock lock fdtable properly if necessary
 int
 vkern_dup_fd(int fd, bool is_cloexec)
 {
@@ -512,14 +510,14 @@ get_file(int fd)
   }
   
   struct file *ret = NULL;
-  fdtable_user_lock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_rdlock(&proc.fileinfo.fdtable_lock);
   if (!test_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd)) {
     goto out;
   }
   ret = &proc.fileinfo.fdtable.files[fd - proc.fileinfo.fdtable.start];
   
 out:
-  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
 }
 
@@ -1006,7 +1004,7 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
 {
   int ret;
   
-  fdtable_kernel_lock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int fd = do_openat(atdirfd, name, flags, mode);
   if (fd < 0) {
     ret = fd;
@@ -1016,7 +1014,7 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
   close(fd);
   
 out:
-  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
 }
 
@@ -1030,7 +1028,7 @@ int
 user_openat(int atdirfd, const char *name, int flags, int mode)
 {
   int fd;
-  fdtable_user_lock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   fd = do_openat(atdirfd, name, flags, mode);
   if (fd < 0) {
     goto out;
@@ -1038,7 +1036,7 @@ user_openat(int atdirfd, const char *name, int flags, int mode)
   register_fd(fd, flags & LINUX_O_CLOEXEC);
 
 out:
-  fdtable_unlock(&proc.fileinfo.fdtable_lock);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return fd;
 }
 
@@ -1049,37 +1047,44 @@ user_open(const char *path, int l_flags, int mode)
 }
 
 int
-user_close(int fd)
+do_close(struct fdtable *table, int fd)
 {
-  struct file *file = get_file(fd);
-  if (file == NULL) {
+  if (fd < table->start || fd >= table->start + table->size) {
     return -LINUX_EBADF;
   }
+  if (!test_fdbit(table, table->open_fds, fd)) {
+    return -LINUX_EBADF;
+  }
+  struct file *file = &table->files[fd - table->start];
+  assert(file);
   int n = file->ops->close(file);
-  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd);
-  clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+  clear_fdbit(table, table->open_fds, fd);
+  clear_fdbit(table, table->cloexec_fds, fd);
   return n;
+}
+
+int
+user_close(int fd)
+{
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+  int ret = do_close(&proc.fileinfo.fdtable, fd);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  return ret;
 }
 
 int
 vkern_close(int fd)
 {
-  if (fd < proc.fileinfo.vkern_fdtable.start || fd >= proc.fileinfo.vkern_fdtable.start + proc.fileinfo.vkern_fdtable.size) {
-    return -LINUX_EBADF;
-  }
-  struct file *file = &proc.fileinfo.vkern_fdtable.files[fd - proc.fileinfo.vkern_fdtable.start];
-  if (file == NULL) {
-    return -LINUX_EBADF;
-  }
-  int n = file->ops->close(file);
-  clear_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, fd);
-  clear_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, fd);
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+  int n = do_close(&proc.fileinfo.vkern_fdtable, fd);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return n;
 }
 
 void
 close_cloexec()
 {
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   struct fdtable *fdtable = &proc.fileinfo.fdtable;
   for (int i = 0; i < fdtable->size / 64; i++) {
     for (int j = 0; j < 64; j++) {
@@ -1087,10 +1092,11 @@ close_cloexec()
         break;
       }
       if ((fdtable->cloexec_fds[i] >> j) & 1) {
-        user_close(fdtable->files[j + i * 64].fd);
+        do_close(fdtable, j + i * 64);
       }
     }
   }
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
 }
 
 DEFINE_SYSCALL(openat, int, dirfd, gstr_t, path_ptr, int, flags, int, mode)
@@ -1485,16 +1491,22 @@ DEFINE_SYSCALL(umask, int, mask)
 
 DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
 {
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int fd[2];
   int r = syswrap(pipe(fd));
   if (r < 0) {
-    return r;
+    goto out;
   }
   if (copy_to_user(fildes_ptr, fd, sizeof fd)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
+    goto out;
   }
   register_fd(fd[0], false);
   register_fd(fd[1], false);
+  
+out:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  
   return 0;
 }
 
@@ -1504,17 +1516,16 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
     return -LINUX_EINVAL;
   }
 
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int fildes[2];
 
-  int err = pipe(fildes);
-  if (err < 0) {
-    return err;
+  int ret = pipe(fildes);
+  if (ret < 0) {
+    goto out;
   }
 
   int err0, err1;
   if (flags & LINUX_O_CLOEXEC) {
-    // TODO: This implementation does not prevent race condition
-    //       Make sure that exec closes fds after robust fd control is implemented (i.e. VFS)
     err0 = syswrap(fcntl(fildes[0], F_SETFD, FD_CLOEXEC));
     err1 = syswrap(fcntl(fildes[1], F_SETFD, FD_CLOEXEC));
     if (err0 < 0 || err1 < 0) {
@@ -1537,26 +1548,34 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
   }
 
   if (copy_to_user(fildes_ptr, fildes, sizeof(fildes))) {
-    return -LINUX_EFAULT;
+    ret = -LINUX_EFAULT;
+    goto out;
   }
   register_fd(fildes[0], flags & LINUX_O_CLOEXEC);
   register_fd(fildes[1], flags & LINUX_O_CLOEXEC);
 
-  return 0;
+  goto out;
 
 fail_fcntl:
   close(fildes[0]);
   close(fildes[1]);
-  return (err0 < 0) ? err0 : err1;
+  ret = (err0 < 0) ? err0 : err1;
+  
+out:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  
+  return ret;
 }
 
 DEFINE_SYSCALL(dup, unsigned int, fd)
 {
+  
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int dup_fd = sys_fcntl(fd, LINUX_F_DUPFD, 0);
-  if (dup_fd < 0) {
-    return dup_fd;
+  if (dup_fd >= 0) {
+    register_fd(dup_fd, false);
   }
-  register_fd(dup_fd, false);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return dup_fd;
 }
 
@@ -1565,11 +1584,12 @@ DEFINE_SYSCALL(dup2, unsigned int, fd1, unsigned int, fd2)
   if (!fd_ok(fd1) || !fd_ok(fd2)) {
     return -LINUX_EBADF;
   }
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int dup_fd = syswrap(dup2(fd1, fd2));
-  if (dup_fd < 0) {
-    return dup_fd;
+  if (dup_fd >= 0) {
+    register_fd(dup_fd, false);
   }
-  register_fd(dup_fd, false);
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return dup_fd;
 }
 
@@ -1582,22 +1602,24 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
     return -LINUX_EINVAL;
   }
 
-  // TODO: This implementation does not prevent race condition
-  //       Make sure that exec closes fds after robust fd control is implemented (i.e. VFS)
-  int dup_fd = syswrap(dup2(oldfd, newfd));
-  if (dup_fd < 0) {
-    return dup_fd;
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+  int ret = syswrap(dup2(oldfd, newfd));
+  if (ret < 0) {
+    goto out;
   }
   if (flags & LINUX_O_CLOEXEC) {
     int fcntl_err = syswrap(fcntl(newfd, F_SETFD, FD_CLOEXEC));
     if (fcntl_err < 0) {
-      close(dup_fd);
-      return fcntl_err;
+      close(ret);
+      ret = fcntl_err;
+      goto out;
     }
   }
-  register_fd(dup_fd, flags & LINUX_O_CLOEXEC);
-
-  return dup_fd;
+  register_fd(ret, flags & LINUX_O_CLOEXEC);
+  
+out:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)

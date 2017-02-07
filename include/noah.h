@@ -96,7 +96,7 @@ struct fileinfo {
   int rootfd;                      // FS root
   struct fdtable fdtable;          // File descriptors for the user space
   struct fdtable vkern_fdtable;    // File descriptors for the kernel space
-  fdtable_lock_t fdtable_lock;     // Lock to prevent kernel fds from being visible from the user space
+  pthread_rwlock_t fdtable_lock;
 };
 
 struct proc {
