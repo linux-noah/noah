@@ -83,12 +83,15 @@ struct file_operations {
 };
 
 static inline bool in_userfd(int fd);
+static const int vkern_fdtable_maxsize = 64;
+
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
 
 void
-init_fileinfo(struct fileinfo *fileinfo, int rootfd)
+init_fileinfo(int rootfd)
 {
   struct rlimit limit;
+  struct fileinfo *fileinfo = &proc.fileinfo;
   
   getrlimit(RLIMIT_NOFILE, &limit);
   fileinfo->vkern_fdtable = (struct fdtable) {
@@ -102,8 +105,8 @@ init_fileinfo(struct fileinfo *fileinfo, int rootfd)
   fileinfo->vkern_fdtable.cloexec_fds[0] = 0;
   fileinfo->fdtable = (struct fdtable) {
     .start = 0,
-    .size = 64,
-    .files = malloc(sizeof(struct file) * 64),
+    .size = vkern_fdtable_maxsize,
+    .files = malloc(sizeof(struct file) * vkern_fdtable_maxsize),
     .open_fds = malloc(sizeof(uint64_t)),
     .cloexec_fds = malloc(sizeof(uint64_t))
   };
@@ -386,22 +389,6 @@ darwinfs_fstatfs(struct file *file, struct l_statfs *buf)
   return r;
 }
 
-static inline int
-find_emptyfd(struct fdtable *table)
-{
-  int ret = -1;
-  for (int i = 0; i < table->size / 64; i++) {
-    ret = ffs(~table->open_fds[i]);
-    if (ret > 0) {
-      break;
-    }
-  }
-  if (ret >= table->size) {
-    ret = -1;
-  }
-  return table->start + ret - 1;
-}
-
 static inline bool
 in_userfd(int fd)
 {
@@ -489,6 +476,18 @@ register_fd(int fd, bool is_cloexec)
   return 0;
 }
 
+static inline int
+find_emptyfd(struct fdtable *table)
+{
+  for (int i = 0; i < table->size / 64; i++) {
+    int ret = ffs(~table->open_fds[i]);
+    if (ret > 0) {
+      return table->start + ret - 1 + i * 64;
+    }
+  }
+  return -1;
+}
+
 int
 vkern_dup_fd(int fd, bool is_cloexec)
 {
@@ -496,7 +495,7 @@ vkern_dup_fd(int fd, bool is_cloexec)
   if (vkern_fd == -1) {
     panic("Too many files opened in the kernel space");
   }
-  dup2(fd, vkern_fd); // FIXME flags
+  dup2(fd, vkern_fd);
   set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.open_fds, vkern_fd);
   if (is_cloexec) {
     set_fdbit(&proc.fileinfo.vkern_fdtable, proc.fileinfo.vkern_fdtable.cloexec_fds, vkern_fd);

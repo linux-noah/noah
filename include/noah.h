@@ -90,8 +90,6 @@ struct fdtable {
   uint64_t *cloexec_fds;
 };
 
-typedef pthread_rwlock_t fdtable_lock_t;
-
 struct fileinfo {
   int rootfd;                      // FS root
   struct fdtable fdtable;          // File descriptors for the user space
@@ -116,7 +114,7 @@ _Thread_local extern struct task task;
 
 void init_signal(void);
 void reset_signal_state(void);
-void init_fileinfo(struct fileinfo *fileinfo, int rootfd);
+void init_fileinfo(int rootfd);
 
 void init_fpu(void);
 

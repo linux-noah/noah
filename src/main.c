@@ -394,7 +394,7 @@ init_first_proc(int rootfd)
   list_add(&task.tasks, &proc.tasks);
   init_mm(proc.mm);
   init_signal();
-  init_fileinfo(&proc.fileinfo, rootfd);
+  init_fileinfo(rootfd);
 }
 
 void
