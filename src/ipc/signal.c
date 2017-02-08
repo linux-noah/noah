@@ -12,11 +12,14 @@
 #include <stdatomic.h>
 #include <pthread.h>
 
+#define SET_SIGBIT(sigbits, lsig) (atomic_fetch_or((sigbits), (1UL << ((lsig) - 1))))
+#define CLEAR_SIGBIT(sigbits, lsig) (atomic_fetch_and((sigbits), ~(1UL << ((lsig) - 1))))
+
 static void
 __host_signal_handler(int signum, siginfo_t *info, ucontext_t *context)
 {
   /* actually no need to do it atomically */
-  sigbits_addbit(&task.sigpending, darwin_to_linux_signal(signum));
+  SET_SIGBIT(&task.sigpending, darwin_to_linux_signal(signum));
 }
 
 int
@@ -67,7 +70,7 @@ init_signal(void)
   sigset_t set;
   sigprocmask(0, NULL, &set);
   darwin_to_linux_sigset(&set, &task.sigmask);
-  sigbits_emptyset(&task.sigpending);
+  task.sigpending = ATOMIC_VAR_INIT(0);
 }
 
 static void
@@ -109,7 +112,7 @@ pop_signal()
     return 0;
   int sig = __builtin_ffs(pending);
   assert(0 < sig && sig < 32);
-  sigbits_delbit(&task.sigpending, sig);
+  CLEAR_SIGBIT(&task.sigpending, sig);
   return sig;
 }
 
@@ -295,67 +298,6 @@ handle_signal()
 DEFINE_SYSCALL(alarm, unsigned int, seconds)
 {
   return syswrap(alarm(seconds));
-}
-
-inline void
-sigbits_emptyset(atomic_sigbits_t *sigbits)
-{
-  *sigbits = ATOMIC_VAR_INIT(0);
-}
-
-inline int
-sigbits_ismember(atomic_sigbits_t *sigbits, int sig)
-{
-  return *sigbits & (1UL << (sig - 1));
-}
-
-inline uint64_t
-sigbits_load(atomic_sigbits_t *sigbits)
-{
-  return atomic_load(sigbits);
-}
-
-inline uint64_t
-sigbits_addbit(atomic_sigbits_t *sigbits, int sig)
-{
-  return atomic_fetch_or(sigbits, (1UL << (sig - 1)));
-}
-
-inline uint64_t
-sigbits_delbit(atomic_sigbits_t *sigbits, int sig)
-{
-  return atomic_fetch_and(sigbits, ~(1UL << (sig - 1)));
-}
-
-inline uint64_t
-sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set)
-{
-  return atomic_fetch_or(sigbits, LINUX_SIGSET_TO_UI64(set));
-}
-
-inline uint64_t
-sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set)
-{
-  return atomic_fetch_and(sigbits, ~(LINUX_SIGSET_TO_UI64(set)));
-}
-
-inline uint64_t
-sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set)
-{
-  return atomic_exchange(sigbits, LINUX_SIGSET_TO_UI64(set));
-}
-
-inline void
-sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set)
-{
-  for (int i = 1; i <= NSIG; i++) {
-    if (!sigismember(set, i))
-      continue;
-    int num = darwin_to_linux_signal(i);
-    if (num) {
-      sigbits_addbit(sigbits, num);
-    }
-  }
 }
 
 DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size)

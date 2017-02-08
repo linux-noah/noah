@@ -57,16 +57,7 @@ void main_loop(int return_on_sigret);
 
 typedef atomic_uint_least64_t atomic_sigbits_t;
 
-void sigbits_emptyset(atomic_sigbits_t *sigbits);
-int  sigbits_ismember(atomic_sigbits_t *sigbits, int sig);
-uint64_t sigbits_load(atomic_sigbits_t *sigbits);
-uint64_t sigbits_addbit(atomic_sigbits_t *sigbits, int sig);
-uint64_t sigbits_delbit(atomic_sigbits_t *sigbits, int sig);
-uint64_t sigbits_addset(atomic_sigbits_t *sigbits, l_sigset_t *set);
-uint64_t sigbits_delset(atomic_sigbits_t *sigbits, l_sigset_t *set);
-uint64_t sigbits_replace(atomic_sigbits_t *sigbits, l_sigset_t *set);
-void sigset_to_sigbits(atomic_sigbits_t *sigbits, sigset_t *set);
-
+#define INIT_SIGBIT(sigbit) (*(sigbit) = ATOMIC_VAR_INIT(0))
 void handle_signal(void);
 bool has_sigpending(void);
 int send_signal(pid_t pid, int sig);
