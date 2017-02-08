@@ -76,7 +76,7 @@ struct clone_thread_arg {
   gaddr_t parent_tid;
   gaddr_t child_tid;
   gaddr_t tls;
-  struct vcpu_snapshot *vcpu_snapshot;
+  struct vcpu_snapshot vcpu_snapshot;
 };
 
 static void*
@@ -86,7 +86,7 @@ __start_thread(struct clone_thread_arg *arg)
 
   printk("__start_thread\n");
 
-  vmm_create_vcpu(arg->vcpu_snapshot);
+  vmm_create_vcpu(&arg->vcpu_snapshot);
   vmm_write_register(HV_X86_RAX, 0);
   vmm_write_register(HV_X86_RSP, arg->newsp);
   vmm_read_register(HV_X86_RIP, &rip);
@@ -101,7 +101,6 @@ __start_thread(struct clone_thread_arg *arg)
 
   init_task(arg->clone_flags, arg->child_tid, arg->tls);
 
-  free(arg->vcpu_snapshot);
   free(arg);
 
   main_loop(0);
@@ -116,10 +115,9 @@ __do_clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent
   uint64_t tid;
   pthread_t threadid;
 
-  struct vcpu_snapshot *snapshot = malloc(sizeof(struct vcpu_snapshot));
   struct clone_thread_arg *arg = malloc(sizeof(struct clone_thread_arg));
-  *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls, snapshot};
-  vmm_snapshot_vcpu(snapshot);
+  *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls};
+  vmm_snapshot_vcpu(&arg->vcpu_snapshot);
   pthread_create(&threadid, NULL, (void *)__start_thread, arg);
   pthread_threadid_np(threadid, &tid);
 

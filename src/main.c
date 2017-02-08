@@ -368,7 +368,30 @@ init_fpu()
 }
 
 static void
-init_vkernel()
+init_first_proc(const char *root)
+{
+  proc = (struct proc) {
+    .nr_tasks = 1,
+    .lock = PTHREAD_RWLOCK_INITIALIZER,
+    .mm = malloc(sizeof(struct mm)),
+  };
+  INIT_LIST_HEAD(&proc.tasks);
+  list_add(&task.head, &proc.tasks);
+  init_mm(proc.mm);
+  init_signal();
+  int rootfd = open(root, O_RDONLY | O_DIRECTORY);
+  if (rootfd < 0) {
+    perror("could not open initial root directory");
+    exit(1);
+  }
+  init_fileinfo(rootfd);
+  close(rootfd);
+  proc.pfutex = kh_init(pfutex);
+  pthread_rwlock_init(&proc.futex_lock, NULL);
+}
+
+static void
+init_vkernel(const char *root)
 {
   init_mm(&vkern_mm);
   init_shm_malloc();
@@ -380,21 +403,8 @@ init_vkernel()
   init_idt();
   init_regs();
   init_fpu();
-}
 
-static void
-init_first_proc(int rootfd)
-{
-  proc = (struct proc) {
-    .nr_tasks = 1,
-    .lock = PTHREAD_RWLOCK_INITIALIZER,
-    .mm = malloc(sizeof(struct mm)),
-  };
-  INIT_LIST_HEAD(&proc.tasks);
-  list_add(&task.head, &proc.tasks);
-  init_mm(proc.mm);
-  init_signal();
-  init_fileinfo(rootfd);
+  init_first_proc(root);
 }
 
 void
@@ -417,7 +427,7 @@ void
 die_with_forcedsig(int sig)
 {
   // TODO: Termination processing
-  
+
   /* Force default signal action */
   int dsig = linux_to_darwin_signal(sig);
   sigset_t mask;
@@ -477,17 +487,11 @@ main(int argc, char *argv[], char **envp)
   if (argc == 0) {
     abort();
   }
-  
+
   vmm_create();
-  init_vkernel();
-  int rootfd = open(root, O_RDONLY | O_DIRECTORY);
-  if (rootfd < 0) {
-    perror("could not open initial root directory");
-    exit(1);
-  }
-  init_first_proc(rootfd);
-  close(rootfd);
-  
+
+  init_vkernel(root);
+
   for (int i = PRINTK_PATH; i < MAX_DEBUG_PATH; i++) {
     static void (* init_funcs[3])(const char *path) = {
       [PRINTK_PATH] = init_printk,

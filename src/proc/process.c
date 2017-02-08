@@ -153,11 +153,16 @@ DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
   return 0;
 }
 
-DEFINE_SYSCALL(gettid)
+uint64_t do_gettid()
 {
   uint64_t tid;
   pthread_threadid_np(NULL, &tid);
   return tid;
+}
+
+DEFINE_SYSCALL(gettid)
+{
+  return do_gettid();
 }
 
 DEFINE_SYSCALL(setsid)
@@ -311,11 +316,12 @@ DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
 DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 {
   task.clear_child_tid = tidptr;
-  return sys_gettid();
+  return do_gettid();
 }
 
 DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
 {
+  warnk("set_robust_list is unimplemented\n");
   return 0;
 }
 

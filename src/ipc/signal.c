@@ -138,7 +138,7 @@ setup_sigcontext(struct l_sigcontext *mcontext)
   vmm_read_register(HV_X86_RIP, &mcontext->sc_rip);
   vmm_read_register(HV_X86_RFLAGS, &mcontext->sc_rflags);
   uint64_t cs, gs, fs, ss;
-  vmm_read_register(HV_X86_CS, &cs); // Is saving segment indices really suffice? Manipulating base, limit may be needed.
+  vmm_read_register(HV_X86_CS, &cs); // Does saving segment indices really suffice? Manipulating base, limit may be needed.
   vmm_read_register(HV_X86_GS, &gs);
   vmm_read_register(HV_X86_FS, &fs);
   vmm_read_register(HV_X86_SS, &ss);
@@ -178,7 +178,7 @@ restore_sigcontext(struct l_sigcontext *mcontext)
   vmm_write_register(HV_X86_GS, mcontext->sc_gs);
   vmm_write_register(HV_X86_FS, mcontext->sc_fs);
   vmm_write_register(HV_X86_SS, mcontext->sc_ss); // TODO: handle ss register more carefully if you want to support software such as DOSEMU
-  
+
   // TODO: restore FPU state
 }
 
@@ -341,7 +341,7 @@ DEFINE_SYSCALL(rt_sigaction, int, sig, gaddr_t, act, gaddr_t, oact, size_t, size
 
   int err = 0;
   pthread_rwlock_wrlock(&proc.sig_lock);
-  
+
   err = syswrap(sigaction(dsig, &dact, &doact));
   if (err >= 0) {
     proc.sigaction[sig - 1] = lact;

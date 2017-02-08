@@ -7,6 +7,7 @@
 #include "types.h"
 #include "util/misc.h"
 #include "util/list.h"
+#include "util/khash.h"
 #include "linux/mman.h"
 #include "malloc.h"
 #include "version.h"
@@ -34,6 +35,7 @@ ssize_t strnlen_user(gaddr_t gaddr, size_t n);
 
 /* linux emulation */
 
+uint64_t do_gettid(void);
 int do_exec(const char *elf_path, int argc, char *argv[], char **envp);
 int do_faccessat(int l_dirfd, const char *l_path, int l_mode);
 int do_access(const char *path, int l_mode);
@@ -87,6 +89,16 @@ struct fileinfo {
   pthread_rwlock_t fdtable_lock;
 };
 
+/* for private futex */
+struct pfutex_entry {
+  pthread_mutex_t mutex;
+  int nr_waiters;
+  pthread_cond_t cond;
+};
+
+/* TODO: collect garbage entries */
+KHASH_MAP_INIT_INT64(pfutex, struct pfutex_entry *)
+
 struct proc {
   int nr_tasks;
   struct list_head tasks;
@@ -95,6 +107,10 @@ struct proc {
   struct {
     pthread_rwlock_t sig_lock;
     l_sigaction_t sigaction[LINUX_NSIG];
+  };
+  struct {
+    pthread_rwlock_t futex_lock;
+    khash_t(pfutex) *pfutex; /* TODO: modify khash and make this field being non-pointer */
   };
   struct fileinfo fileinfo;
 };
