@@ -215,7 +215,7 @@ DEFINE_SYSCALL(exit, int, reason)
     _exit(reason);
   } else {
     proc.nr_tasks--;
-    list_del(&task.tasks);
+    list_del(&task.head);
     pthread_rwlock_unlock(&proc.lock);
     pthread_exit(&reason);
   }

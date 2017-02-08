@@ -73,9 +73,8 @@ int send_signal(pid_t pid, int sig);
 
 /* task related data */
 
-
 struct task {
-  struct list_head tasks; /* Threads in the current proc */
+  struct list_head head;
   gaddr_t set_child_tid, clear_child_tid;
   l_sigset_t sigmask;
   atomic_sigbits_t sigpending;

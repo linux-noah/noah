@@ -391,7 +391,7 @@ init_first_proc(int rootfd)
     .mm = malloc(sizeof(struct mm)),
   };
   INIT_LIST_HEAD(&proc.tasks);
-  list_add(&task.tasks, &proc.tasks);
+  list_add(&task.head, &proc.tasks);
   init_mm(proc.mm);
   init_signal();
   init_fileinfo(rootfd);

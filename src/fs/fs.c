@@ -92,7 +92,7 @@ init_fileinfo(int rootfd)
 {
   struct rlimit limit;
   struct fileinfo *fileinfo = &proc.fileinfo;
-  
+
   getrlimit(RLIMIT_NOFILE, &limit);
   fileinfo->vkern_fdtable = (struct fdtable) {
     .start = limit.rlim_cur - 64,
@@ -112,7 +112,7 @@ init_fileinfo(int rootfd)
   };
   fileinfo->fdtable.open_fds[0] = 0;
   fileinfo->fdtable.cloexec_fds[0] = 0;
-  
+
   for (int i = 0; i < (int) limit.rlim_cur; i++) {
     if (i == rootfd) {
       continue;
@@ -311,7 +311,7 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
   int r;
   struct l_flock lflock;
   struct flock dflock;
-  
+
   switch (cmd) {
   case LINUX_F_DUPFD:
     return syswrap(fcntl(file->fd, F_DUPFD, arg)); /* FIXME */
@@ -519,14 +519,14 @@ get_file(int fd)
   if (fd < 0 || fd >= proc.fileinfo.fdtable.size) {
     return NULL;
   }
-  
+
   struct file *ret = NULL;
   pthread_rwlock_rdlock(&proc.fileinfo.fdtable_lock);
   if (!test_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd)) {
     goto out;
   }
   ret = &proc.fileinfo.fdtable.files[fd - proc.fileinfo.fdtable.start];
-  
+
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
@@ -1014,7 +1014,7 @@ int
 vkern_openat(int atdirfd, const char *name, int flags, int mode)
 {
   int ret;
-  
+
   pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
   int fd = do_openat(atdirfd, name, flags, mode);
   if (fd < 0) {
@@ -1023,7 +1023,7 @@ vkern_openat(int atdirfd, const char *name, int flags, int mode)
   }
   ret = vkern_dup_fd(fd, flags & LINUX_O_CLOEXEC);
   close(fd);
-  
+
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
@@ -1523,10 +1523,10 @@ DEFINE_SYSCALL(pipe, gaddr_t, fildes_ptr)
     close(err0);
     close(err1);
   }
-  
+
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
-  
+
   return r;
 }
 
@@ -1566,7 +1566,7 @@ DEFINE_SYSCALL(pipe2, gaddr_t, fildes_ptr, int, flags)
       goto close_by_fail;
     }
   }
-  
+
   err0 = register_fd(fildes[0], flags & LINUX_O_CLOEXEC);
   err1 = register_fd(fildes[1], flags & LINUX_O_CLOEXEC);
   if (err0 < 0 || err1 < 0) {
@@ -1583,10 +1583,10 @@ close_by_fail:
   close(fildes[0]);
   close(fildes[1]);
   ret = (err0 < 0) ? err0 : err1;
-  
+
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
-  
+
   return ret;
 }
 
@@ -1650,7 +1650,7 @@ DEFINE_SYSCALL(dup3, unsigned int, oldfd, unsigned int, newfd, int, flags)
     close(ret);
     ret = err;
   }
-  
+
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
   return ret;
@@ -1658,8 +1658,6 @@ out:
 
 DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)
 {
-  //TODO no need to use vfs?
-  
   if (!in_userfd(fd)) {
     return -LINUX_EBADF;
   }
@@ -1693,7 +1691,7 @@ DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, g
   fd_set readfds, writefds, errorfds;
   struct timeval *to;
   fd_set *rfds, *wfds, *efds;
-  
+
   if (nfds - 1 >= proc.fileinfo.vkern_fdtable.start) {
     return -LINUX_EBADF;
   }
@@ -1748,7 +1746,7 @@ DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr,
   fd_set readfds, writefds, errorfds;
   struct timespec *to;
   fd_set *rfds, *wfds, *efds;
-  
+
   if (nfds - 1 >= proc.fileinfo.vkern_fdtable.start) {
     return -LINUX_EBADF;
   }
@@ -1801,14 +1799,14 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
   /* FIXME! event numbers should be translated */
 
   struct pollfd fds[nfds];
-  
+
   if (nfds > OPEN_MAX) {
     return -LINUX_EINVAL;
   }
 
   if (copy_from_user(fds, fds_ptr, sizeof fds))
     return -LINUX_EFAULT;
-  
+
   for (int i = 0; i < nfds; i++) {
     if (!in_userfd(fds[i].fd)) {
       return -LINUX_EBADF;

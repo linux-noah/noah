@@ -94,7 +94,7 @@ __start_thread(struct clone_thread_arg *arg)
 
   pthread_rwlock_wrlock(&proc.lock);
   proc.nr_tasks++;
-  list_add(&task.tasks, &proc.tasks);
+  list_add(&task.head, &proc.tasks);
   pthread_rwlock_unlock(&proc.lock);
 
   sigbits_emptyset(&task.sigpending);
