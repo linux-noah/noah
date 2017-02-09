@@ -25,9 +25,8 @@ init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
   }
 
   if (task.set_child_tid != 0) {
-    int pid = getpid();
+    int pid = do_gettid();
     if (copy_to_user(task.set_child_tid, &pid, sizeof pid)) {
-      printk("fixme");
       assert(false);
     }
   }
@@ -76,6 +75,8 @@ struct clone_thread_arg {
   gaddr_t parent_tid;
   gaddr_t child_tid;
   gaddr_t tls;
+  pthread_cond_t cond;
+  pthread_mutex_t mutex;
   struct vcpu_snapshot vcpu_snapshot;
 };
 
@@ -83,6 +84,8 @@ static void*
 __start_thread(struct clone_thread_arg *arg)
 {
   uint64_t rip;
+
+  pthread_mutex_lock(&arg->mutex);
 
   printk("__start_thread\n");
 
@@ -101,6 +104,10 @@ __start_thread(struct clone_thread_arg *arg)
 
   init_task(arg->clone_flags, arg->child_tid, arg->tls);
 
+  pthread_mutex_unlock(&arg->mutex);
+  pthread_cond_signal(&arg->cond);
+
+  pthread_cond_destroy(&arg->cond);
   free(arg);
 
   main_loop(0);
@@ -115,10 +122,14 @@ __do_clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent
   uint64_t tid;
   pthread_t threadid;
 
-  struct clone_thread_arg *arg = malloc(sizeof(struct clone_thread_arg));
+  struct clone_thread_arg *arg = malloc(sizeof *arg);
   *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls};
   vmm_snapshot_vcpu(&arg->vcpu_snapshot);
+  pthread_cond_init(&arg->cond, NULL);
+  pthread_mutex_init(&arg->mutex, NULL);
+  pthread_mutex_lock(&arg->mutex);
   pthread_create(&threadid, NULL, (void *)__start_thread, arg);
+  pthread_cond_wait(&arg->cond, &arg->mutex);
   pthread_threadid_np(threadid, &tid);
 
   return tid;
