@@ -375,6 +375,7 @@ prepare_newproc(void)
   reset_signal_state();
   // TODO: destroy LDT if it is implemented
 
+  /* task.tid = getpid(); */
   task.clear_child_tid = task.set_child_tid = 0;
   close_cloexec();
 }

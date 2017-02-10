@@ -16,6 +16,15 @@
 static void
 init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
 {
+  LINUX_SIGEMPTYSET(&task.sigmask);
+  INIT_SIGBIT(&task.sigpending);
+
+  if (clone_flags & LINUX_CLONE_THREAD) {
+    pthread_threadid_np(NULL, &task.tid);
+  } else {
+    task.tid = getpid();
+  }
+
   task.set_child_tid = task.clear_child_tid = 0;
   if (clone_flags & LINUX_CLONE_CHILD_SETTID) {
     task.set_child_tid = child_tid;
@@ -25,14 +34,11 @@ init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
   }
 
   if (task.set_child_tid != 0) {
-    int pid = do_gettid();
-    if (copy_to_user(task.set_child_tid, &pid, sizeof pid)) {
+    int tid = do_gettid();
+    if (copy_to_user(task.set_child_tid, &tid, sizeof tid)) {
       assert(false);
     }
   }
-
-  LINUX_SIGEMPTYSET(&task.sigmask);
-  INIT_SIGBIT(&task.sigpending);
 
   if (clone_flags & LINUX_CLONE_SETTLS) {
     vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);
@@ -57,7 +63,17 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
   }
 
   if (ret == 0) {
+    /* NB: we don't yet support multi-threaded execve so comment out the following: */
+    /* proc.nr_tasks = 1; */
+    /* INIT_LIST_HEAD(&proc.tasks); */
+    /* list_add(&task.head, &proc.tasks); */
     init_task(clone_flags, child_tid, tls);
+    if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
+      int tid = getpid();
+      if (copy_to_user(parent_tid, &tid, sizeof tid)) {
+        return -LINUX_EFAULT;
+      }
+    }
   } else {
     if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
       if (copy_to_user(parent_tid, &ret, sizeof ret)) {

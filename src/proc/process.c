@@ -155,15 +155,7 @@ DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
 
 uint64_t do_gettid()
 {
-  uint64_t tid;
-  pthread_rwlock_rdlock(&proc.lock);
-  if (proc.nr_tasks == 1) {
-    tid = getpid();
-  } else {
-    pthread_threadid_np(NULL, &tid);
-  }
-  pthread_rwlock_unlock(&proc.lock);
-  return tid;
+  return task.tid;
 }
 
 DEFINE_SYSCALL(gettid)

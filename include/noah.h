@@ -69,6 +69,7 @@ int send_signal(pid_t pid, int sig);
 struct task {
   struct list_head head;
   gaddr_t set_child_tid, clear_child_tid;
+  uint64_t tid;
   l_sigset_t sigmask;
   atomic_sigbits_t sigpending;
   l_stack_t sas;
