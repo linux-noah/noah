@@ -1685,6 +1685,7 @@ DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 
 DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, gaddr_t, errorfds_ptr, gaddr_t, timeout_ptr)
 {
+  // TODO: Check if fd is in userspace
   // Darwin's fd_set and timeval is compatible with those of Linux
 
   struct timeval timeout;
@@ -1740,6 +1741,7 @@ DEFINE_SYSCALL(select, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, g
 
 DEFINE_SYSCALL(pselect6, int, nfds, gaddr_t, readfds_ptr, gaddr_t, writefds_ptr, gaddr_t, errorfds_ptr, gaddr_t, timeout_ptr, gaddr_t, sigmask_ptr)
 {
+  // TODO: Check if fd is in userspace
   // Darwin's fd_set and timeval is compatible with those of Linux
 
   struct timespec timeout;
@@ -1798,26 +1800,37 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
 {
   /* FIXME! event numbers should be translated */
 
-  struct pollfd fds[nfds];
+  struct pollfd l_fds[nfds], d_fds[nfds];
 
   if (nfds > OPEN_MAX) {
     return -LINUX_EINVAL;
   }
 
-  if (copy_from_user(fds, fds_ptr, sizeof fds))
+  if (copy_from_user(l_fds, fds_ptr, sizeof l_fds))
     return -LINUX_EFAULT;
 
   for (int i = 0; i < nfds; i++) {
-    if (!in_userfd(fds[i].fd)) {
-      return -LINUX_EBADF;
+    d_fds[i] = l_fds[i];
+    if (!in_userfd(l_fds[i].fd)) {
+      d_fds[i].fd = -1;
     }
+    POLLIN;
   }
 
-  int r = syswrap(poll(fds, nfds, timeout));
+  int r = syswrap(poll(d_fds, nfds, timeout));
   if (r < 0)
     return r;
 
-  if (copy_to_user(fds_ptr, fds, sizeof fds))
+  for (int i = 0; i < nfds; i++) {
+    if (in_userfd(l_fds[i].fd) || l_fds[i].fd < 0 || l_fds[i].events == 0) {
+      l_fds[i].revents = d_fds[i].revents;
+    } else {
+      l_fds[i].revents = LINUX_POLLNVAL;
+      r++;
+    }
+  }
+
+  if (copy_to_user(fds_ptr, l_fds, sizeof l_fds))
     return -LINUX_EFAULT;
 
   return r;

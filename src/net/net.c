@@ -448,6 +448,12 @@ DEFINE_SYSCALL(accept, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr)
   if (ret < 0) {
     goto err;
   }
+  int e = register_fd(ret, false);
+  if (e < 0) {
+    close(ret);
+    ret = e;
+    goto err;
+  }
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
     darwin_to_linux_sockaddr((struct l_sockaddr *) addr, sock_ptr);
