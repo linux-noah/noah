@@ -204,18 +204,18 @@ DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval_pt
 
 DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval_ptr, gaddr_t, optlen_ptr)
 {
-  l_socklen_t len;
-  if (copy_from_user(&len, optlen_ptr, sizeof len))
+  l_socklen_t l_optlen;
+  if (copy_from_user(&l_optlen, optlen_ptr, sizeof l_optlen))
     return -LINUX_EFAULT;
-  char optval[len];
-  unsigned int optlen;
+  char optval[l_optlen];
+  unsigned int optlen = l_optlen;
   // Darwin's optval is compatible with that of Linux
   int r = syswrap(getsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, &optlen));
   if (r >= 0) {
     if (copy_to_user(optval_ptr, optval, optlen))
       return -LINUX_EFAULT;
-    l_socklen_t tmp = optlen;
-    if (copy_to_user(optlen_ptr, &tmp, sizeof tmp))
+    l_optlen = optlen;
+    if (copy_to_user(optlen_ptr, &l_optlen, sizeof l_optlen))
       return -LINUX_EFAULT;
   }
   return r;
