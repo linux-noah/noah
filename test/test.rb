@@ -77,7 +77,7 @@ end
 
 def test_stdout(targets = nil)
   Dir.glob(__dir__ + "/test_stdout/build/*").each do |target|
-    next if targets && !targets.include?(target)
+    next if targets && !targets.include?(File.basename(target))
     puts_testname(target)
     testdata_base = __dir__ + "/test_stdout/" + File.basename(target)
     target_stdin = File.exists?(testdata_base + ".stdin") ? (testdata_base + ".stdin").shellescape : "/dev/null"
@@ -104,7 +104,7 @@ end
 
 def test_shell(targets = nil)
   Dir.glob(__dir__ + "/test_shell/build/*").each do |target|
-    next if targets && !targets.include?(target)
+    next if targets && !targets.include?(File.basename(target))
     puts_testname(target)
     run = __dir__ + "/test_shell/" + File.basename(target) + ".sh"
 
