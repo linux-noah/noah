@@ -33,7 +33,7 @@ if (! -d $noahdir) {
 if (! defined $root) {
   $root = "$noahdir/tree";
   if (! -d $root) {
-    prompt_yn("Noah is installing the initial filesystem in ~/.noah/tree. Proceed? [Y/n]") or exit 1;
+    prompt_yn("Noah is installing the initial filesystem in ~/.noah/tree. Proceed? [Y/n]", "y") or exit 1;
     system "sudo noahstrap -p ubuntu $root";
   }
 }
@@ -43,7 +43,7 @@ my $noah = "@CMAKE_INSTALL_PREFIX@/libexec/noah";
 if ($> != 0) {
   my $st = stat $noah;
   if ($st->uid != 0 || ($st->mode & 04000) == 0) {
-    if (prompt_yn("Allow noah to run as root by default? [Y/n]")) {
+    if (prompt_yn("Allow noah to run as root? It's necessary for privileged commands such as sudo.\nNoah is still under development, so please enable it at your own risk! [y/N]", "n")) {
       system "sudo chown root:admin $noah";
       system "sudo chmod u+s $noah";
     } else {
@@ -69,9 +69,10 @@ if (defined $output) {
 system "${noah} -m $root $opts $init";
 
 sub prompt_yn {
-  my ($query) = @_;
+  my ($query, $default) = @_;
   my $ans = prompt($query);
-  return ($ans eq '' or $ans eq 'y' or $ans eq 'Y');
+  $ans = $default if ($ans eq '');
+  return ($ans eq 'y' or $ans eq 'Y');
 }
 
 sub prompt {
