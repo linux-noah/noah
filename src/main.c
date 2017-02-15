@@ -388,6 +388,12 @@ init_first_proc(const char *root)
   close(rootfd);
   proc.pfutex = kh_init(pfutex);
   pthread_mutex_init(&proc.futex_mutex, NULL);
+  proc.cred = (struct cred) {
+    .uid = getuid(),
+    .euid = geteuid(),
+    .suid = geteuid(),
+  };
+  pthread_rwlock_init(&proc.cred.lock, NULL);
 
   task.tid = getpid();
 }
@@ -417,12 +423,17 @@ drop_privilege(void)
   }
 }
 
+int sys_setresuid(int, int, int);
 void
 elevate_privilege(void)
 {
+  pthread_rwlock_wrlock(&proc.cred.lock);
+  proc.cred.euid = 0;
+  proc.cred.suid = 0;
   if (seteuid(0) != 0) {
     panic("elevate_privilege");
   }
+  pthread_rwlock_unlock(&proc.cred.lock);
 }
 
 void

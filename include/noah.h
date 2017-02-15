@@ -91,6 +91,15 @@ struct fileinfo {
   pthread_rwlock_t fdtable_lock;
 };
 
+// We manage uid and suid independently on Darwin since we cannot change those of Darwin's freely.
+// Wa always hold 0 in Darwin's suid to emulate Linux suid behavior (Note: in the case where Noah has setuid bit).
+struct cred {
+  pthread_rwlock_t lock;
+  l_uid_t uid;
+  l_uid_t euid;
+  l_uid_t suid;
+};
+
 /* for private futex */
 struct pfutex_entry {
   struct list_head head;
@@ -106,6 +115,7 @@ struct proc {
   int nr_tasks;
   struct list_head tasks;
   pthread_rwlock_t lock;
+  struct cred cred;
   struct mm *mm;
   struct {
     pthread_rwlock_t sig_lock;

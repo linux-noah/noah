@@ -20,6 +20,8 @@
 #include "linux/errno.h"
 #include "linux/futex.h"
 
+#include <sys/sysctl.h>
+
 struct proc proc;
 _Thread_local struct task task;
 
@@ -36,7 +38,10 @@ DEFINE_SYSCALL(getpid)
 
 DEFINE_SYSCALL(getuid)
 {
-  return syswrap(getuid());
+  pthread_rwlock_rdlock(&proc.cred.lock);
+  int ret = proc.cred.uid;
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(getgid)
@@ -44,9 +49,70 @@ DEFINE_SYSCALL(getgid)
   return syswrap(getgid());
 }
 
+static inline int
+macos_getsuid()
+{
+  struct kinfo_proc kinfo;
+  size_t len = sizeof kinfo;
+  int name[] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+  int ret  = sysctl(name, 4, &kinfo, &len, NULL, 0);
+  if (ret < 0) {
+    return ret;
+  }
+  return kinfo.kp_eproc.e_pcred.p_svuid;
+}
+
+// Linux's setuid is not compatible with POSIX.1-2001.
+// It does not set real uid and saved-uid unless the current uid is capable of CAP_SETUID (in Noah, it means root now)
 DEFINE_SYSCALL(setuid, l_uid_t, uid)
 {
-  return syswrap(setuid(uid));
+  if (uid == (l_uid_t) -1) {
+    return -LINUX_EINVAL;
+  }
+  int ret = 0;
+  pthread_rwlock_wrlock(&proc.cred.lock);
+  l_uid_t new_ruid = proc.cred.uid, new_euid = proc.cred.euid, new_suid = proc.cred.suid;
+  if (proc.cred.euid == 0) {
+    new_suid = new_ruid = uid;
+  } else if (proc.cred.uid != uid && proc.cred.suid != uid) {
+    ret = -LINUX_EPERM;
+    goto out;
+  }
+  new_euid = uid;
+  if (proc.cred.euid != 0 && new_euid != proc.cred.uid) {
+    // The app is getting back from a NON-root user to the NON-root saved user ID.
+    // We have to get root privilege once for it.
+    // To implement it, we need some kind of global lock for security. So just panic now.
+    panic("Noah cannot setuid from non-root to non-root saved set-user-ID currently. Panic to prevent privileged software from becoming out of control");
+    
+    /* Implementation would be like this...
+    acquire_global_lock_to_stop_other_threads();
+    if (syswrap(seteuid(0)) < 0) {
+      panic("cannot seteuid(0) in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
+            proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
+    }
+    ...after setruid below
+    unlock_it();
+    */
+  }
+  // Call setruid and seteuid instead of setreuid because it also overwrites saved set-user-ID
+  ret = syswrap(setruid(new_ruid));
+  if (ret < 0) {
+    panic("cannot setruid in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
+  }
+  ret = syswrap(seteuid(new_euid));
+  if (ret < 0) {
+    panic("cannot seteuid in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
+  }
+  proc.cred.uid = new_ruid;
+  proc.cred.euid = new_euid;
+  proc.cred.suid = new_suid;
+  
+out:
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(setgid, l_gid_t, gid)
@@ -56,12 +122,125 @@ DEFINE_SYSCALL(setgid, l_gid_t, gid)
 
 DEFINE_SYSCALL(geteuid)
 {
-  return syswrap(geteuid());
+  pthread_rwlock_rdlock(&proc.cred.lock);
+  int ret = proc.cred.euid;
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(getegid)
 {
   return syswrap(getegid());
+}
+
+static inline bool
+can_setresxid(l_uid_t id)
+{
+  return proc.cred.euid == 0 || proc.cred.euid == id || proc.cred.uid == id || proc.cred.suid == id;
+}
+
+DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
+{
+  int ret = 0;
+  pthread_rwlock_wrlock(&proc.cred.lock);
+  warnk("setresuid: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+  l_uid_t new_ruid = proc.cred.uid, new_euid = proc.cred.euid, new_suid = proc.cred.suid;
+  if (ruid != (l_uid_t) -1) {
+    if (can_setresxid(ruid)) {
+      new_ruid = ruid;
+    } else {
+      ret = -LINUX_EPERM;
+      goto out;
+    }
+  }
+  if (euid != (l_uid_t) -1) {
+    if (can_setresxid(euid)) {
+      new_euid = euid;
+    } else {
+      ret = -LINUX_EPERM;
+      goto out;
+    }
+  }
+  if (suid != (l_uid_t) -1) {
+    if (can_setresxid(suid)) {
+      new_suid = suid;
+    } else {
+      ret = -LINUX_EPERM;
+      goto out;
+    }
+  }
+  // Call setruid and seteuid instead of setreuid because it also overwrites saved set-user-ID
+  warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+  warnk("setruid\n");
+  ret = syswrap(setruid(new_ruid));
+  if (ret < 0) {
+    panic("cannot setruid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
+  }
+  warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+  warnk("seteuid\n");
+  ret = syswrap(seteuid(new_euid));
+  if (ret < 0) {
+    panic("cannot seteuid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
+  }
+  proc.cred.uid = new_ruid;
+  proc.cred.euid = new_euid;
+  proc.cred.suid = new_suid;
+  
+out:
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
+}
+
+DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
+{
+  int ret = 0;
+  pthread_rwlock_rdlock(&proc.cred.lock);
+  if (copy_to_user(ruid, &proc.cred.uid, sizeof proc.cred.uid)) {
+    ret = -LINUX_EFAULT;
+    goto out;
+  }
+  if (copy_to_user(euid, &proc.cred.euid, sizeof proc.cred.euid)) {
+    ret = -LINUX_EFAULT;
+    goto out;
+  }
+  if (copy_to_user(suid, &proc.cred.suid, sizeof proc.cred.suid)) {
+    ret = -LINUX_EFAULT;
+    goto out;
+  }
+  
+out:
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
+}
+
+DEFINE_SYSCALL(setresgid, l_gid_t, rgid, l_gid_t, egid, l_gid_t, sgid)
+{
+  return syswrap(setregid(rgid, egid));
+}
+
+DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
+{
+  int n;
+  n = getgid();
+  if (copy_to_user(rgid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = getegid();
+  if (copy_to_user(egid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  n = getgid();
+  if (copy_to_user(sgid, &n, sizeof n)) {
+    return -LINUX_EFAULT;
+  }
+  return 0;
+}
+
+DEFINE_SYSCALL(setsid)
+{
+  return syswrap(setsid());
 }
 
 DEFINE_SYSCALL(setpgid, pid_t, pid, pid_t, pgid)
@@ -108,52 +287,6 @@ DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
   return syswrap(setgroups(gidsetsize, gl));
 }
 
-DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
-{
-  return syswrap(setreuid(ruid, euid));
-}
-
-DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
-{
-  int n;
-  n = getuid();
-  if (copy_to_user(ruid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  n = geteuid();
-  if (copy_to_user(euid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  n = getuid();
-  if (copy_to_user(suid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  return 0;
-}
-
-DEFINE_SYSCALL(setresgid, l_gid_t, rgid, l_gid_t, egid, l_gid_t, sgid)
-{
-  return syswrap(setregid(rgid, egid));
-}
-
-DEFINE_SYSCALL(getresgid, gaddr_t, rgid, gaddr_t, egid, gaddr_t, sgid)
-{
-  int n;
-  n = getgid();
-  if (copy_to_user(rgid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  n = getegid();
-  if (copy_to_user(egid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  n = getgid();
-  if (copy_to_user(sgid, &n, sizeof n)) {
-    return -LINUX_EFAULT;
-  }
-  return 0;
-}
-
 uint64_t do_gettid()
 {
   return task.tid;
@@ -162,11 +295,6 @@ uint64_t do_gettid()
 DEFINE_SYSCALL(gettid)
 {
   return do_gettid();
-}
-
-DEFINE_SYSCALL(setsid)
-{
-  return syswrap(setsid());
 }
 
 DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
