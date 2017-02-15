@@ -34,6 +34,7 @@ struct pfutex_entry *pfutex_get(gaddr_t uaddr)
     struct pfutex_entry *e = malloc(sizeof *e);
     e->nr_waiters = 0;
     pthread_cond_init(&e->cond, NULL);
+    pthread_mutex_init(&e->mutex, NULL);
     kh_value(proc.pfutex, k) = e;
   }
   entry = kh_value(proc.pfutex, k);
