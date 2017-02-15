@@ -40,6 +40,10 @@ init_task(unsigned long clone_flags, gaddr_t child_tid, gaddr_t tls)
     }
   }
 
+  /* TODO: do we need to clear task.robust_list when CLONE_THREAD is set? */
+  /* task.robust_list = 0; */
+  /* task.robust_list_len = 0; */
+
   if (clone_flags & LINUX_CLONE_SETTLS) {
     vmm_write_vmcs(VMCS_GUEST_FS_BASE, tls);
   }
@@ -120,11 +124,9 @@ __start_thread(struct clone_thread_arg *arg)
 
   init_task(arg->clone_flags, arg->child_tid, arg->tls);
 
-  pthread_mutex_unlock(&arg->mutex);
   pthread_cond_signal(&arg->cond);
 
-  pthread_cond_destroy(&arg->cond);
-  free(arg);
+  pthread_mutex_unlock(&arg->mutex);
 
   main_loop(0);
 
@@ -146,6 +148,11 @@ __do_clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent
   pthread_mutex_lock(&arg->mutex);
   pthread_create(&threadid, NULL, (void *)__start_thread, arg);
   pthread_cond_wait(&arg->cond, &arg->mutex);
+  pthread_mutex_unlock(&arg->mutex);
+  pthread_cond_destroy(&arg->cond);
+  pthread_mutex_destroy(&arg->mutex);
+  free(arg);
+
   pthread_threadid_np(threadid, &tid);
 
   return tid;

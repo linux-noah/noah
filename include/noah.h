@@ -70,6 +70,8 @@ struct task {
   struct list_head head;
   gaddr_t set_child_tid, clear_child_tid;
   uint64_t tid;
+  gaddr_t robust_list;
+  size_t robust_list_len;
   l_sigset_t sigmask;
   atomic_sigbits_t sigpending;
   l_stack_t sas;

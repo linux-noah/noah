@@ -106,6 +106,7 @@ FUTEX_WAKE_OP
       pthread_mutex_lock(&entry->mutex);
       entry->nr_waiters++;
       pthread_cond_wait(&entry->cond, &entry->mutex);
+      pthread_mutex_unlock(&entry->mutex);
       return 0;
     }
     struct l_timespec timeout;
@@ -118,6 +119,7 @@ FUTEX_WAKE_OP
     pthread_mutex_lock(&entry->mutex);
     entry->nr_waiters++;
     int ret = pthread_cond_timedwait(&entry->cond, &entry->mutex, &ts);
+    pthread_mutex_unlock(&entry->mutex);
     if (ret < 0) {
       if (ret == -ETIMEDOUT)
         return -LINUX_ETIMEDOUT;

@@ -377,6 +377,8 @@ prepare_newproc(void)
 
   /* task.tid = getpid(); */
   task.clear_child_tid = task.set_child_tid = 0;
+  task.robust_list = 0;
+  task.robust_list_len = 0;
   close_cloexec();
 }
 

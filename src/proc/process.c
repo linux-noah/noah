@@ -319,7 +319,8 @@ DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 
 DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
 {
-  warnk("set_robust_list is unimplemented\n");
+  task.robust_list = head;
+  task.robust_list_len = len;
   return 0;
 }
 
