@@ -18,6 +18,7 @@
 #include "linux/common.h"
 #include "linux/misc.h"
 #include "linux/errno.h"
+#include "linux/futex.h"
 
 struct proc proc;
 _Thread_local struct task task;
@@ -207,8 +208,8 @@ DEFINE_SYSCALL(setrlimit, unsigned int, resource, gaddr_t, rlim)
 DEFINE_SYSCALL(exit, int, reason)
 {
   if (task.clear_child_tid) {
-    long zero = 0;
-    if (copy_to_user(task.clear_child_tid, &zero, sizeof task.clear_child_tid))
+    int zero = 0;
+    if (copy_to_user(task.clear_child_tid, &zero, sizeof zero))
       return -LINUX_EFAULT;
     do_futex_wake(task.clear_child_tid, 1);
   }
@@ -227,8 +228,8 @@ DEFINE_SYSCALL(exit, int, reason)
 DEFINE_SYSCALL(exit_group, int, reason)
 {
   if (task.clear_child_tid) {
-    long zero = 0;
-    if (copy_to_user(task.clear_child_tid, &zero, sizeof task.clear_child_tid))
+    int zero = 0;
+    if (copy_to_user(task.clear_child_tid, &zero, sizeof zero))
       return -LINUX_EFAULT;
     do_futex_wake(task.clear_child_tid, 1);
   }
@@ -282,7 +283,7 @@ DEFINE_SYSCALL(prctl, int, option)
 {
   /* FIXME */
   printk("prctl is not implemented yet\n");
-  return -EINVAL;
+  return -ENOSYS;
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
@@ -319,8 +320,9 @@ DEFINE_SYSCALL(set_tid_address, gaddr_t, tidptr)
 
 DEFINE_SYSCALL(set_robust_list, gaddr_t, head, size_t, len)
 {
+  if (len != sizeof(struct linux_robust_list_head))
+    return -EINVAL;
   task.robust_list = head;
-  task.robust_list_len = len;
   return 0;
 }
 
