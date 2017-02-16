@@ -177,8 +177,12 @@ do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gad
   } else {
     ret = __do_clone_process(clone_flags, newsp, parent_tid, child_tid, tls);
   }
+  if (ret < 0) {
+    return ret;
+  }
   
-  if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
+  if (clone_flags & LINUX_CLONE_PARENT_SETTID &&
+      !((clone_flags & LINUX_CLONE_THREAD) == 0 && ret == 0)) /* This proc is not forked child */ {
     if (copy_to_user(parent_tid, &ret, sizeof ret)) {
       return -LINUX_EFAULT;
     }
