@@ -11,7 +11,8 @@ void*
 thread_start(void *arg)
 {
   count++;
-  return NULL;
+  usleep(500);
+  return (void *)&count;
 }
 
 void
@@ -19,8 +20,10 @@ test_thread_create()
 {
   pthread_t thread;
   pthread_create(&thread, NULL, thread_start, NULL);
-  usleep(5000); // FIXME: replace with pthread_join after implementing futex
+  void *ret;
+  pthread_join(thread, &ret);
   assert_true(count == 1);
+  assert_true(ret == &count);
 }
 
 void*
@@ -40,13 +43,13 @@ test_tls()
   assert_true(tls_data == 0xface);
   pthread_t thread;
   pthread_create(&thread, NULL, thread_tls, NULL);
-  usleep(5000); // FIXME: replace with pthread_join after implementing futex
+  pthread_join(thread, NULL);
   assert_true(tls_data == 0xface);
 }
 
 int main()
 {
-  nr_tests(6);
+  nr_tests(7);
   test_thread_create();
   test_tls();
 }
