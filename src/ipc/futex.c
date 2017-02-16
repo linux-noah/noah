@@ -140,5 +140,6 @@ DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_p
     op &= ~LINUX_FUTEX_PRIVATE_FLAG;
     return do_private_futex(uaddr, op, val, timeout_ptr, uaddr2_ptr, val3);
   }
-  panic("non-private futex is unsupported\n");
+  warnk("Non-private futex is unsupported! Supposing it as private futex..\n");
+  return do_private_futex(uaddr, op, val, timeout_ptr, uaddr2_ptr, val3);
 }
