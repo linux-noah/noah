@@ -166,9 +166,11 @@ FUTEX_WAIT_BITSET
     }
     uint32_t val2 = timeout_ptr;
     if (cond) {
-      if ((ret = do_private_futex_wake_no_lock(entry2, val2)) < 0) {
+      int ret2;
+      if ((ret2 = do_private_futex_wake_no_lock(entry2, val2)) < 0) {
         goto out;
       }
+      ret += ret2;
     }
     out:
     pthread_mutex_unlock(&entry2->mutex);
