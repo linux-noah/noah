@@ -56,6 +56,11 @@
 
 #define LINUX_FUTEX_CMD_MASK (128 - 1)
 
+#define LINUX_FUTEX_GETOP(v) (((v) >> 28) & 0xf)
+#define LINUX_FUTEX_GETCMP(v) (((v) >> 24) & 0xf)
+#define LINUX_FUTEX_GETOPARG(v) ((v >> 12) & 0xfff)
+#define LINUX_FUTEX_GETCMPARG(v) ((int)((v) & 0xfff))
+
 #define FUTEX_OP_SET            0	/* *(int *)UADDR2 = OPARG; */
 #define FUTEX_OP_ADD            1	/* *(int *)UADDR2 += OPARG; */
 #define FUTEX_OP_OR             2	/* *(int *)UADDR2 |= OPARG; */

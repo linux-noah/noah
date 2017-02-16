@@ -24,8 +24,8 @@ FUTEX_WAKE_OP_PRIVATE
 FUTEX_WAIT
 */
 
-static
-struct pfutex_entry *pfutex_get(gaddr_t uaddr)
+static struct pfutex_entry *
+pfutex_get(gaddr_t uaddr)
 {
   struct pfutex_entry *entry;
   pthread_rwlock_wrlock(&proc.futex_lock);
@@ -43,12 +43,9 @@ struct pfutex_entry *pfutex_get(gaddr_t uaddr)
   return entry;
 }
 
-int
-do_futex_wake(gaddr_t uaddr, int count)
+static int
+do_private_futex_wake_no_lock(struct pfutex_entry *entry, int count)
 {
-  warnk("non-provate do_futex_wake is not implemented\n");
-  struct pfutex_entry *entry = pfutex_get(uaddr);
-  pthread_mutex_lock(&entry->mutex);
   int ret;
   if (entry->nr_waiters < count) {
     ret = entry->nr_waiters;
@@ -61,12 +58,22 @@ do_futex_wake(gaddr_t uaddr, int count)
       pthread_cond_signal(&entry->cond);
     }
   }
+  return ret;
+}
+
+int
+do_futex_wake(gaddr_t uaddr, int count)
+{
+  warnk("non-provate do_futex_wake is not implemented\n");
+  struct pfutex_entry *entry = pfutex_get(uaddr);
+  pthread_mutex_lock(&entry->mutex);
+  int ret = do_private_futex_wake_no_lock(entry, count);
   pthread_mutex_unlock(&entry->mutex);
   return ret;
 }
 
 static int
-do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2_ptr, uint32_t val3)
+do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2, uint32_t val3)
 {
 /*
 FUTEX_UNLOCK_PI
@@ -75,7 +82,6 @@ FUTEX_CMP_REQUEUE_PI
 FUTEX_CMP_REQUEUE_PI
 FUTEX_WAIT_REQUEUE_PI
 FUTEX_WAIT_BITSET
-FUTEX_WAKE_OP
 */
 
   switch (op & LINUX_FUTEX_CMD_MASK) {
@@ -83,18 +89,7 @@ FUTEX_WAKE_OP
     int count = val;
     struct pfutex_entry *entry = pfutex_get(uaddr);
     pthread_mutex_lock(&entry->mutex);
-    int ret;
-    if (entry->nr_waiters < count) {
-      ret = entry->nr_waiters;
-      entry->nr_waiters = 0;
-      pthread_cond_broadcast(&entry->cond);
-    } else {
-      ret = count;
-      entry->nr_waiters -= count;
-      for (int i = 0; i < count; ++i) {
-        pthread_cond_signal(&entry->cond);
-      }
-    }
+    int ret = do_private_futex_wake_no_lock(entry, count);
     pthread_mutex_unlock(&entry->mutex);
     return ret;
   }
@@ -128,6 +123,57 @@ FUTEX_WAKE_OP
         return -LINUX_EINTR;
     }
     return 0;
+  }
+  case LINUX_FUTEX_WAKE_OP: {
+    int ret = 0;
+    struct pfutex_entry *entry1, *entry2;
+    entry1 = pfutex_get(uaddr);
+    entry2 = pfutex_get(uaddr2);
+    pthread_mutex_lock(&entry1->mutex);
+    pthread_mutex_lock(&entry2->mutex); /* not sure this does not cause race condition */
+    int oldval;
+    if (copy_from_user(&oldval, uaddr2, sizeof oldval)) {
+      ret = -LINUX_EFAULT;
+      goto out;
+    }
+    int newval = 0;
+    switch (LINUX_FUTEX_GETOP(val3)) {
+    default:
+      panic("unknown op for futex_wake_op\n");
+    case FUTEX_OP_SET: newval = LINUX_FUTEX_GETOPARG(val3); break;
+    case FUTEX_OP_ADD: newval = oldval + LINUX_FUTEX_GETOPARG(val3); break;
+    case FUTEX_OP_OR: newval = oldval | LINUX_FUTEX_GETOPARG(val3); break;
+    case FUTEX_OP_ANDN: newval = oldval & LINUX_FUTEX_GETOPARG(val3); break;
+    case FUTEX_OP_XOR: newval = oldval * LINUX_FUTEX_GETOPARG(val3); break;
+    }
+    if (copy_to_user(uaddr2, &newval, sizeof newval)) {
+      ret = -LINUX_EFAULT;
+      goto out;
+    }
+    if ((ret = do_private_futex_wake_no_lock(entry1, val)) < 0) {
+      goto out;
+    }
+    bool cond;
+    switch (LINUX_FUTEX_GETCMP(val3)) {
+    default:
+      panic("unknown cmp for futex_wake_op\n");
+    case FUTEX_OP_CMP_EQ: cond = oldval == LINUX_FUTEX_GETCMPARG(val3); break;
+    case FUTEX_OP_CMP_NE: cond = oldval != LINUX_FUTEX_GETCMPARG(val3); break;
+    case FUTEX_OP_CMP_LT: cond = oldval < LINUX_FUTEX_GETCMPARG(val3); break;
+    case FUTEX_OP_CMP_LE: cond = oldval <= LINUX_FUTEX_GETCMPARG(val3); break;
+    case FUTEX_OP_CMP_GT: cond = oldval > LINUX_FUTEX_GETCMPARG(val3); break;
+    case FUTEX_OP_CMP_GE: cond = oldval >= LINUX_FUTEX_GETCMPARG(val3); break;
+    }
+    uint32_t val2 = timeout_ptr;
+    if (cond) {
+      if ((ret = do_private_futex_wake_no_lock(entry2, val2)) < 0) {
+        goto out;
+      }
+    }
+    out:
+    pthread_mutex_unlock(&entry2->mutex);
+    pthread_mutex_unlock(&entry1->mutex);
+    return ret;
   }
   default:
     warnk("unsupported futex command: %d\n", op);
