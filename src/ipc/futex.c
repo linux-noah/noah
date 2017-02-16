@@ -76,8 +76,6 @@ static int
 do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2, uint32_t val3)
 {
 /*
-FUTEX_UNLOCK_PI
-FUTEX_LOCK_PI
 FUTEX_CMP_REQUEUE_PI
 FUTEX_CMP_REQUEUE_PI
 FUTEX_WAIT_REQUEUE_PI
@@ -176,6 +174,56 @@ FUTEX_WAIT_BITSET
     pthread_mutex_unlock(&entry2->mutex);
     pthread_mutex_unlock(&entry1->mutex);
     return ret;
+  }
+  case LINUX_FUTEX_LOCK_PI: {
+    if ((op & LINUX_FUTEX_CLOCK_REALTIME) != 0) {
+      warnk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
+    }
+    struct timespec ts;
+    if (timeout_ptr != 0) {
+      struct l_timespec timeout;
+      if (copy_from_user(&timeout, timeout_ptr, sizeof timeout))
+        return -LINUX_EFAULT;
+      ts.tv_sec = timeout.tv_sec;
+      ts.tv_nsec = timeout.tv_nsec;
+    }
+    int tid = do_gettid();
+    struct pfutex_entry *entry = pfutex_get(uaddr);
+    pthread_mutex_lock(&entry->mutex);
+    /* TODO: check mprotect flags */
+    atomic_int *mem = (atomic_int *) guest_to_host(uaddr); /* FIXME: don't cast to atomic_int */
+    assert(mem);
+    /* first update mem's value to something else to prevent other user processes getting the lock of this futex */
+    int value = atomic_exchange(mem, tid);
+    if (value == 0) {
+      /* acquired the lock */
+      pthread_mutex_unlock(&entry->mutex);
+      return 0; /* NOTE: man page is telling ambiguous things about this path. My interpretation can be wrong. */
+    }
+    /* there are waiters other than me */
+    entry->nr_waiters++;
+    atomic_store(mem, value | FUTEX_WAITERS);
+    int ret = 0;
+    if (timeout_ptr == 0) {
+      pthread_cond_wait(&entry->cond, &entry->mutex);
+    } else {
+      int r = pthread_cond_timedwait(&entry->cond, &entry->mutex, &ts);
+      if (r < 0) {
+        if (ret == -ETIMEDOUT)
+          ret = -LINUX_ETIMEDOUT;
+        else
+          ret = -LINUX_EINTR;
+      }
+    }
+    pthread_mutex_unlock(&entry->mutex);
+    return ret;
+  }
+  case LINUX_FUTEX_UNLOCK_PI: {
+    struct pfutex_entry *entry = pfutex_get(uaddr);
+    pthread_mutex_lock(&entry->mutex);
+    pthread_cond_signal(&entry->cond);
+    pthread_mutex_unlock(&entry->mutex);
+    return 0;
   }
   default:
     warnk("unsupported futex command: %d\n", op);
