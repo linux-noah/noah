@@ -129,10 +129,16 @@ __do_clone_thread(unsigned long clone_flags, unsigned long newsp, gaddr_t parent
   pthread_t threadid;
 
   struct clone_thread_arg *arg = malloc(sizeof *arg);
-  *arg = (struct clone_thread_arg){clone_flags, newsp, parent_tid, child_tid, tls};
+  *arg = (struct clone_thread_arg){
+    .clone_flags = clone_flags,
+    .newsp = newsp,
+    .parent_tid = parent_tid,
+    .child_tid = child_tid,
+    .tls = tls,
+    .cond = PTHREAD_COND_INITIALIZER,
+    .mutex =PTHREAD_MUTEX_INITIALIZER
+  };
   vmm_snapshot_vcpu(&arg->vcpu_snapshot);
-  pthread_cond_init(&arg->cond, NULL);
-  pthread_mutex_init(&arg->mutex, NULL);
   pthread_mutex_lock(&arg->mutex);
   pthread_create(&threadid, NULL, (void *)__start_thread, arg);
   pthread_cond_wait(&arg->cond, &arg->mutex);
