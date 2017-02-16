@@ -240,6 +240,12 @@ record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_t size, int prot, 
   return region;
 }
 
+bool
+is_region_private(struct mm_region *region)
+{
+  return !(region->mm_flags & LINUX_MAP_SHARED) && region->mm_fd == -1;
+}
+
 void
 destroy_mm(struct mm *mm)
 {

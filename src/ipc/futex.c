@@ -1,5 +1,6 @@
 #include "common.h"
 #include "noah.h"
+#include "mm.h"
 #include "linux/common.h"
 #include "linux/futex.h"
 #include "linux/time.h"
@@ -138,8 +139,15 @@ DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_p
 {
   if (op & LINUX_FUTEX_PRIVATE_FLAG) {
     op &= ~LINUX_FUTEX_PRIVATE_FLAG;
-    return do_private_futex(uaddr, op, val, timeout_ptr, uaddr2_ptr, val3);
+  } else {
+    // Check if op is actually private
+    struct mm_region *region = find_region(uaddr, proc.mm);
+    if (region == NULL) {
+      return -LINUX_EFAULT;
+    }
+    if (!is_region_private(region)) {
+      panic("Non-private futex is unsupported!\n");
+    }
   }
-  warnk("Non-private futex is unsupported! Supposing it as private futex..\n");
   return do_private_futex(uaddr, op, val, timeout_ptr, uaddr2_ptr, val3);
 }

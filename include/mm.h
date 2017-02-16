@@ -51,6 +51,8 @@ struct mm_region *record_region(struct mm *mm, void *haddr, gaddr_t gaddr, size_
 void split_region(struct mm *mm, struct mm_region *region, gaddr_t gaddr);
 void destroy_mm(struct mm *mm);
 
+bool is_region_private(struct mm_region*);
+
 gaddr_t do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset);
 int do_munmap(gaddr_t gaddr, size_t size);
 
