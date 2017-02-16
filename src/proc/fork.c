@@ -72,12 +72,6 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
     /* INIT_LIST_HEAD(&proc.tasks); */
     /* list_add(&task.head, &proc.tasks); */
     init_task(clone_flags, child_tid, tls);
-    if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
-      int tid = getpid();
-      if (copy_to_user(parent_tid, &tid, sizeof tid)) {
-        return -LINUX_EFAULT;
-      }
-    }
   } else {
     if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
       if (copy_to_user(parent_tid, &ret, sizeof ret)) {
