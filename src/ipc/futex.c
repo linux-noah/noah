@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <sys/time.h>
 
 /*
 FUTEX_UNLOCK_PI_PRIVATE
@@ -36,15 +37,19 @@ pfutex_get(gaddr_t uaddr)
 }
 
 static int
-do_private_futex_wake(gaddr_t uaddr, int count)
+do_private_futex_wake(gaddr_t uaddr, int count, bool use_bitset, uint32_t bitset)
 {
   struct list_head *p, *head = pfutex_get(uaddr);
   int ret = 0;
   list_for_each (p, head) {
     if (count == 0)
       break;
-    list_del(p);
     struct pfutex_entry *entry = container_of(p, struct pfutex_entry, head);
+    if (use_bitset) {
+      if ((entry->bitset & bitset) == 0)
+        continue;
+    }
+    list_del(p);
     pthread_cond_signal(&entry->cond);
     ret++; count--;
   }
@@ -56,7 +61,7 @@ do_futex_wake(gaddr_t uaddr, int count)
 {
   warnk("non-provate do_futex_wake is not implemented\n");
   pthread_mutex_lock(&proc.futex_mutex);
-  int ret = do_private_futex_wake(uaddr, count);
+  int ret = do_private_futex_wake(uaddr, count, false, 0);
   pthread_mutex_unlock(&proc.futex_mutex);
   return ret;
 }
@@ -79,11 +84,12 @@ __cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex, bool use_timeout, stru
 }
 
 static int
-do_private_wait(gaddr_t uaddr, bool use_timeout, struct timespec *ts, bool check_requeue, gaddr_t uaddr2)
+do_private_wait(gaddr_t uaddr, bool use_timeout, struct timespec *ts, bool check_requeue, gaddr_t uaddr2, bool use_bitset, uint32_t bitset)
 {
   struct pfutex_entry *entry = malloc(sizeof *entry);
   pthread_cond_init(&entry->cond, NULL);
   entry->uaddr = uaddr;
+  entry->bitset = use_bitset ? bitset : FUTEX_BITSET_MATCH_ANY;
   list_add_tail(&entry->head, pfutex_get(uaddr));
   int r = __cond_wait(&entry->cond, &proc.futex_mutex, use_timeout, ts);
   if (check_requeue) {
@@ -97,17 +103,13 @@ do_private_wait(gaddr_t uaddr, bool use_timeout, struct timespec *ts, bool check
 static int
 do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2, int val3)
 {
-/*
-FUTEX_WAIT_BITSET
-*/
-
   if ((op & LINUX_FUTEX_CLOCK_REALTIME) != 0) {
     warnk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
   }
 
   switch (op & LINUX_FUTEX_CMD_MASK) {
   case LINUX_FUTEX_WAKE: {
-    return do_private_futex_wake(uaddr, val);
+    return do_private_futex_wake(uaddr, val, false, 0);
   }
   case LINUX_FUTEX_WAIT: {
     struct timespec ts;
@@ -117,8 +119,12 @@ FUTEX_WAIT_BITSET
         return -LINUX_EFAULT;
       ts.tv_sec = timeout.tv_sec;
       ts.tv_nsec = timeout.tv_nsec;
+      struct timeval tv;
+      gettimeofday(&tv, NULL);
+      ts.tv_sec = tv.tv_sec;
+      ts.tv_nsec = tv.tv_usec * 1000;
     }
-    return do_private_wait(uaddr, timeout_ptr, &ts, false, 0);
+    return do_private_wait(uaddr, timeout_ptr, &ts, false, 0, false, 0);
   }
   case LINUX_FUTEX_WAKE_OP: {
     int ret = 0;
@@ -141,7 +147,7 @@ FUTEX_WAIT_BITSET
       ret = -LINUX_EFAULT;
       goto out;
     }
-    if ((ret = do_private_futex_wake(uaddr, val)) < 0) {
+    if ((ret = do_private_futex_wake(uaddr, val, false, 0)) < 0) {
       goto out;
     }
     bool cond;
@@ -158,7 +164,7 @@ FUTEX_WAIT_BITSET
     uint32_t val2 = timeout_ptr;
     if (cond) {
       int ret2;
-      if ((ret2 = do_private_futex_wake(uaddr2, val2)) < 0) {
+      if ((ret2 = do_private_futex_wake(uaddr2, val2, false, 0)) < 0) {
         goto out;
       }
       ret += ret2;
@@ -187,10 +193,10 @@ FUTEX_WAIT_BITSET
     }
     /* there are waiters other than me */
     atomic_store(mem, value | FUTEX_WAITERS);
-    return do_private_wait(uaddr, timeout_ptr, &ts, false, 0);
+    return do_private_wait(uaddr, timeout_ptr, &ts, false, 0, false, 0);
   }
   case LINUX_FUTEX_UNLOCK_PI: {
-    do_private_futex_wake(uaddr, 1);
+    do_private_futex_wake(uaddr, 1, false, 0);
     return 0;
   }
   case LINUX_FUTEX_CMP_REQUEUE_PI: {
@@ -202,7 +208,7 @@ FUTEX_WAIT_BITSET
       return -LINUX_EFAULT;
     if (oldval != val3)
       return -LINUX_EAGAIN;
-    int num = do_private_futex_wake(uaddr, val);
+    int num = do_private_futex_wake(uaddr, val, false, 0);
     struct list_head *p, *n, *list = pfutex_get(uaddr), *list2 = pfutex_get(uaddr2);
     int val2 = timeout_ptr;
     list_for_each_safe (p, n, list) {
@@ -225,7 +231,21 @@ FUTEX_WAIT_BITSET
       ts.tv_sec = timeout.tv_sec;
       ts.tv_nsec = timeout.tv_nsec;
     }
-    return do_private_wait(uaddr, timeout_ptr, &ts, true, uaddr2);
+    return do_private_wait(uaddr, timeout_ptr, &ts, true, uaddr2, false, 0);
+  }
+  case LINUX_FUTEX_WAIT_BITSET: {
+    struct timespec ts;
+    if (timeout_ptr != 0) {
+      struct l_timespec timeout;
+      if (copy_from_user(&timeout, timeout_ptr, sizeof timeout))
+        return -LINUX_EFAULT;
+      ts.tv_sec = timeout.tv_sec;
+      ts.tv_nsec = timeout.tv_nsec;
+    }
+    return do_private_wait(uaddr, timeout_ptr, &ts, false, 0, true, val3);
+  }
+  case LINUX_FUTEX_WAKE_BITSET: {
+    return do_private_futex_wake(uaddr, val, true, val3);
   }
   default:
     warnk("unsupported futex command: %d\n", op);

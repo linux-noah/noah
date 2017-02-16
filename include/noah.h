@@ -97,6 +97,7 @@ struct pfutex_entry {
   struct list_head head;
   pthread_cond_t cond;
   gaddr_t uaddr;
+  uint32_t bitset;
 };
 
 /* TODO: collect garbage entries */
