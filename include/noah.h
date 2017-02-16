@@ -94,13 +94,13 @@ struct fileinfo {
 
 /* for private futex */
 struct pfutex_entry {
-  pthread_mutex_t mutex;
-  int nr_waiters;
+  struct list_head head;
   pthread_cond_t cond;
+  gaddr_t uaddr;
 };
 
 /* TODO: collect garbage entries */
-KHASH_MAP_INIT_INT64(pfutex, struct pfutex_entry *)
+KHASH_MAP_INIT_INT64(pfutex, struct list_head)
 
 struct proc {
   int nr_tasks;
@@ -112,7 +112,7 @@ struct proc {
     l_sigaction_t sigaction[LINUX_NSIG];
   };
   struct {
-    pthread_rwlock_t futex_lock;
+    pthread_mutex_t futex_mutex;
     khash_t(pfutex) *pfutex; /* TODO: modify khash and make this field being non-pointer */
   };
   struct fileinfo fileinfo;

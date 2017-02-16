@@ -387,7 +387,7 @@ init_first_proc(const char *root)
   init_fileinfo(rootfd);
   close(rootfd);
   proc.pfutex = kh_init(pfutex);
-  pthread_rwlock_init(&proc.futex_lock, NULL);
+  pthread_mutex_init(&proc.futex_mutex, NULL);
 
   task.tid = getpid();
 }
