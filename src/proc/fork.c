@@ -72,6 +72,12 @@ __do_clone_process(unsigned long clone_flags, unsigned long newsp, gaddr_t paren
     /* INIT_LIST_HEAD(&proc.tasks); */
     /* list_add(&task.head, &proc.tasks); */
     init_task(clone_flags, child_tid, tls);
+  } else {
+    if (clone_flags & LINUX_CLONE_PARENT_SETTID) {
+      if (copy_to_user(parent_tid, &ret, sizeof ret)) {
+        return -LINUX_EFAULT;
+      }
+    }
   }
 
   return ret;
@@ -111,6 +117,12 @@ __start_thread(struct clone_thread_arg *arg)
   INIT_SIGBIT(&task.sigpending);
 
   init_task(arg->clone_flags, arg->child_tid, arg->tls);
+
+  if (arg->clone_flags & LINUX_CLONE_PARENT_SETTID) {
+    if (copy_to_user(arg->parent_tid, &task.tid, sizeof task.tid)) {
+      assert(false);
+    }
+  }
 
   pthread_cond_signal(&arg->cond);
 
@@ -171,24 +183,11 @@ do_clone(unsigned long clone_flags, unsigned long newsp, gaddr_t parent_tid, gad
   }
 
 
-  int ret;
   if (clone_flags & LINUX_CLONE_THREAD) {
-    ret = __do_clone_thread(clone_flags, newsp, parent_tid, child_tid, tls);
+    return __do_clone_thread(clone_flags, newsp, parent_tid, child_tid, tls);
   } else {
-    ret = __do_clone_process(clone_flags, newsp, parent_tid, child_tid, tls);
+    return __do_clone_process(clone_flags, newsp, parent_tid, child_tid, tls);
   }
-  if (ret < 0) {
-    return ret;
-  }
-  
-  if (clone_flags & LINUX_CLONE_PARENT_SETTID &&
-      !((clone_flags & LINUX_CLONE_THREAD) == 0 && ret == 0)) /* This proc is not forked child */ {
-    if (copy_to_user(parent_tid, &ret, sizeof ret)) {
-      return -LINUX_EFAULT;
-    }
-  }
-  
-  return ret;
 }
 
 DEFINE_SYSCALL(clone, unsigned long, clone_flags, unsigned long, newsp, gaddr_t, parent_tid, gaddr_t, child_tid, gaddr_t, tls)
