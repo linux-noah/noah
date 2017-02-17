@@ -96,6 +96,7 @@ do_private_wait(gaddr_t uaddr, bool use_timeout, struct timespec *ts, bool check
     if (entry->uaddr != uaddr2)
       r = -LINUX_EAGAIN;
   }
+  pthread_cond_destroy(&entry->cond);
   free(entry);
   return r;
 }
