@@ -175,3 +175,16 @@ DEFINE_SYSCALL(clock_gettime, l_clockid_t, id, gaddr_t, spec_ptr)
   }
   return 0;
 }
+
+DEFINE_SYSCALL(clock_getres, l_clockid_t, id, gaddr_t, res_ptr)
+{
+  struct timespec ts;
+  int r = syswrap(clock_getres(linux_to_darwin_clockid(id), &ts));
+  if (r < 0) {
+    return r;
+  }
+  if (res_ptr != 0 && copy_to_user(res_ptr, &ts, sizeof ts)) {
+    return -LINUX_EFAULT;
+  }
+  return 0;
+}

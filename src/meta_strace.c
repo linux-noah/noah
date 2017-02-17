@@ -366,16 +366,16 @@ trace_rt_sigprocmask_post(int syscall_num, int argc, char *argnames[6], char *ty
 }
 
 meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
-  [NR_read] = trace_read_pre,
-  [NR_recvfrom] = trace_recvfrom_pre,
-  [NR_write] = trace_write_pre,
-  [NR_sendto] = trace_sendto_pre,
-  [NR_execve] = trace_execve_pre,
-  [NR_rt_sigprocmask] = trace_rt_sigprocmask_post,
+  [LSYS_read] = trace_read_pre,
+  [LSYS_recvfrom] = trace_recvfrom_pre,
+  [LSYS_write] = trace_write_pre,
+  [LSYS_sendto] = trace_sendto_pre,
+  [LSYS_execve] = trace_execve_pre,
+  [LSYS_rt_sigprocmask] = trace_rt_sigprocmask_post,
 };
 meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
-  [NR_read] = trace_read_post,
-  [NR_recvfrom] = trace_recvfrom_post,
-  [NR_rt_sigprocmask] = trace_rt_sigprocmask_pre,
+  [LSYS_read] = trace_read_post,
+  [LSYS_recvfrom] = trace_recvfrom_post,
+  [LSYS_rt_sigprocmask] = trace_rt_sigprocmask_pre,
 };
 

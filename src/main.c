@@ -53,7 +53,7 @@ handle_syscall(void)
   uint64_t retval = sc_handler_table[rax](rdi, rsi, rdx, r10, r8, r9);
   vmm_write_register(HV_X86_RAX, retval);
 
-  if (rax == NR_rt_sigreturn) {
+  if (rax == LSYS_rt_sigreturn) {
     return -1;
   }
   return 0;

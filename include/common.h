@@ -24,9 +24,9 @@
 
 #define DEFINE_SCWRAPPER(name, ...)                                                \
   uint64_t _sys_##name(_MAP(MK_TEMP,__VA_ARGS__)) {                                 \
-    meta_strace_pre(NR_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
+    meta_strace_pre(LSYS_##name, #name, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));     \
     uint64_t ret = sys_##name(_MAP(MK_CAST,__VA_ARGS__));                         \
-    meta_strace_post(NR_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
+    meta_strace_post(LSYS_##name, #name, ret, _MAP(MK_STRACE_CALL, ##__VA_ARGS__, 0, 0));                                       \
     return ret;                                                                    \
   }
 
@@ -59,12 +59,12 @@ static inline int _syswrap(int sys_ret) {
 #include "syscall.h"
 
 enum sc_numbers {
-// omit duplicted "unimplemented"s by expanding them to NR_(an unique number)
+// omit duplicted "unimplemented"s by expanding them to LSYS_(an unique number)
 #define unimplemented __COUNTER__
-#define OMIT_UNIMPLEMENTED(NR_, name) NR_ ## name
-#define SYSCALL(n, name) OMIT_UNIMPLEMENTED(NR_, name) = n,
+#define OMIT_UNIMPLEMENTED(LSYS_, name) LSYS_ ## name
+#define SYSCALL(n, name) OMIT_UNIMPLEMENTED(LSYS_, name) = n,
   SYSCALLS
 #undef SYSCALL
 #undef unimplemented
-  NR_unimplemented = -1
+  LSYS_unimplemented = -1
 };

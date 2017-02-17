@@ -230,7 +230,7 @@
   SYSCALL(226, unimplemented)                   \
   SYSCALL(227, unimplemented)                   \
   SYSCALL(228, clock_gettime)                   \
-  SYSCALL(229, unimplemented)                   \
+  SYSCALL(229, clock_getres)                    \
   SYSCALL(230, unimplemented)                   \
   SYSCALL(231, exit_group)                      \
   SYSCALL(232, unimplemented)                   \
