@@ -65,7 +65,7 @@ if (defined $output) {
   $opts .= "--output $output ";
 }
 
-#system "sudo lldb -- ${noah} -m $root $opts $init";
+#system "lldb -- ${noah} -m $root $opts $init";
 system "${noah} -m $root $opts $init";
 
 sub prompt_yn {

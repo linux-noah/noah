@@ -74,8 +74,8 @@ __cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex, bool use_timeout, stru
     return 0;
   }
   int ret = pthread_cond_timedwait(cond, mutex, ts);
-  if (ret < 0) {
-    if (ret == -ETIMEDOUT)
+  if (ret != 0) {
+    if (ret == ETIMEDOUT)
       return -LINUX_ETIMEDOUT;
     else
       return -LINUX_EINTR;
@@ -105,7 +105,7 @@ static int
 do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2, int val3)
 {
   if ((op & LINUX_FUTEX_CLOCK_REALTIME) != 0) {
-    warnk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
+    printk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
   }
 
   switch (op & LINUX_FUTEX_CMD_MASK) {
