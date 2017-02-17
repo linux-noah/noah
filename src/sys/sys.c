@@ -77,13 +77,15 @@ DEFINE_SYSCALL(getrandom, gaddr_t, buf_ptr, size_t, count, unsigned, flags)
     printk("getrandom: logic flaw\n");
     return -darwin_to_linux_errno(errno);
   }
-  char buf[count];
-  int r = read(fd, buf, count);
+  char *buf = malloc(count);
+  int r = syswrap(read(fd, buf, count));
   if (r < 0) {
-    return -darwin_to_linux_errno(errno);
+    goto out;
   }
   if (copy_to_user(buf_ptr, buf, count)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
   }
+out:
+  free(buf);
   return r;
 }
