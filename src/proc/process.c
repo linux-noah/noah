@@ -9,6 +9,7 @@
 #include <sys/wait.h>
 #include <sys/resource.h>
 #include <pthread.h>
+#include <assert.h>
 
 #include "common.h"
 #include "noah.h"
@@ -62,141 +63,77 @@ macos_getsuid()
   return kinfo.kp_eproc.e_pcred.p_svuid;
 }
 
-// Linux's setuid is not compatible with POSIX.1-2001.
-// It does not set real uid and saved-uid unless the current uid is capable of CAP_SETUID (in Noah, it means root now)
-DEFINE_SYSCALL(setuid, l_uid_t, uid)
-{
-  if (uid == (l_uid_t) -1) {
-    return -LINUX_EINVAL;
-  }
-  int ret = 0;
-  pthread_rwlock_wrlock(&proc.cred.lock);
-  l_uid_t new_ruid = proc.cred.uid, new_euid = proc.cred.euid, new_suid = proc.cred.suid;
-  if (proc.cred.euid == 0) {
-    new_suid = new_ruid = uid;
-  } else if (proc.cred.uid != uid && proc.cred.suid != uid) {
-    ret = -LINUX_EPERM;
-    goto out;
-  }
-  new_euid = uid;
-  if (proc.cred.euid != 0 && new_euid != proc.cred.uid) {
-    // The app is getting back from a NON-root user to the NON-root saved user ID.
-    // We have to get root privilege once for it.
-    // To implement it, we need some kind of global lock for security. So just panic now.
-    panic("Noah cannot setuid from non-root to non-root saved set-user-ID currently. Panic to prevent privileged software from becoming out of control");
-  }
-  // Call setruid and seteuid instead of setreuid because it also overwrites saved set-user-ID
-  ret = syswrap(setruid(new_ruid));
-  if (ret < 0) {
-    panic("cannot setruid in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
-  }
-  ret = syswrap(seteuid(new_euid));
-  if (ret < 0) {
-    panic("cannot seteuid in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
-  }
-  proc.cred.uid = new_ruid;
-  proc.cred.euid = new_euid;
-  proc.cred.suid = new_suid;
-  
-out:
-  pthread_rwlock_unlock(&proc.cred.lock);
-  return ret;
-}
-
-DEFINE_SYSCALL(setgid, l_gid_t, gid)
-{
-  return syswrap(setgid(gid));
-}
-
-DEFINE_SYSCALL(geteuid)
-{
-  pthread_rwlock_rdlock(&proc.cred.lock);
-  int ret = proc.cred.euid;
-  pthread_rwlock_unlock(&proc.cred.lock);
-  return ret;
-}
-
-DEFINE_SYSCALL(getegid)
-{
-  return syswrap(getegid());
-}
-
 static inline bool
 can_setresxid(l_uid_t id)
 {
   return proc.cred.euid == 0 || proc.cred.euid == id || proc.cred.uid == id || proc.cred.suid == id;
 }
 
-DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
+int
+do_setresuid(l_uid_t ruid, l_uid_t euid, l_uid_t suid)
 {
-  int ret = 0;
-  pthread_rwlock_wrlock(&proc.cred.lock);
-  warnk("setresuid: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
-  l_uid_t new_ruid = proc.cred.uid, new_euid = proc.cred.euid, new_suid = proc.cred.suid;
   if (ruid != (l_uid_t) -1) {
-    if (can_setresxid(ruid)) {
-      if (ruid != 0 && proc.cred.euid != 0) {
-        // The app is setting ruid to NON-root while euid is also NON-root.
-        // If we do that, we cannot keep saved set-user-ID as root due to bahavior of Darwin's setruid and setreuid.
-        // To implement it, we need some kind of global lock for security. Just panic now.
-        panic("Noah cannot setruid to non-root while euid is non-root. Panic to prevent privileged software from becoming out of control");
-        
-        /* Implementation would be like this...
-         acquire_global_lock_to_stop_other_threads();
-         if (syswrap(seteuid(0)) < 0) {
-           goto cred_management_err;
-         }
-         ret = syswrap(setruid(new_ruid));
-         seteuid(previous_euid);
-         unlock_it();
-         */
-      }
-      warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
-      warnk("setruid\n");
-      ret = syswrap(setruid(new_ruid));
-      if (ret < 0) {
-        goto cred_management_err;
-      }
-    } else {
-      ret = -LINUX_EPERM;
-      goto out;
+    if (!can_setresxid(ruid)) {
+      return -LINUX_EPERM;
+    }
+    if (ruid != 0 && proc.cred.euid != 0) {
+      // The app is setting ruid to NON-root while euid is also NON-root.
+      // To keep saved set-user-ID as 0, we have to set euid to 0 once due to bahavior of Darwin's setruid and setreuid.
+      // To implement it, we need some kind of global lock for security. We haven't implemented that and just panic now.
+      panic("Noah cannot setruid to non-root while euid is non-root currently");
+
+      /* Implementation would be like this...
+       acquire_global_lock_to_stop_other_threads();
+       if (syswrap(seteuid(0)) < 0) {
+       goto cred_management_err;
+       }
+       ret = syswrap(setruid(new_ruid));
+       seteuid(previous_euid);
+       unlock_it();
+       */
+    }
+    proc.cred.uid = ruid;
+    if (syswrap(setruid(ruid)) < 0) {
+      goto cred_management_err;
     }
   }
   if (euid != (l_uid_t) -1) {
-    if (can_setresxid(euid)) {
-      new_euid = euid;
-    } else {
-      ret = -LINUX_EPERM;
-      goto out;
+    if (!can_setresxid(euid)) {
+      return -LINUX_EPERM;
+    }
+    if (proc.cred.euid != 0 && euid != proc.cred.uid && proc.cred.suid != 0) {
+      assert(euid == proc.cred.suid);
+      // The app is getting back from NON-root euid to NON-root saved user ID.
+      // We have to get root privilege once for it.
+      // To implement it, we need some kind of global lock for security. We haven't implement that and just panic now.
+      panic("Noah cannot setuid from non-root euid to non-root saved set-user-ID currently");
+    }
+    proc.cred.euid = euid;
+    if (syswrap(seteuid(euid)) < 0) {
+      goto cred_management_err;
     }
   }
   if (suid != (l_uid_t) -1) {
-    if (can_setresxid(suid)) {
-      new_suid = suid;
-    } else {
-      ret = -LINUX_EPERM;
-      goto out;
+    if (!can_setresxid(suid)) {
+      return -LINUX_EPERM;
     }
+    proc.cred.suid = suid;
   }
-  warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
-  warnk("seteuid\n");
-  ret = syswrap(seteuid(new_euid));
-  if (ret < 0) {
-    goto cred_management_err;
-  }
-  proc.cred.uid = new_ruid;
-  proc.cred.euid = new_euid;
-  proc.cred.suid = new_suid;
   
-out:
-  pthread_rwlock_unlock(&proc.cred.lock);
-  return ret;
+  return 0;
   
 cred_management_err:
   panic("cannot seteuid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+}
+
+
+DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
+{
+  pthread_rwlock_wrlock(&proc.cred.lock);
+  int ret = do_setresuid(ruid, euid, suid);
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
 }
 
 DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
@@ -219,6 +156,47 @@ DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
 out:
   pthread_rwlock_unlock(&proc.cred.lock);
   return ret;
+}
+
+// Linux's setuid is not compatible with POSIX.1-2001.
+// It does not set real uid and saved-uid unless the current uid is capable of CAP_SETUID (that means root in Noah now)
+DEFINE_SYSCALL(setuid, l_uid_t, uid)
+{
+  if (uid == (l_uid_t) -1) {
+    return -LINUX_EINVAL;
+  }
+  int ret = 0;
+  pthread_rwlock_wrlock(&proc.cred.lock);
+  l_uid_t new_ruid = -1, new_euid = -1, new_suid = -1;
+  if (proc.cred.euid == 0) {
+    new_suid = new_ruid = uid;
+  } else if (proc.cred.uid != uid && proc.cred.suid != uid) {
+    ret = -LINUX_EPERM;
+    goto out;
+  }
+  new_euid = uid;
+  ret = do_setresuid(new_ruid, new_euid, new_suid);
+out:
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
+}
+
+DEFINE_SYSCALL(setgid, l_gid_t, gid)
+{
+  return syswrap(setgid(gid));
+}
+
+DEFINE_SYSCALL(geteuid)
+{
+  pthread_rwlock_rdlock(&proc.cred.lock);
+  int ret = proc.cred.euid;
+  pthread_rwlock_unlock(&proc.cred.lock);
+  return ret;
+}
+
+DEFINE_SYSCALL(getegid)
+{
+  return syswrap(getegid());
 }
 
 DEFINE_SYSCALL(setresgid, l_gid_t, rgid, l_gid_t, egid, l_gid_t, sgid)
