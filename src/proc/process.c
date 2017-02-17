@@ -84,16 +84,6 @@ DEFINE_SYSCALL(setuid, l_uid_t, uid)
     // We have to get root privilege once for it.
     // To implement it, we need some kind of global lock for security. So just panic now.
     panic("Noah cannot setuid from non-root to non-root saved set-user-ID currently. Panic to prevent privileged software from becoming out of control");
-    
-    /* Implementation would be like this...
-    acquire_global_lock_to_stop_other_threads();
-    if (syswrap(seteuid(0)) < 0) {
-      panic("cannot seteuid(0) in setuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d]",
-            proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid());
-    }
-    ...after setruid below
-    unlock_it();
-    */
   }
   // Call setruid and seteuid instead of setreuid because it also overwrites saved set-user-ID
   ret = syswrap(setruid(new_ruid));
@@ -147,7 +137,28 @@ DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
   l_uid_t new_ruid = proc.cred.uid, new_euid = proc.cred.euid, new_suid = proc.cred.suid;
   if (ruid != (l_uid_t) -1) {
     if (can_setresxid(ruid)) {
-      new_ruid = ruid;
+      if (ruid != 0 && proc.cred.euid != 0) {
+        // The app is setting ruid to NON-root while euid is also NON-root.
+        // If we do that, we cannot keep saved set-user-ID as root due to bahavior of Darwin's setruid and setreuid.
+        // To implement it, we need some kind of global lock for security. Just panic now.
+        panic("Noah cannot setruid to non-root while euid is non-root. Panic to prevent privileged software from becoming out of control");
+        
+        /* Implementation would be like this...
+         acquire_global_lock_to_stop_other_threads();
+         if (syswrap(seteuid(0)) < 0) {
+           goto cred_management_err;
+         }
+         ret = syswrap(setruid(new_ruid));
+         seteuid(previous_euid);
+         unlock_it();
+         */
+      }
+      warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+      warnk("setruid\n");
+      ret = syswrap(setruid(new_ruid));
+      if (ret < 0) {
+        goto cred_management_err;
+      }
     } else {
       ret = -LINUX_EPERM;
       goto out;
@@ -169,20 +180,11 @@ DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
       goto out;
     }
   }
-  // Call setruid and seteuid instead of setreuid because it also overwrites saved set-user-ID
-  warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
-  warnk("setruid\n");
-  ret = syswrap(setruid(new_ruid));
-  if (ret < 0) {
-    panic("cannot setruid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
-  }
   warnk("current: [%d, %d, %d] -> [%d, %d, %d]. host: [%d, %d, %d]\n", proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
   warnk("seteuid\n");
   ret = syswrap(seteuid(new_euid));
   if (ret < 0) {
-    panic("cannot seteuid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
+    goto cred_management_err;
   }
   proc.cred.uid = new_ruid;
   proc.cred.euid = new_euid;
@@ -191,6 +193,10 @@ DEFINE_SYSCALL(setresuid, l_uid_t, ruid, l_uid_t, euid, l_uid_t, suid)
 out:
   pthread_rwlock_unlock(&proc.cred.lock);
   return ret;
+  
+cred_management_err:
+  panic("cannot seteuid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, new_ruid, new_euid, new_suid, getuid(), geteuid(), macos_getsuid());
 }
 
 DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
