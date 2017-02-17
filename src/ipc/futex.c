@@ -205,7 +205,7 @@ do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr
       return -LINUX_EINVAL;
     }
     int oldval;
-    if (copy_from_user(&oldval, uaddr, sizeof oldval))
+    if (copy_from_user(&oldval, uaddr, sizeof oldval)) /* FIXME: this operation must be atomic */
       return -LINUX_EFAULT;
     if (oldval != val3)
       return -LINUX_EAGAIN;
