@@ -1397,12 +1397,16 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
   char name[LINUX_PATH_MAX];
   strncpy_from_user(name, path_ptr, sizeof name);
 
-  struct path path;
   int r;
+  struct path path;
   if ((r = vfs_grab_dir(dirfd, name, LOOKUP_NOFOLLOW, &path)) < 0) {
     return r;
   }
-  char buf[bufsize];
+  char *buf = malloc(bufsize);
+  if (buf == NULL) {
+    r = -LINUX_ENOMEM;
+    goto out;
+  }
   r = path.fs->ops->readlinkat(path.fs, path.dir, path.subpath, buf, bufsize);
   if (r < 0) {
     goto out;
@@ -1412,6 +1416,9 @@ DEFINE_SYSCALL(readlinkat, int, dirfd, gstr_t, path_ptr, gaddr_t, buf_ptr, int, 
     goto out;
   }
  out:
+  if (buf) {
+    free(buf);
+  }
   vfs_ungrab_dir(&path);
   return r;
 }
@@ -1479,16 +1486,23 @@ vfs_umask(int mask)
  */
 DEFINE_SYSCALL(getcwd, gaddr_t, buf_ptr, unsigned long, size)
 {
-  char buf[size];
-  memset(buf, 0, sizeof buf);
+  char *buf = malloc(size);
+  if (buf == NULL) {
+    return -LINUX_ENOMEM;
+  }
+  memset(buf, 0, size);
   int r;
   if ((r = vfs_getcwd(buf, size)) < 0) {
-    return r;
+    goto out;
   }
   if (copy_to_user(buf_ptr, buf, size)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
+    goto out;
   }
-  return strlen(buf) + 1;
+  r = strlen(buf) + 1;
+out:
+  free(buf);
+  return r;
 }
 
 DEFINE_SYSCALL(fchdir, int, fd)
@@ -1674,14 +1688,17 @@ DEFINE_SYSCALL(pread64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t,
   if (!in_userfd(fd)) {
     return -LINUX_EBADF;
   }
-  char buf[count];
+  char *buf = malloc(count);
   int r = syswrap(pread(fd, buf, count, pos));
   if (r < 0) {
-    return r;
+    goto out;
   }
   if (copy_to_user(buf_ptr, buf, r)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
+    goto out;
   }
+out:
+  free(buf);
   return r;
 }
 
