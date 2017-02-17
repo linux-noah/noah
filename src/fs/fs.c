@@ -550,7 +550,7 @@ DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
-  char buf[size];
+  char *buf = malloc(size);
   struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
@@ -560,11 +560,14 @@ DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
   struct iovec iov = { buf, size };
   int r = file->ops->readv(file, &iov, 1);
   if (r < 0) {
-    return r;
+    goto out;
   }
   if (copy_to_user(buf_ptr, buf, r)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
+    goto out;
   }
+out:
+  free(buf);
   return r;
 }
 
