@@ -51,7 +51,7 @@ DEFINE_SYSCALL(getgid)
 }
 
 static inline int
-macos_getsuid()
+darwin_getsuid()
 {
   struct kinfo_proc kinfo;
   size_t len = sizeof kinfo;
@@ -123,8 +123,8 @@ do_setresuid(l_uid_t ruid, l_uid_t euid, l_uid_t suid)
   return 0;
   
 cred_management_err:
-  panic("cannot seteuid in setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management error. Host cred is [%d, %d, %d]",
-          proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), macos_getsuid());
+  panic("Cannot setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management bug of Noah. Host cred is [%d, %d, %d]",
+          proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), darwin_getsuid());
 }
 
 

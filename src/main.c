@@ -389,11 +389,11 @@ init_first_proc(const char *root)
   proc.pfutex = kh_init(pfutex);
   pthread_mutex_init(&proc.futex_mutex, NULL);
   proc.cred = (struct cred) {
+    .lock = PTHREAD_RWLOCK_INITIALIZER,
     .uid = getuid(),
     .euid = geteuid(),
     .suid = geteuid(),
   };
-  pthread_rwlock_init(&proc.cred.lock, NULL);
 
   task.tid = getpid();
 }
