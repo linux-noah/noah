@@ -254,21 +254,31 @@ DEFINE_SYSCALL(getsid, l_pid_t, pid)
 
 DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
-  gid_t gl[gidsetsize];
+  gid_t *gl = malloc(gidsetsize * sizeof(gid_t));
   int r = syswrap(getgroups(gidsetsize, gl));
-  if (r < 0)
-    return r;
-  if (copy_to_user(grouplist_ptr, gl, sizeof gl))
-    return -LINUX_EFAULT;
+  if (r < 0) {
+    goto out;
+  }
+  if (copy_to_user(grouplist_ptr, gl, sizeof gl)) {
+    r = -LINUX_EFAULT;
+  }
+out:
+  free(gl);
   return r;
 }
 
 DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
-  gid_t gl[gidsetsize];
-  if (copy_from_user(gl, grouplist_ptr, sizeof gl))
-    return -LINUX_EFAULT;
-  return syswrap(setgroups(gidsetsize, gl));
+  int r;
+  gid_t *gl = malloc(gidsetsize * sizeof(gid_t));
+  if (copy_from_user(gl, grouplist_ptr, sizeof gl)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
+  r = syswrap(setgroups(gidsetsize, gl));
+out:
+  free(gl);
+  return r;
 }
 
 uint64_t do_gettid()
