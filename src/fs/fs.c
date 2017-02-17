@@ -534,18 +534,26 @@ out:
 
 DEFINE_SYSCALL(write, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
-  char buf[size];
+  int r;
+  char *buf = malloc(size);
   if (copy_from_user(buf, buf_ptr, size)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
+    goto out;
   }
   struct file *file = get_file(fd);
-  if (file == NULL)
-    return -LINUX_EBADF;
+  if (file == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
+  }
   if (file->ops->writev == NULL) {
-    return -LINUX_EBADF;
+    r = -LINUX_EBADF;
+    goto out;
   }
   struct iovec iov = { buf, size };
-  return file->ops->writev(file, &iov, 1);
+  r =  file->ops->writev(file, &iov, 1);
+out:
+  free(buf);
+  return r;
 }
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
@@ -686,14 +694,16 @@ DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, co
   struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
-  char buf[count];
+  char *buf = malloc(count);
   int r = file->ops->getdents(file, buf, count);
   if (r < 0) {
-    return r;
+    goto out;
   }
   if (copy_to_user(dirent_ptr, buf, count)) {
-    return -LINUX_EFAULT;
+    r = -LINUX_EFAULT;
   }
+out:
+  free(buf);
   return r;
 }
 
