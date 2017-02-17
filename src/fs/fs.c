@@ -1830,26 +1830,39 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
 {
   /* FIXME! event numbers should be translated */
 
-  struct pollfd l_fds[nfds], d_fds[nfds];
-
-  if (nfds > OPEN_MAX) {
-    return -LINUX_EINVAL;
+  struct pollfd *l_fds = malloc(nfds * sizeof(struct pollfd)), *d_fds = malloc(nfds * sizeof(struct pollfd));
+  
+  if (l_fds == NULL || d_fds == NULL) {
+    if (l_fds) {
+      free(l_fds);
+    }
+    if (d_fds) {
+      free(d_fds);
+    }
+    return -LINUX_ENOMEM;
   }
 
-  if (copy_from_user(l_fds, fds_ptr, sizeof l_fds))
-    return -LINUX_EFAULT;
+  int r;
+  if (nfds > OPEN_MAX) {
+    r = -LINUX_EINVAL;
+    goto out;
+  }
+
+  if (copy_from_user(l_fds, fds_ptr, nfds * sizeof(struct pollfd))) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
 
   for (int i = 0; i < nfds; i++) {
     d_fds[i] = l_fds[i];
     if (!in_userfd(l_fds[i].fd)) {
       d_fds[i].fd = -1;
     }
-    POLLIN;
   }
 
-  int r = syswrap(poll(d_fds, nfds, timeout));
+  r = syswrap(poll(d_fds, nfds, timeout));
   if (r < 0)
-    return r;
+    goto out;
 
   for (int i = 0; i < nfds; i++) {
     if (in_userfd(l_fds[i].fd) || l_fds[i].fd < 0 || l_fds[i].events == 0) {
@@ -1860,9 +1873,13 @@ DEFINE_SYSCALL(poll, gaddr_t, fds_ptr, int, nfds, int, timeout)
     }
   }
 
-  if (copy_to_user(fds_ptr, l_fds, sizeof l_fds))
-    return -LINUX_EFAULT;
+  if (copy_to_user(fds_ptr, l_fds, nfds * sizeof(struct pollfd))) {
+    r = -LINUX_EFAULT;
+  }
 
+out:
+  free(l_fds);
+  free(d_fds);
   return r;
 }
 
