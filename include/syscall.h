@@ -133,7 +133,7 @@
   SYSCALL(129, unimplemented)                   \
   SYSCALL(130, rt_sigsuspend)                   \
   SYSCALL(131, sigaltstack)                     \
-  SYSCALL(132, unimplemented)                   \
+  SYSCALL(132, utime)                           \
   SYSCALL(133, unimplemented)                   \
   SYSCALL(134, uselib)                          \
   SYSCALL(135, unimplemented)                   \

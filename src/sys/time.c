@@ -13,6 +13,7 @@
 #include <fcntl.h>
 #include <ctype.h>
 
+#include <utime.h>
 #include <time.h>
 #include <sys/time.h>
 #include <sys/attr.h>
@@ -76,15 +77,13 @@ DEFINE_SYSCALL(nanosleep, gaddr_t, rqtp_ptr, gaddr_t, rmtp_ptr)
   return r;
 }
 
-DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int, flags)
+int
+do_utimensat(int dirfd, const char *name, const struct l_timespec *l_times, int flags)
 {
   int fd;
-  if (filename == 0) {
+  if (name == 0) {
     fd = dirfd; // Linux allows filename to be NULL and treat dirfd as fd
   } else {
-    char name[LINUX_PATH_MAX];
-    if (strncpy_from_user(name, filename, sizeof name) < 0)
-      return -LINUX_EFAULT;
     int lflags = 0;
     if (flags & LINUX_AT_SYMLINK_NOFOLLOW) {
       lflags |= LINUX_O_NOFOLLOW | LINUX_O_PATH;
@@ -96,12 +95,7 @@ DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int
   // HFS+ suppots only second precision timestamp
   struct timeval times[2], *tp = NULL;
   int r;
-  if (times_ptr != 0) {
-    struct l_timespec l_times[2];
-    if (copy_from_user(l_times, times_ptr, sizeof l_times)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+  if (l_times != NULL) {
     times[0].tv_sec = l_times[0].tv_sec;
     times[0].tv_usec = l_times[0].tv_nsec / 1000;
     times[1].tv_sec = l_times[1].tv_sec;
@@ -139,9 +133,47 @@ DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int
   return r;
 }
 
+DEFINE_SYSCALL(utimensat, int, dirfd, gaddr_t, filename, gaddr_t, times_ptr, int, flags)
+{
+  char name[LINUX_PATH_MAX];
+  if (filename != 0) {
+    if (strncpy_from_user(name, filename, sizeof name) < 0)
+      return -LINUX_EFAULT;
+  }
+  
+  struct l_timespec l_times[2];
+  if (times_ptr != 0) {
+    if (copy_from_user(l_times, times_ptr, sizeof l_times)) {
+      return -LINUX_EFAULT;
+    }
+  }
+  
+  return do_utimensat(dirfd, filename == 0 ? NULL : name, times_ptr == 0 ? NULL : l_times, flags);
+}
+
 DEFINE_SYSCALL(utimes, gaddr_t, filename, gaddr_t, times_ptr)
 {
   return sys_utimensat(LINUX_AT_FDCWD, filename, times_ptr, 0);
+}
+
+DEFINE_SYSCALL(utime, gaddr_t, path, gaddr_t, times)
+{
+  char name[LINUX_PATH_MAX];
+  if (strncpy_from_user(name, path, sizeof name) < 0)
+    return -LINUX_EFAULT;
+  
+  struct l_timespec l_time[2];
+  struct utimbuf buf;
+  if (times != 0) {
+    if (copy_from_user(&buf, times, sizeof buf)) {
+      return -LINUX_EFAULT;
+    }
+    l_time[0].tv_sec = buf.actime;
+    l_time[0].tv_nsec = 0;
+    l_time[1].tv_sec = buf.modtime;
+    l_time[1].tv_nsec = 0;
+  }
+  return do_utimensat(LINUX_AT_FDCWD, name, times == 0 ? NULL : l_time, 0);
 }
 
 clockid_t
