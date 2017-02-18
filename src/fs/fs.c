@@ -42,6 +42,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <assert.h>
 #include <errno.h>
@@ -72,7 +73,7 @@ struct file_operations {
   int (*close)(struct file *f);
   int (*ioctl)(struct file *f, int cmd, uint64_t val0);
   int (*lseek)(struct file *f, l_off_t offset, int whence);
-  int (*getdents)(struct file *f, char *buf, uint count);
+  int (*getdents)(struct file *f, char *buf, uint count, bool is64);
   int (*fcntl)(struct file *f, unsigned int cmd, unsigned long arg);
   int (*fsync)(struct file *f);
   /* inode operations */
@@ -264,11 +265,34 @@ darwinfs_lseek(struct file *file, l_off_t offset, int whence)
 }
 
 int
-darwinfs_getdents(struct file *file, char *direntp, unsigned count)
+darwin_to_linux_dent(struct dirent *d_dent, void *l_dent, int is64)
+{
+  size_t reclen = roundup(is64 ? offsetof(struct l_dirent64, d_name) : offsetof(struct l_dirent, d_name) + d_dent->d_namlen + 2, 8);
+  /* fill dirent buffer */
+  if (is64) {
+    struct l_dirent64 *dp = (struct l_dirent64 *) l_dent;
+    dp->d_reclen = reclen;
+    dp->d_ino = d_dent->d_ino;
+    dp->d_off = d_dent->d_seekoff;
+    dp->d_type = d_dent->d_type;
+    memcpy(dp->d_name, d_dent->d_name, d_dent->d_namlen + 1);
+  } else {
+    struct l_dirent *dp = (struct l_dirent *) l_dent;
+    dp->d_reclen = reclen;
+    dp->d_ino = d_dent->d_ino;
+    dp->d_off = d_dent->d_seekoff;
+    memcpy(dp->d_name, d_dent->d_name, d_dent->d_namlen + 1);
+    ((char *) dp)[reclen - 1] = d_dent->d_type;
+  }
+  return reclen;
+}
+
+int
+darwinfs_getdents(struct file *file, char *direntp, unsigned count, bool is64)
 {
   int fd = dup(file->fd);
   DIR *dir = fdopendir(fd);
-
+  
   if (dir == NULL) {
     return -darwin_to_linux_errno(errno);
   }
@@ -277,19 +301,11 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count)
   long loc = telldir(dir);
   errno = 0;
   while ((dent = readdir(dir)) != NULL) {
-    size_t reclen = roundup(offsetof(struct l_dirent, d_name) + dent->d_namlen + 2, 8);
+    size_t reclen = darwin_to_linux_dent(dent, direntp + pos, is64);
     if (pos + reclen > count) {
       seekdir(dir, loc);
       goto end;
     }
-    /* fill dirent buffer */
-    struct l_dirent *dp = (struct l_dirent *) (direntp + pos);
-    dp->d_reclen = reclen;
-    dp->d_ino = dent->d_ino;
-    dp->d_off = dent->d_seekoff;
-    memcpy(dp->d_name, dent->d_name, dent->d_namlen + 1);
-    ((char *) dp)[reclen - 1] = dent->d_type;
-
     pos += reclen;
     loc = telldir(dir);
   }
@@ -689,13 +705,31 @@ DEFINE_SYSCALL(lseek, int, fd, off_t, offset, int, whence)
   return file->ops->lseek(file, offset, whence);
 }
 
+DEFINE_SYSCALL(getdents64, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
+{
+  struct file *file = get_file(fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
+  char *buf = malloc(count);
+  int r = file->ops->getdents(file, buf, count, true);
+  if (r < 0) {
+    goto out;
+  }
+  if (copy_to_user(dirent_ptr, buf, count)) {
+    r = -LINUX_EFAULT;
+  }
+out:
+  free(buf);
+  return r;
+}
+
 DEFINE_SYSCALL(getdents, unsigned int, fd, gaddr_t, dirent_ptr, unsigned int, count)
 {
   struct file *file = get_file(fd);
   if (file == NULL)
     return -LINUX_EBADF;
   char *buf = malloc(count);
-  int r = file->ops->getdents(file, buf, count);
+  int r = file->ops->getdents(file, buf, count, false);
   if (r < 0) {
     goto out;
   }

@@ -218,7 +218,7 @@
   SYSCALL(214, epoll_ctl_old)                   \
   SYSCALL(215, epoll_wait_old)                  \
   SYSCALL(216, unimplemented)                   \
-  SYSCALL(217, unimplemented)                   \
+  SYSCALL(217, getdents64)                      \
   SYSCALL(218, set_tid_address)                 \
   SYSCALL(219, unimplemented)                   \
   SYSCALL(220, unimplemented)                   \
