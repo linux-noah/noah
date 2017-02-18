@@ -220,3 +220,8 @@ DEFINE_SYSCALL(clock_getres, l_clockid_t, id, gaddr_t, res_ptr)
   }
   return 0;
 }
+
+DEFINE_SYSCALL(fdatasync, int, fildes)
+{
+  return syswrap(fsync(fildes));
+}

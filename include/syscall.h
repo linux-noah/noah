@@ -76,7 +76,7 @@
   SYSCALL(72, fcntl)                            \
   SYSCALL(73, unimplemented)                    \
   SYSCALL(74, fsync)                            \
-  SYSCALL(75, unimplemented)                    \
+  SYSCALL(75, fdatasync)                        \
   SYSCALL(76, unimplemented)                    \
   SYSCALL(77, ftruncate)                        \
   SYSCALL(78, getdents)                         \
