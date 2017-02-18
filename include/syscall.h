@@ -204,7 +204,7 @@
   SYSCALL(200, unimplemented)                   \
   SYSCALL(201, time)                            \
   SYSCALL(202, futex)                           \
-  SYSCALL(203, unimplemented)                   \
+  SYSCALL(203, sched_setaffinity)               \
   SYSCALL(204, sched_getaffinity)               \
   SYSCALL(205, set_thread_area)                 \
   SYSCALL(206, unimplemented)                   \

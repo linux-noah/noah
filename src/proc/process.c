@@ -433,6 +433,11 @@ DEFINE_SYSCALL(setpriority, int, which, int, who, int, niceval)
   return syswrap(setpriority(which, who, niceval));
 }
 
+DEFINE_SYSCALL(sched_setaffinity, l_pid_t, pid, unsigned int, len, gaddr_t, user_mask_ptr)
+{
+  return 0;
+}
+
 DEFINE_SYSCALL(sched_getaffinity, l_pid_t, pid, unsigned int, len, gaddr_t, user_mask_ptr)
 {
   static const unsigned sizeof_cpumask_t = 32; /* FIXME */
