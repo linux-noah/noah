@@ -189,15 +189,15 @@
   SYSCALL(185, security)                        \
   SYSCALL(186, gettid)                          \
   SYSCALL(187, unimplemented)                   \
-  SYSCALL(188, unimplemented)                   \
+  SYSCALL(188, setxattr)                        \
   SYSCALL(189, unimplemented)                   \
-  SYSCALL(190, unimplemented)                   \
+  SYSCALL(190, fsetxattr)                       \
   SYSCALL(191, getxattr)                        \
   SYSCALL(192, unimplemented)                   \
-  SYSCALL(193, unimplemented)                   \
+  SYSCALL(193, fgetxattr)                       \
   SYSCALL(194, unimplemented)                   \
   SYSCALL(195, unimplemented)                   \
-  SYSCALL(196, unimplemented)                   \
+  SYSCALL(196, flistxattr)                      \
   SYSCALL(197, unimplemented)                   \
   SYSCALL(198, unimplemented)                   \
   SYSCALL(199, unimplemented)                   \

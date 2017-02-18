@@ -1708,6 +1708,24 @@ DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, siz
   return -LINUX_ENOTSUP;
 }
 
+DEFINE_SYSCALL(fgetxattr, int, fd, gaddr_t, name, gaddr_t, value, size_t, size)
+{
+  warnk("fgetxattr is unimplemented\n");
+  return -LINUX_ENOTSUP;
+}
+
+DEFINE_SYSCALL(setxattr, gstr_t, pathname, gstr_t, name, gaddr_t, value, size_t, size, int, flags)
+{
+  warnk("setxattr is unimplemented\n");
+  return 0;
+}
+
+DEFINE_SYSCALL(fsetxattr, int, fd, gaddr_t, name, gaddr_t, value, size_t, size, int, flags)
+{
+  warnk("fsetxattr is unimplemented\n");
+  return 0;
+}
+
 DEFINE_SYSCALL(fadvise64, int, fd, off_t, offset, size_t, len, int, advice)
 {
   return 0;
@@ -1909,4 +1927,10 @@ DEFINE_SYSCALL(chroot, gstr_t, path_ptr)
 DEFINE_SYSCALL(ftruncate, unsigned int, fd, unsigned long, length)
 {
   return syswrap(ftruncate(fd, length));
+}
+
+DEFINE_SYSCALL(flistxattr, int, fd, gaddr_t, list, size_t, size)
+{
+  assert(size == 0);
+  return 0;
 }
