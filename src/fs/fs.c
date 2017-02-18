@@ -1998,3 +1998,17 @@ DEFINE_SYSCALL(flock, int, fd, int, operation)
   // Linux's and Darwin's operation are compatible
   return syswrap(flock(fd, operation));
 }
+
+DEFINE_SYSCALL(fallocate, int, fd, int, mode, l_off_t, offset, l_off_t, len)
+{
+  if (mode != 0) {
+    // FreeBSD's Linuxulator also implements only mode zero
+    warnk("Unsupported fallocate mode\n");
+    return -ENOSYS;
+  }
+  
+  // Emulate posix_fallocate
+  assert(offset == 0);
+  struct fstore store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, len, 0};
+  return syswrap(fcntl(fd, F_PREALLOCATE, &store));
+}

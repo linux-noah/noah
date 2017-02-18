@@ -286,7 +286,7 @@
   SYSCALL(282, unimplemented)                   \
   SYSCALL(283, unimplemented)                   \
   SYSCALL(284, unimplemented)                   \
-  SYSCALL(285, unimplemented)                   \
+  SYSCALL(285, fallocate)                       \
   SYSCALL(286, unimplemented)                   \
   SYSCALL(287, unimplemented)                   \
   SYSCALL(288, unimplemented)                   \
