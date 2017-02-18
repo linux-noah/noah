@@ -27,7 +27,7 @@
   SYSCALL(23, select)                           \
   SYSCALL(24, sched_yield)                      \
   SYSCALL(25, mremap)                           \
-  SYSCALL(26, unimplemented)                    \
+  SYSCALL(26, msync)                            \
   SYSCALL(27, unimplemented)                    \
   SYSCALL(28, madvise)                          \
   SYSCALL(29, unimplemented)                    \

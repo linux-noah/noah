@@ -322,3 +322,16 @@ DEFINE_SYSCALL(get_mempolicy, gaddr_t, policy, gaddr_t, nmask, unsigned long, ma
     return -LINUX_EFAULT;
   return 0;
 }
+
+DEFINE_SYSCALL(msync, gaddr_t, addr, size_t, len, int, flags)
+{
+  struct mm_region *region = find_region(addr, proc.mm);
+  if (!region || addr - region->gaddr >= len || len + addr - region->gaddr >= region->size) {
+    return -LINUX_ENOMEM;
+  }
+  // Darwin's flags are compatible with that of Linux
+  if (flags & ~(MS_ASYNC | MS_SYNC | MS_INVALIDATE)) {
+    return -LINUX_EINVAL;
+  }
+  return syswrap(msync(addr - region->gaddr + region->haddr, len, flags));
+}
