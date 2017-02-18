@@ -65,7 +65,8 @@ linux_to_darwin_sockaddr(struct sockaddr **sockaddr, const struct l_sockaddr *l_
 
   memcpy(*sockaddr, l_sockaddr, l_sockaddr_len);
   assert(offsetof(struct sockaddr, sa_data) == offsetof(struct l_sockaddr, sa_data));
-  (*sockaddr)->sa_family = l_sockaddr->sa_family;
+  (*sockaddr)->sa_family = linux_to_darwin_sa_family(l_sockaddr->sa_family);
+
 
   switch (linux_to_darwin_sa_family(l_sockaddr->sa_family)) {
   case AF_UNIX: {

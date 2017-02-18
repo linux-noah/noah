@@ -253,7 +253,7 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     return sys_fcntl(fd, LINUX_F_SETFD, 1);
   }
   default:
-    printk("unhandled darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
+    warnk("unhandled darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
     return -LINUX_EPERM;
   }
 }

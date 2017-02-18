@@ -99,6 +99,13 @@ struct l_ifmap {
 #define	LINUX_IFHWADDRLEN	6
 #define	LINUX_IFNAMSIZ		16
 
+struct l_sockaddr_nl {
+  l_ushort nl_samily;
+  l_ushort nl_pad;              /* == 0 */
+  l_uint nl_pid;
+  l_uint nl_groups;
+};
+
 struct l_ifreq {
   union {
     char	ifrn_name[LINUX_IFNAMSIZ];

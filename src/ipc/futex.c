@@ -30,18 +30,22 @@ pfutex_get(gaddr_t uaddr)
 {
   int ret;
   khiter_t k = kh_put(pfutex, proc.pfutex, uaddr, &ret);
+  assert(ret != -1);
   if (ret != 0) {             /* not present */
-    INIT_LIST_HEAD(&kh_value(proc.pfutex, k));
+    assert(ret == 1);
+    struct list_head *head = malloc(sizeof *head);
+    INIT_LIST_HEAD(head);
+    kh_value(proc.pfutex, k) = head;
   }
-  return &kh_value(proc.pfutex, k);
+  return kh_value(proc.pfutex, k);
 }
 
 static int
 do_private_futex_wake(gaddr_t uaddr, int count, bool use_bitset, uint32_t bitset)
 {
-  struct list_head *p, *head = pfutex_get(uaddr);
+  struct list_head *p, *n, *head = pfutex_get(uaddr);
   int ret = 0;
-  list_for_each (p, head) {
+  list_for_each_safe (p, n, head) {
     if (count == 0)
       break;
     struct pfutex_entry *entry = container_of(p, struct pfutex_entry, head);
@@ -49,7 +53,7 @@ do_private_futex_wake(gaddr_t uaddr, int count, bool use_bitset, uint32_t bitset
       if ((entry->bitset & bitset) == 0)
         continue;
     }
-    list_del(p);
+    list_del_init(p);
     pthread_cond_signal(&entry->cond);
     ret++; count--;
   }
@@ -74,8 +78,8 @@ __cond_wait(pthread_cond_t *cond, pthread_mutex_t *mutex, bool use_timeout, stru
     return 0;
   }
   int ret = pthread_cond_timedwait(cond, mutex, ts);
-  if (ret < 0) {
-    if (ret == -ETIMEDOUT)
+  if (ret != 0) {
+    if (ret == ETIMEDOUT)
       return -LINUX_ETIMEDOUT;
     else
       return -LINUX_EINTR;
@@ -87,6 +91,7 @@ static int
 do_private_wait(gaddr_t uaddr, bool use_timeout, struct timespec *ts, bool check_requeue, gaddr_t uaddr2, bool use_bitset, uint32_t bitset)
 {
   struct pfutex_entry *entry = malloc(sizeof *entry);
+  INIT_LIST_HEAD(&entry->head);
   pthread_cond_init(&entry->cond, NULL);
   entry->uaddr = uaddr;
   entry->bitset = use_bitset ? bitset : FUTEX_BITSET_MATCH_ANY;
@@ -105,7 +110,7 @@ static int
 do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr_t uaddr2, int val3)
 {
   if ((op & LINUX_FUTEX_CLOCK_REALTIME) != 0) {
-    warnk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
+    printk("futex: FUTEX_CLOCK_REALTIME flags is not supported\n");
   }
 
   switch (op & LINUX_FUTEX_CMD_MASK) {
@@ -215,7 +220,7 @@ do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr
     list_for_each_safe (p, n, list) {
       if (val2 == 0)
         break;
-      list_del(p);
+      list_del_init(p);
       list_add_tail(p, list2);
       container_of(p, struct pfutex_entry, head)->uaddr = uaddr2;
       val2--;
@@ -254,7 +259,7 @@ do_private_futex(gaddr_t uaddr, int op, uint32_t val, gaddr_t timeout_ptr, gaddr
   }
 }
 
-DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_ptr, gaddr_t, uaddr2_ptr, uint32_t, val3)
+DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_ptr, gaddr_t, uaddr2, uint32_t, val3)
 {
   if (op & LINUX_FUTEX_PRIVATE_FLAG) {
     op &= ~LINUX_FUTEX_PRIVATE_FLAG;
@@ -269,7 +274,7 @@ DEFINE_SYSCALL(futex, gaddr_t, uaddr, int, op, uint32_t, val, gaddr_t, timeout_p
     }
   }
   pthread_mutex_lock(&proc.futex_mutex);
-  int ret = do_private_futex(uaddr, op, val, timeout_ptr, uaddr2_ptr, val3);
+  int ret = do_private_futex(uaddr, op, val, timeout_ptr, uaddr2, val3);
   pthread_mutex_unlock(&proc.futex_mutex);
   return ret;
 }

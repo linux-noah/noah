@@ -83,6 +83,13 @@
 #define	LINUX_IPC_64	0x0100	/* New version (support 32-bit UIDs, bigger
 				   message sizes, etc. */
 
+
+struct l_sembuf {
+  ushort sem_num;
+  short sem_op;
+  short sem_flg;
+};
+
 union l_semun {
   l_int		val;
   l_uintptr_t	buf;
@@ -100,5 +107,13 @@ struct l_ipc_perm {
   l_ushort	mode;
   l_ushort	seq;
 };
+
+#define LINUX_IPC_PRIVATE 0
+
+#define LINUX_IPC_CREAT  00001000
+#define LINUX_IPC_EXCL   00002000
+#define LINUX_IPC_NOWAIT 00004000
+
+#define LINUX_SEM_UNDO 0x1000
 
 #endif /* _LINUX_IPC_H_ */

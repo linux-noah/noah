@@ -30,9 +30,9 @@
   SYSCALL(26, msync)                            \
   SYSCALL(27, unimplemented)                    \
   SYSCALL(28, madvise)                          \
-  SYSCALL(29, unimplemented)                    \
-  SYSCALL(30, unimplemented)                    \
-  SYSCALL(31, unimplemented)                    \
+  SYSCALL(29, shmget)                           \
+  SYSCALL(30, shmat)                            \
+  SYSCALL(31, shmctl)                           \
   SYSCALL(32, dup)                              \
   SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
@@ -65,9 +65,9 @@
   SYSCALL(61, wait4)                            \
   SYSCALL(62, kill)                             \
   SYSCALL(63, uname)                            \
-  SYSCALL(64, unimplemented)                    \
-  SYSCALL(65, unimplemented)                    \
-  SYSCALL(66, unimplemented)                    \
+  SYSCALL(64, semget)                           \
+  SYSCALL(65, semop)                            \
+  SYSCALL(66, semctl)                           \
   SYSCALL(67, unimplemented)                    \
   SYSCALL(68, unimplemented)                    \
   SYSCALL(69, unimplemented)                    \
