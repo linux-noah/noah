@@ -100,7 +100,7 @@ struct pfutex_entry {
 };
 
 /* TODO: collect garbage entries */
-KHASH_MAP_INIT_INT64(pfutex, struct list_head)
+KHASH_MAP_INIT_INT64(pfutex, struct list_head *)
 
 struct proc {
   int nr_tasks;
