@@ -78,7 +78,7 @@
   SYSCALL(74, fsync)                            \
   SYSCALL(75, unimplemented)                    \
   SYSCALL(76, unimplemented)                    \
-  SYSCALL(77, unimplemented)                    \
+  SYSCALL(77, ftruncate)                        \
   SYSCALL(78, getdents)                         \
   SYSCALL(79, getcwd)                           \
   SYSCALL(80, chdir)                            \

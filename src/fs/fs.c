@@ -1905,3 +1905,8 @@ DEFINE_SYSCALL(chroot, gstr_t, path_ptr)
   }
   return 0;
 }
+
+DEFINE_SYSCALL(ftruncate, unsigned int, fd, unsigned long, length)
+{
+  return syswrap(ftruncate(fd, length));
+}
