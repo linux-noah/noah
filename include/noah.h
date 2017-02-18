@@ -49,6 +49,7 @@ int vkern_close(int fd);
 void close_cloexec();
 int register_fd(int fd, bool is_cloexec);
 int vkern_dup_fd(int fd, bool is_cloexec);
+gaddr_t alloc_region(size_t len);
 
 void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);

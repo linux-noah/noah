@@ -30,6 +30,8 @@ add_executable(noah
   src/mm/mmap.c
   src/mm/malloc.c
   src/proc/ptrace.c
+  src/mm/shm.c
+  src/ipc/sem.c
   )
 target_link_libraries(noah pthread "-framework Hypervisor")
 
