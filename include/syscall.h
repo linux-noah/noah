@@ -74,7 +74,7 @@
   SYSCALL(70, unimplemented)                    \
   SYSCALL(71, unimplemented)                    \
   SYSCALL(72, fcntl)                            \
-  SYSCALL(73, unimplemented)                    \
+  SYSCALL(73, flock)                            \
   SYSCALL(74, fsync)                            \
   SYSCALL(75, fdatasync)                        \
   SYSCALL(76, unimplemented)                    \

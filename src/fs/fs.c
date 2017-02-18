@@ -1992,3 +1992,9 @@ DEFINE_SYSCALL(flistxattr, int, fd, gaddr_t, list, size_t, size)
   assert(size == 0);
   return 0;
 }
+
+DEFINE_SYSCALL(flock, int, fd, int, operation)
+{
+  // Linux's and Darwin's operation are compatible
+  return syswrap(flock(fd, operation));
+}
