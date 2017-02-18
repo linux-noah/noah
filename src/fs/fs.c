@@ -1702,6 +1702,30 @@ out:
   return r;
 }
 
+DEFINE_SYSCALL(pwrite64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t, pos)
+{
+  if (!in_userfd(fd)) {
+    return -LINUX_EBADF;
+  }
+  int r;
+  char *buf = malloc(count);
+  if (copy_from_user(buf, buf_ptr, count)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
+  r = syswrap(pwrite(fd, buf, count, pos));
+  if (r < 0) {
+    goto out;
+  }
+  if (copy_to_user(buf_ptr, buf, r)) {
+    r = -LINUX_EFAULT;
+    goto out;
+  }
+out:
+  free(buf);
+  return r;
+}
+
 DEFINE_SYSCALL(getxattr, gstr_t, path_ptr, gstr_t, name_ptr, gaddr_t, value, size_t, size)
 {
   warnk("getxattr is unimplemented\n");

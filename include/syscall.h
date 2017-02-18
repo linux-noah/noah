@@ -19,7 +19,7 @@
   SYSCALL(15, rt_sigreturn)                     \
   SYSCALL(16, ioctl)                            \
   SYSCALL(17, pread64)                          \
-  SYSCALL(18, unimplemented)                    \
+  SYSCALL(18, pwrite64)                         \
   SYSCALL(19, readv)                            \
   SYSCALL(20, writev)                           \
   SYSCALL(21, access)                           \
