@@ -69,6 +69,16 @@ do_munmap(gaddr_t gaddr, size_t size)
   return 0;
 }
 
+static int
+linux_to_darwin_mflags(int l_flags)
+{
+  int d_flags = 0;
+  if (l_flags & LINUX_MAP_SHARED) d_flags |= MAP_SHARED;
+  if (l_flags & LINUX_MAP_PRIVATE) d_flags |= MAP_PRIVATE;
+  if (l_flags & LINUX_MAP_ANON) d_flags |= MAP_ANON;
+  return d_flags;
+}
+
 gaddr_t
 do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, off_t offset)
 {
@@ -98,12 +108,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
     addr = alloc_region(len);
   }
 
-  int mflags = 0;
-  if (l_flags & LINUX_MAP_SHARED) mflags |= MAP_SHARED;
-  if (l_flags & LINUX_MAP_PRIVATE) mflags |= MAP_PRIVATE;
-  if (l_flags & LINUX_MAP_ANON) mflags |= MAP_ANON;
-
-  void *ptr = mmap(0, len, d_prot, mflags, fd, offset);
+  void *ptr = mmap(0, len, d_prot, linux_to_darwin_mflags(l_flags), fd, offset);
   if (ptr == MAP_FAILED) {
     panic("mmap failed. addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
   }
@@ -127,15 +132,16 @@ DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd,
 
 DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, int, flags, gaddr_t, new_addr)
 {
-  if (flags & ~(LINUX_MREMAP_FIXED | LINUX_MREMAP_MAYMOVE))
+  if (flags & ~(LINUX_MREMAP_FIXED | LINUX_MREMAP_MAYMOVE)) {
     return -LINUX_EINVAL;
+  }
   if (flags & LINUX_MREMAP_FIXED && !(flags & LINUX_MREMAP_MAYMOVE))
     return -LINUX_EINVAL;
-  if (is_page_aligned((void*)old_addr, PAGE_4KB))
+  if (!is_page_aligned((void*)old_addr, PAGE_4KB))
     return -LINUX_EINVAL;
   if (!(flags & LINUX_MREMAP_MAYMOVE)) {
     warnk("unsupported mremap flags: 0x%x\n", flags);
-    return -LINUX_ENOSYS;
+    return -LINUX_EINVAL;
   }
 
   if (new_size == 0)
@@ -170,9 +176,9 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
   }
 
   /* new_size > old_size */
-  void *moved_to = mmap(0, new_size, PROT_NONE, region->mm_flags, region->mm_fd, region->pgoff);
+  void *moved_to = mmap(0, new_size, PROT_NONE, linux_to_darwin_mflags(region->mm_flags), region->mm_fd, region->pgoff);
   if (moved_to == MAP_FAILED) {
-    panic("mremap failed. old_addr :0x%llx, old_size: 0x%lux, new_size: 0x%lux, flags:0x%ux, new_addr: 0x%llx", old_addr, old_size, new_size, flags, new_addr);
+    panic("mremap failed. old_addr :0x%llx, old_size: 0x%lux, new_size: 0x%lux, flags:0x%ux, new_addr: 0x%llx, mm_flags: 0x%ux, mm_fd: %d", old_addr, old_size, new_size, flags, new_addr, region->mm_flags, region->mm_fd);
   }
   if (!(region->mm_flags & LINUX_MAP_ANONYMOUS)) {
     /* A file is mapped to this region. We have to take the file permission into account */
@@ -205,7 +211,7 @@ DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, in
 out:
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
 
-  return 0;
+  return ret;
 }
 
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
