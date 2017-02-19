@@ -125,26 +125,19 @@ darwin_to_linux_sockaddr(struct l_sockaddr *l_sockaddr, const struct sockaddr *s
 
 DEFINE_SYSCALL(connect, int, sockfd, gaddr_t, addr_ptr, uint64_t, addrlen)
 {
-  char *addr = malloc(addrlen);
+  char addr[addrlen];
 
-  int r;
-  if (copy_from_user(addr, addr_ptr, addrlen)) {
-    r = -LINUX_EFAULT;
-    goto err;
-  }
+  if (copy_from_user(addr, addr_ptr, addrlen))
+    return -LINUX_EFAULT;
 
   struct sockaddr *sockaddr;
   if (linux_to_darwin_sockaddr(&sockaddr, (struct l_sockaddr *) addr, addrlen) < 0) {
-    r = -LINUX_EINVAL;
-    goto err;
+    return -1;
   }
 
-  r = syswrap(connect(sockfd, sockaddr, sockaddr->sa_len));
-  
+  int fd = syswrap(connect(sockfd, sockaddr, sockaddr->sa_len));
   free(sockaddr);
-err:
-  free(addr);
-  return r;
+  return fd;
 }
 
 int
@@ -202,18 +195,12 @@ to_host_sockopt_name(int name)
 
 DEFINE_SYSCALL(setsockopt, int, fd, int, level, int, optname, gaddr_t, optval_ptr, uint, opt_len)
 {
-  int r;
-  char *optval = malloc(opt_len);
-  
-  if (copy_from_user(optval, optval_ptr, opt_len)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
+  char optval[opt_len];
+  if (copy_from_user(optval, optval_ptr, opt_len))
+    return -LINUX_EFAULT;
+
   // Darwin's optval is compatible with that of Linux
-  r = syswrap(setsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, opt_len));
-out:
-  free(optval);
-  return r;
+  return syswrap(setsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, opt_len));
 }
 
 DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval_ptr, gaddr_t, optlen_ptr)
@@ -221,23 +208,17 @@ DEFINE_SYSCALL(getsockopt, int, fd, int, level, int, optname, gaddr_t, optval_pt
   l_socklen_t l_optlen;
   if (copy_from_user(&l_optlen, optlen_ptr, sizeof l_optlen))
     return -LINUX_EFAULT;
-  char *optval = malloc(l_optlen);
+  char optval[l_optlen];
   unsigned int optlen = l_optlen;
   // Darwin's optval is compatible with that of Linux
   int r = syswrap(getsockopt(fd, linux_to_darwin_sockopt_level(level), to_host_sockopt_name(optname), optval, &optlen));
   if (r >= 0) {
-    if (copy_to_user(optval_ptr, optval, optlen)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+    if (copy_to_user(optval_ptr, optval, optlen))
+      return -LINUX_EFAULT;
     l_optlen = optlen;
-    if (copy_to_user(optlen_ptr, &l_optlen, sizeof l_optlen)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+    if (copy_to_user(optlen_ptr, &l_optlen, sizeof l_optlen))
+      return -LINUX_EFAULT;
   }
-out:
-  free(optval);
   return r;
 }
 
@@ -249,18 +230,10 @@ DEFINE_SYSCALL(shutdown, int, socket, int, how)
 DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf_ptr, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
 {
   warnk("sendto: dest_addr is not used! (dest_addr = 0x%llx, dest_len = %d)\n", dest_addr, dest_len);
-  int r;
-  char *buf = malloc(length);
-  
-  if (copy_from_user(buf, buf_ptr, length)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
-  r = syswrap(sendto(socket, buf, length, flags, NULL, 0));
-  
-out:
-  free(buf);
-  return r;
+  char buf[length];
+  if (copy_from_user(buf, buf_ptr, sizeof buf))
+    return -LINUX_EFAULT;
+  return syswrap(sendto(socket, buf, length, flags, NULL, 0));
 }
 
 int
@@ -387,57 +360,44 @@ DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
 
 DEFINE_SYSCALL(sendmmsg, int, sockfd, gaddr_t, msgvec_ptr, unsigned int, vlen, unsigned int, flags)
 {
-  int r;
-  struct l_mmsghdr *msg = malloc(vlen * sizeof(struct l_mmsghdr));
-  if (copy_from_user(msg, msgvec_ptr, vlen * sizeof(struct l_mmsghdr))) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
+  struct l_mmsghdr msg[vlen];
+  if (copy_from_user(msg, msgvec_ptr, sizeof msg))
+    return -LINUX_EFAULT;
   uint i;
   for (i = 0; i < vlen; ++i) {
     int err = do_sendmsg(sockfd, &msg[i].msg_hdr, flags);
     if (err < 0) {
-      r = err;
-      goto out;
+      return err;
     }
-    if (copy_to_user(msgvec_ptr + sizeof msg[0] * i + offsetof(struct l_mmsghdr, msg_len), &err, sizeof err)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+    if (copy_to_user(msgvec_ptr + sizeof msg[0] * i + offsetof(struct l_mmsghdr, msg_len), &err, sizeof err))
+      return -LINUX_EFAULT;
   }
-  r = i;
-  
-out:
-  free(msg);
-  return r;
+  return i;
 }
 
 DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
 {
-  int r;
   struct l_msghdr lmsg;
   if (copy_from_user(&lmsg, msg_ptr, sizeof lmsg)) {
     return -LINUX_EFAULT;
   }
-  char *msg_name = malloc(lmsg.msg_name == 0 ? 0 : lmsg.msg_namelen);
-  struct l_iovec *liov = malloc(lmsg.msg_iovlen * sizeof(struct l_iovec));
+  char msg_name[lmsg.msg_name == 0 ? 0 : lmsg.msg_namelen];
+  struct l_iovec liov[lmsg.msg_iovlen];
   if (copy_from_user(liov, lmsg.msg_iov, sizeof liov)) {
-    free(msg_name);
-    free(liov);
     return -LINUX_EFAULT;
   }
-  struct iovec *msg_iov = malloc(lmsg.msg_iovlen * sizeof(struct iovec));
+  struct iovec msg_iov[lmsg.msg_iovlen];
   size_t iov_total_len = 0;
   for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
     iov_total_len += liov[i].iov_len;
   }
-  char *iov_buf = malloc(iov_total_len), *iov_buf_ptr = iov_buf;
+  char iov_buf[iov_total_len], *iov_buf_ptr = iov_buf;
   for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
     msg_iov[i].iov_base = iov_buf_ptr;
     msg_iov[i].iov_len = liov[i].iov_len;
     iov_buf_ptr += liov[i].iov_len;
   }
-  char *msg_control = malloc(lmsg.msg_controllen);
+  char msg_control[lmsg.msg_controllen];
   struct msghdr dmsg;
   dmsg.msg_namelen = lmsg.msg_namelen;
   dmsg.msg_name = lmsg.msg_name == 0 ? 0 : msg_name;
@@ -446,40 +406,24 @@ DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
   dmsg.msg_control = msg_control;
   dmsg.msg_controllen = lmsg.msg_controllen;
   dmsg.msg_flags = linux_to_darwin_msg_flags(lmsg.msg_flags);
-  r = syswrap(recvmsg(sockfd, &dmsg, flags));
+  int r = syswrap(recvmsg(sockfd, &dmsg, flags));
   if (r < 0) {
-    goto out;
+    return r;
   }
   if (lmsg.msg_name != 0) {
-    if (copy_to_user(lmsg.msg_name, dmsg.msg_name, dmsg.msg_namelen)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+    if (copy_to_user(lmsg.msg_name, dmsg.msg_name, dmsg.msg_namelen))
+      return -LINUX_EFAULT;
   }
-  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_namelen), &dmsg.msg_namelen, sizeof dmsg.msg_namelen)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
+  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_namelen), &dmsg.msg_namelen, sizeof dmsg.msg_namelen))
+    return -LINUX_EFAULT;
   for (size_t i = 0; i < lmsg.msg_iovlen; ++i) {
-    if (copy_to_user(liov[i].iov_base, dmsg.msg_iov[i].iov_base, liov[i].iov_len)) {
-      r = -LINUX_EFAULT;
-      goto out;
-    }
+    if (copy_to_user(liov[i].iov_base, dmsg.msg_iov[i].iov_base, liov[i].iov_len))
+      return -LINUX_EFAULT;
   }
-  if (copy_to_user(lmsg.msg_control, dmsg.msg_control, lmsg.msg_controllen)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
-  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_controllen), &dmsg.msg_controllen, sizeof dmsg.msg_controllen)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
-out:
-  free(msg_name);
-  free(liov);
-  free(msg_iov);
-  free(iov_buf);
-  free(msg_control);
+  if (copy_to_user(lmsg.msg_control, dmsg.msg_control, lmsg.msg_controllen))
+    return -LINUX_EFAULT;
+  if (copy_to_user(msg_ptr + offsetof(struct l_msghdr, msg_controllen), &dmsg.msg_controllen, sizeof dmsg.msg_controllen))
+    return -LINUX_EFAULT;
   return r;
 }
 
@@ -532,11 +476,9 @@ err:
 DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr_ptr, int, addrlen)
 {
   struct sockaddr *sockaddr;
-  char *addr = malloc(addrlen);
-  if (copy_from_user(addr, addr_ptr, addrlen)) {
-    free(addr);
+  char addr[addrlen];
+  if (copy_from_user(addr, addr_ptr, addrlen))
     return -LINUX_EFAULT;
-  }
 
   if (linux_to_darwin_sockaddr(&sockaddr, (struct l_sockaddr *) addr, addrlen) < 0) {
     return -LINUX_EINVAL;
@@ -544,7 +486,6 @@ DEFINE_SYSCALL(bind, int, sockfd, gaddr_t, addr_ptr, int, addrlen)
   int ret = syswrap(bind(sockfd, sockaddr, addrlen));
 
   free(sockaddr);
-  free(addr);
   return ret;
 }
 
