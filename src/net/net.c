@@ -421,7 +421,7 @@ DEFINE_SYSCALL(recvmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
   }
   char *msg_name = malloc(lmsg.msg_name == 0 ? 0 : lmsg.msg_namelen);
   struct l_iovec *liov = malloc(lmsg.msg_iovlen * sizeof(struct l_iovec));
-  if (copy_from_user(liov, lmsg.msg_iov, sizeof liov)) {
+  if (copy_from_user(liov, lmsg.msg_iov, lmsg.msg_iovlen * sizeof(struct l_iovec))) {
     free(msg_name);
     free(liov);
     return -LINUX_EFAULT;
