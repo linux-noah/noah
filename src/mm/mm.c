@@ -329,9 +329,14 @@ DEFINE_SYSCALL(msync, gaddr_t, addr, size_t, len, int, flags)
   if (!region || addr - region->gaddr >= len || len + addr - region->gaddr >= region->size) {
     return -LINUX_ENOMEM;
   }
-  // Darwin's flags are compatible with that of Linux
-  if (flags & ~(MS_ASYNC | MS_SYNC | MS_INVALIDATE)) {
+  
+  if (flags & ~(LINUX_MS_ASYNC | LINUX_MS_SYNC | LINUX_MS_INVALIDATE)) {
     return -LINUX_EINVAL;
   }
-  return syswrap(msync(addr - region->gaddr + region->haddr, len, flags));
+  int dflags = 0;
+  if (flags & LINUX_MS_ASYNC) dflags |= MS_ASYNC;
+  if (flags & LINUX_MS_SYNC) dflags |= MS_SYNC;
+  if (flags & LINUX_MS_INVALIDATE) dflags |= MS_INVALIDATE;
+  
+  return syswrap(msync(addr - region->gaddr + region->haddr, len, dflags));
 }

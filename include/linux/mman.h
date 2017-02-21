@@ -42,4 +42,8 @@
 #define LINUX_MPOL_MF_MOVE_ALL 4
 #define LINUX_MPOL_MF_INTERNAL 8
 
+#define LINUX_MS_ASYNC         1
+#define LINUX_MS_SYNC          2
+#define LINUX_MS_INVALIDATE    4
+
 #endif
