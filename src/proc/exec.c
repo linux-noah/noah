@@ -450,14 +450,14 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     gaddr_t addr;
     if (copy_from_user(&addr, gargv + sizeof(gaddr_t) * i, sizeof addr)) {
       err = -LINUX_EFAULT;
-      goto argv_out;
+      goto faile_copy_argv;
     }
     if (addr == 0)
       break;
     argc++;
     if (argc + 1 > LINUX_MAX_ARG_STRINGS) {
       err = -LINUX_E2BIG;
-      goto argv_out;
+      goto faile_copy_argv;
     }
     if (argc + 1 > argv_rsrv) {
       argv_rsrv *= 2;
@@ -466,11 +466,11 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     int size = strnlen_user(addr, LINUX_MAX_ARG_STRLEN);
     if (size == 0) {
       err = -LINUX_EFAULT;
-      goto argv_out;
+      goto faile_copy_argv;
     }
     if (size > LINUX_MAX_ARG_STRLEN) {
       err = -LINUX_E2BIG;
-      goto argv_out;
+      goto faile_copy_argv;
     }
     argv[i] = alloca(size);
     copy_from_user(argv[i], addr, size); /* always success */
@@ -485,14 +485,14 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     gaddr_t addr;
     if (copy_from_user(&addr, genvp + sizeof(gaddr_t) * i, sizeof addr)) {
       err = -LINUX_EFAULT;
-      goto envp_out;
+      goto fail_copy_envp;
     }
     if (addr == 0)
       break;
     envc++;
     if (envc + 1 > LINUX_MAX_ARG_STRINGS) {
       err = -LINUX_E2BIG;
-      goto envp_out;
+      goto fail_copy_envp;
     }
     if (envc + 1 > envp_rsrv) {
       envp_rsrv *= 2;
@@ -501,11 +501,11 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
     int size = strnlen_user(addr, LINUX_MAX_ARG_STRLEN);
     if (size == 0) {
       err = -LINUX_EFAULT;
-      goto envp_out;
+      goto fail_copy_envp;
     }
     if (size > LINUX_MAX_ARG_STRLEN) {
       err = -LINUX_E2BIG;
-      goto envp_out;
+      goto fail_copy_envp;
     }
     envp[i] = alloca(size);
     copy_from_user(envp[i], addr, size); /* always success */
@@ -514,18 +514,16 @@ DEFINE_SYSCALL(execve, gstr_t, gelf_path, gaddr_t, gargv, gaddr_t, genvp)
 
   err = do_exec(elf_path, argc, argv, envp);
   if (err < 0) {
-    return err;
+    goto fail_copy_envp;
   }
 
   uint64_t entry;
   vmm_read_register(HV_X86_RIP, &entry);
   vmm_write_register(HV_X86_RIP, entry - 2); // because syscall handler adds 2 to current rip when returning to vmm_run
 
-  return 0;
-
- envp_out:
+ fail_copy_envp:
   free(envp);
- argv_out:
+ faile_copy_argv:
   free(argv);
   return err;
 }

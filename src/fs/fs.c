@@ -574,15 +574,19 @@ out:
 
 DEFINE_SYSCALL(read, int, fd, gaddr_t, buf_ptr, size_t, size)
 {
+  int r;
   char *buf = malloc(size);
   struct file *file = get_file(fd);
-  if (file == NULL)
-    return -LINUX_EBADF;
+  if (file == NULL) {
+    r = -LINUX_EBADF;
+    goto out;
+  }
   if (file->ops->readv == NULL) {
-    return -LINUX_EBADF;
+    r = -LINUX_EBADF;
+    goto out;
   }
   struct iovec iov = { buf, size };
-  int r = file->ops->readv(file, &iov, 1);
+  r = file->ops->readv(file, &iov, 1);
   if (r < 0) {
     goto out;
   }
