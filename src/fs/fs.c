@@ -87,6 +87,7 @@ static inline bool in_userfd(int fd);
 static const int vkern_fdtable_maxsize = 64;
 
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
+static inline void clear_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
 
 void
 init_fileinfo(int rootfd)
@@ -250,7 +251,13 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     return syswrap(tcflush(fd, sel));
   }
   case LINUX_FIOCLEX: {
-    return sys_fcntl(fd, LINUX_F_SETFD, 1);
+    pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+    int r = sys_fcntl(fd, LINUX_F_SETFD, 1);
+    if (r >= 0) {
+      set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, fd);
+    }
+    pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+    return r;
   }
   default:
     warnk("unhandled darwinfs ioctl (fd = %08x, cmd = 0x%08x)\n", fd, cmd);
@@ -330,14 +337,44 @@ darwinfs_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 
   switch (cmd) {
   case LINUX_F_DUPFD:
-    return syswrap(fcntl(file->fd, F_DUPFD, arg)); /* FIXME */
+    pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+    r = syswrap(fcntl(file->fd, F_DUPFD, arg)); /* FIXME */
+    if (r >= 0) {
+      int err = register_fd(r, false);
+      if (err < 0) {
+        close(r);
+        r = err;
+      }
+    }
+    pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+    return r;
   case LINUX_F_DUPFD_CLOEXEC:
-    return syswrap(fcntl(file->fd, F_DUPFD_CLOEXEC, arg));
+    pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+    r = syswrap(fcntl(file->fd, F_DUPFD_CLOEXEC, arg));
+    if (r >= 0) {
+      int err = register_fd(r, true);
+      if (err < 0) {
+        close(r);
+        r = err;
+      }
+    }
+    pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+    return r;
     /* no translation required for fd flags (i.e. CLOEXEC==1 */
   case LINUX_F_GETFD:
     return syswrap(fcntl(file->fd, F_GETFD));
   case LINUX_F_SETFD:
-    return syswrap(fcntl(file->fd, F_SETFD, arg));
+    pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+    r = syswrap(fcntl(file->fd, F_SETFD, arg));
+    if (r >= 0) {
+      if (arg & FD_CLOEXEC) {
+        set_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, file->fd);
+      } else {
+        clear_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.cloexec_fds, file->fd);
+      }
+    }
+    pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+    return r;
   case LINUX_F_GETFL:
     r = syswrap(fcntl(file->fd, F_GETFL));
     if (r < 0)
