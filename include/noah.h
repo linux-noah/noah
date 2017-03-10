@@ -11,6 +11,7 @@
 #include "linux/mman.h"
 #include "malloc.h"
 #include "version.h"
+#include <stdnoreturn.h>
 
 #define __page_aligned __attribute__((aligned(0x1000)))
 
@@ -51,7 +52,7 @@ int register_fd(int fd, bool is_cloexec);
 int vkern_dup_fd(int fd, bool is_cloexec);
 gaddr_t alloc_region(size_t len);
 
-void die_with_forcedsig(int sig);
+noreturn void die_with_forcedsig(int sig);
 void main_loop(int return_on_sigret);
 
 /* signal */

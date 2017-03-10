@@ -437,7 +437,7 @@ elevate_privilege(void)
   pthread_rwlock_unlock(&proc.cred.lock);
 }
 
-void
+noreturn void
 die_with_forcedsig(int sig)
 {
   // TODO: Termination processing

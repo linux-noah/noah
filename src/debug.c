@@ -167,7 +167,18 @@ panic(const char *fmt, ...)
   free(given);
   free(mes);
 
-  // TODO: Termination processing
-
-  exit(1);
+  struct rlimit lim;
+  getrlimit(RLIMIT_CORE, &lim);
+  if (lim.rlim_cur == 0) {
+    fprintf(stderr, "%sSet the ulimit value to unlimited to generate the coredump? [Y/n] %s", magenda, reset);
+    char ans = getchar();
+    if (ans == '\n' || ans == '\r' || ans == 'Y' || ans == 'y') {
+      lim.rlim_cur = RLIM_INFINITY;
+      lim.rlim_max = RLIM_INFINITY;
+      setrlimit(RLIMIT_CORE, &lim);
+    }
+  }
+  
+  fprintf(stderr, "%saborting..%s\n", magenda, reset);
+  die_with_forcedsig(LINUX_SIGABRT);
 }
