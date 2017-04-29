@@ -19,6 +19,7 @@
 #include "x86/specialreg.h"
 #include "x86/vm.h"
 #include "x86/vmx.h"
+#include <sys/sysctl.h>
 
 #include <mach-o/dyld.h>
 
@@ -455,10 +456,27 @@ die_with_forcedsig(int sig)
   assert(false); // sig should be one that can terminate procs
 }
 
+void
+check_platform_version(void)
+{
+  int32_t b;
+  size_t len = sizeof b;
+
+  if (sysctlbyname("kern.hv_support", &b, &len, NULL, 0) < 0) {
+    perror("sysctl kern.hv_support");
+  }
+  if (b == 0) {
+    fprintf(stderr, "Your cpu seems too old. Buy a new mac!\n");
+    exit(1);
+  }
+}
+
 int
 main(int argc, char *argv[], char **envp)
 {
   drop_privilege();
+
+  check_platform_version();
 
   char root[PATH_MAX] = {};
 
