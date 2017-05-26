@@ -10,6 +10,10 @@ Noah is installed via homebrew. On the first run, noah automatically downloads a
     $ brew install noah
     $ noah
 
+## Hacking
+
+See [Hacking.md](Hacking.md).
+
 ## LICENSE
 
 Dual MITL/GPL, for all files without explicit notaiton.
