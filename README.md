@@ -12,7 +12,7 @@ Noah is installed via homebrew. On the first run, noah automatically downloads a
 
 ## Hacking
 
-See [Hacking.md](Hacking.md).
+See [HACKING.md](HACKING.md).
 
 ## LICENSE
 
