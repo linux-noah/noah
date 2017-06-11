@@ -271,10 +271,13 @@ darwinfs_lseek(struct file *file, l_off_t offset, int whence)
   return syswrap(lseek(file->fd, offset, whence));
 }
 
-int
-darwin_to_linux_dent(struct dirent *d_dent, void *l_dent, int is64)
+ssize_t
+darwin_to_linux_dent(struct dirent *d_dent, void *l_dent, size_t buflen, int is64)
 {
-  size_t reclen = roundup(is64 ? offsetof(struct l_dirent64, d_name) : offsetof(struct l_dirent, d_name) + d_dent->d_namlen + 2, 8);
+  unsigned reclen = roundup(is64 ? offsetof(struct l_dirent64, d_name) : offsetof(struct l_dirent, d_name) + d_dent->d_namlen + 2, 8);
+  if (reclen > buflen) {
+    return -1;
+  }
   /* fill dirent buffer */
   if (is64) {
     struct l_dirent64 *dp = (struct l_dirent64 *) l_dent;
@@ -308,8 +311,8 @@ darwinfs_getdents(struct file *file, char *direntp, unsigned count, bool is64)
   long loc = telldir(dir);
   errno = 0;
   while ((dent = readdir(dir)) != NULL) {
-    size_t reclen = darwin_to_linux_dent(dent, direntp + pos, is64);
-    if (pos + reclen > count) {
+    ssize_t reclen = darwin_to_linux_dent(dent, direntp + pos, count - pos, is64);
+    if (reclen < 0) {
       seekdir(dir, loc);
       goto end;
     }
