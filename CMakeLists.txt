@@ -5,8 +5,8 @@ project(noah VERSION 0.3.9)
 configure_file(bin/noah.in ${PROJECT_SOURCE_DIR}/bin/noah @ONLY)
 configure_file(include/version.h.in ${PROJECT_SOURCE_DIR}/include/version.h)
 
-set(CMAKE_C_FLAGS "-g -Wall -Wextra -Wno-unused-parameter -std=gnu11")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+set(CMAKE_C_FLAGS "-Wall -Wextra -Wno-unused-parameter -std=gnu11")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0 -g -fsanitize=address -fno-omit-frame-pointer")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O2")
 include_directories(include)
 
