@@ -459,6 +459,14 @@ int linux_to_darwin_waitopts(int options)
     opts |= WUNTRACED;
     options &= ~LINUX_WUNTRACED;
   }
+  if (options & LINUX_WCONTINUED) {
+    opts |= WCONTINUED;
+    options &= ~LINUX_WCONTINUED;
+  }
+  if (options & LINUX_WEXITED) {
+    opts |= WEXITED;
+    options &= ~LINUX_WEXITED;
+  }
   if (options != 0) {
     warnk("unknown options given to wait4: 0x%x\n", options);
   }
