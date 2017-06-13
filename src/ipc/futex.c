@@ -63,7 +63,6 @@ do_private_futex_wake(gaddr_t uaddr, int count, bool use_bitset, uint32_t bitset
 int
 do_futex_wake(gaddr_t uaddr, int count)
 {
-  warnk("non-provate do_futex_wake is not implemented\n");
   pthread_mutex_lock(&proc.futex_mutex);
   int ret = do_private_futex_wake(uaddr, count, false, 0);
   pthread_mutex_unlock(&proc.futex_mutex);
