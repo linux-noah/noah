@@ -414,6 +414,11 @@ DEFINE_SYSCALL(rt_sigsuspend, gaddr_t, nset, size_t, size)
   }
   LINUX_SIGDELSET(&lnset, LINUX_SIGKILL);
   LINUX_SIGDELSET(&lnset, LINUX_SIGSTOP);
+
+  sigset_t dwset, doset;
+  linux_to_darwin_sigset(&lnset, &dwset);
+  pthread_sigmask(SIG_SETMASK, &dwset, &doset);
+  
   task.sigmask = lnset;
 
   while (1) {
@@ -426,6 +431,7 @@ DEFINE_SYSCALL(rt_sigsuspend, gaddr_t, nset, size_t, size)
   }
   handle_signal();
   warnk("signal handled\n");
+  pthread_sigmask(SIG_SETMASK, &doset, NULL);
   task.sigmask = loset;
   return -LINUX_EINTR;          /* returns -EINTR when its execution ends NORMALLY */
 }
