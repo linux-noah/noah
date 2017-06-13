@@ -23,6 +23,9 @@
 
 #include <sys/sysctl.h>
 
+#define _GNU_SOURCE
+#include <sys/syscall.h>
+
 struct proc proc;
 _Thread_local struct task task;
 
@@ -34,7 +37,7 @@ DEFINE_SYSCALL(sched_yield)
 
 DEFINE_SYSCALL(getpid)
 {
-  return syswrap(getpid());
+  return syswrap(syscall(SYS_getpid));
 }
 
 DEFINE_SYSCALL(getuid)
