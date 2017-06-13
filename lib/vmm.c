@@ -80,7 +80,7 @@ vmm_create()
   /* create the VM */
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printk("could not create the vm: error code %x", ret);
+    panic("could not create the vm: error code %x", ret);
     return;
   }
 
@@ -100,7 +100,7 @@ vmm_destroy()
   list_for_each_entry (vcpu, &vcpus, list) {
     ret = hv_vcpu_destroy(vcpu->vcpuid);
     if (ret != HV_SUCCESS) {
-      printk("could not destroy the vcpu: error code %x", ret);
+      panic("could not destroy the vcpu: error code %x", ret);
       exit(1);
     }
   }
@@ -109,7 +109,7 @@ vmm_destroy()
 
   ret = hv_vm_destroy();
   if (ret != HV_SUCCESS) {
-    printk("could not destroy the vm: error code %x", ret);
+    panic("could not destroy the vm: error code %x", ret);
     exit(1);
   }
 
@@ -124,7 +124,7 @@ vmm_create_vcpu(struct vcpu_snapshot *snapshot)
 
   ret = hv_vcpu_create(&vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printk("could not create a vcpu: error code %x", ret);
+    panic("could not create a vcpu: error code %x", ret);
     return;
   }
 
@@ -325,7 +325,7 @@ vmm_reentry(struct vmm_snapshot *snapshot)
   printk("vmm_restore\n");
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printk("could not create the vm: error code %x", ret);
+    panic("could not create the vm: error code %x", ret);
     return;
   }
   printk("successfully created vm\n");
@@ -339,7 +339,7 @@ vmm_reentry(struct vmm_snapshot *snapshot)
 
   ret = hv_vcpu_create(&vcpu->vcpuid, HV_VCPU_DEFAULT);
   if (ret != HV_SUCCESS) {
-    printk("could not create a vcpu: error code %x", ret);
+    panic("could not create a vcpu: error code %x", ret);
     return;
   }
   vmm_restore_vcpu(&snapshot->first_vcpu_snapshot);
