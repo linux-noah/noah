@@ -163,7 +163,7 @@
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, setrlimit)                       \
   SYSCALL(161, chroot)                          \
-  SYSCALL(162, unimplemented)                   \
+  SYSCALL(162, sync)                            \
   SYSCALL(163, unimplemented)                   \
   SYSCALL(164, unimplemented)                   \
   SYSCALL(165, unimplemented)                   \

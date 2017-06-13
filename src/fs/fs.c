@@ -2056,3 +2056,9 @@ DEFINE_SYSCALL(fallocate, int, fd, int, mode, l_off_t, offset, l_off_t, len)
   struct fstore store = {F_ALLOCATEALL, F_PEOFPOSMODE, 0, len, 0};
   return syswrap(fcntl(fd, F_PREALLOCATE, &store));
 }
+
+DEFINE_SYSCALL(sync)
+{
+  sync();
+  return 0;
+}
