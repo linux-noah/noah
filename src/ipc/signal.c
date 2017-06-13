@@ -267,7 +267,7 @@ wake_sighandler()
     meta_strace_sigdeliver(sig);
     switch (proc.sigaction[sig - 1].lsa_handler) {
       case LINUX_SIG_DFL:
-        warnk("Handling default signal in Noah is not implemented yet\n");
+        //warnk("Handling default signal in Noah is not implemented yet\n");
         /* fall through */
       case LINUX_SIG_IGN:
         continue;

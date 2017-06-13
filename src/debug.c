@@ -102,8 +102,8 @@ warnk(const char *fmt, ...)
   print_to_sink(warnk_sink, &printk_sync, mes);
 
 #ifndef NDEBUG
-  const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
-  fprintf(stderr, "%sNoah WARNING: %s%s", magenda, mes, reset);
+  //const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
+  //fprintf(stderr, "%sNoah WARNING: %s%s", magenda, mes, reset);
 #endif
 
   free(mes);
