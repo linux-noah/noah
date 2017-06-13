@@ -259,7 +259,7 @@ DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
   if (r < 0) {
     goto out;
   }
-  if (copy_to_user(grouplist_ptr, gl, sizeof gl)) {
+  if (copy_to_user(grouplist_ptr, gl, gidsetsize * sizeof(gid_t))) {
     r = -LINUX_EFAULT;
   }
 out:
@@ -271,7 +271,7 @@ DEFINE_SYSCALL(setgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
   int r;
   gid_t *gl = malloc(gidsetsize * sizeof(gid_t));
-  if (copy_from_user(gl, grouplist_ptr, sizeof gl)) {
+  if (copy_from_user(gl, grouplist_ptr, gidsetsize * sizeof(gid_t))) {
     r = -LINUX_EFAULT;
     goto out;
   }
