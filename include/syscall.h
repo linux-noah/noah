@@ -25,7 +25,7 @@
   SYSCALL(21, access)                           \
   SYSCALL(22, pipe)                             \
   SYSCALL(23, select)                           \
-  SYSCALL(24, sched_yield)                      \
+  SYSCALL(24, unimplemented)                      \
   SYSCALL(25, mremap)                           \
   SYSCALL(26, msync)                            \
   SYSCALL(27, unimplemented)                    \
@@ -40,7 +40,7 @@
   SYSCALL(36, unimplemented)                    \
   SYSCALL(37, unimplemented)                            \
   SYSCALL(38, unimplemented)                    \
-  SYSCALL(39, getpid)                           \
+  SYSCALL(39, unimplemented)                           \
   SYSCALL(40, unimplemented)                    \
   SYSCALL(41, unimplemented)                           \
   SYSCALL(42, unimplemented)                          \
@@ -62,7 +62,7 @@
   SYSCALL(58, unimplemented)                            \
   SYSCALL(59, unimplemented)                           \
   SYSCALL(60, exit)                             \
-  SYSCALL(61, wait4)                            \
+  SYSCALL(61, unimplemented)                            \
   SYSCALL(62, unimplemented)                             \
   SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                           \
@@ -98,35 +98,35 @@
   SYSCALL(94, lchown)                           \
   SYSCALL(95, umask)                            \
   SYSCALL(96, unimplemented)                     \
-  SYSCALL(97, getrlimit)                        \
-  SYSCALL(98, getrusage)                        \
+  SYSCALL(97, unimplemented)                        \
+  SYSCALL(98, unimplemented)                        \
   SYSCALL(99, unimplemented)                          \
   SYSCALL(100, unimplemented)                   \
   SYSCALL(101, unimplemented)                          \
-  SYSCALL(102, getuid)                          \
+  SYSCALL(102, unimplemented)                          \
   SYSCALL(103, unimplemented)                   \
-  SYSCALL(104, getgid)                          \
-  SYSCALL(105, setuid)                          \
-  SYSCALL(106, setgid)                          \
-  SYSCALL(107, geteuid)                         \
-  SYSCALL(108, getegid)                         \
-  SYSCALL(109, setpgid)                         \
-  SYSCALL(110, getppid)                         \
-  SYSCALL(111, getpgrp)                         \
-  SYSCALL(112, setsid)                          \
+  SYSCALL(104, unimplemented)                          \
+  SYSCALL(105, unimplemented)                          \
+  SYSCALL(106, unimplemented)                          \
+  SYSCALL(107, unimplemented)                         \
+  SYSCALL(108, unimplemented)                         \
+  SYSCALL(109, unimplemented)                         \
+  SYSCALL(110, unimplemented)                         \
+  SYSCALL(111, unimplemented)                         \
+  SYSCALL(112, unimplemented)                          \
   SYSCALL(113, unimplemented)                   \
   SYSCALL(114, unimplemented)                   \
-  SYSCALL(115, getgroups)                       \
-  SYSCALL(116, setgroups)                       \
-  SYSCALL(117, setresuid)                       \
-  SYSCALL(118, getresuid)                       \
-  SYSCALL(119, setresgid)                       \
-  SYSCALL(120, getresgid)                       \
-  SYSCALL(121, getpgid)                         \
+  SYSCALL(115, unimplemented)                       \
+  SYSCALL(116, unimplemented)                       \
+  SYSCALL(117, unimplemented)                       \
+  SYSCALL(118, unimplemented)                       \
+  SYSCALL(119, unimplemented)                       \
+  SYSCALL(120, unimplemented)                       \
+  SYSCALL(121, unimplemented)                         \
   SYSCALL(122, unimplemented)                   \
   SYSCALL(123, unimplemented)                   \
-  SYSCALL(124, getsid)                          \
-  SYSCALL(125, capget)                          \
+  SYSCALL(124, unimplemented)                          \
+  SYSCALL(125, unimplemented)                          \
   SYSCALL(126, unimplemented)                   \
   SYSCALL(127, unimplemented)                   \
   SYSCALL(128, unimplemented)                   \
@@ -141,8 +141,8 @@
   SYSCALL(137, statfs)                          \
   SYSCALL(138, fstatfs)                         \
   SYSCALL(139, unimplemented)                   \
-  SYSCALL(140, getpriority)                     \
-  SYSCALL(141, setpriority)                     \
+  SYSCALL(140, unimplemented)                     \
+  SYSCALL(141, unimplemented)                     \
   SYSCALL(142, unimplemented)                   \
   SYSCALL(143, unimplemented)                   \
   SYSCALL(144, unimplemented)                   \
@@ -158,10 +158,10 @@
   SYSCALL(154, unimplemented)                   \
   SYSCALL(155, unimplemented)                   \
   SYSCALL(156, unimplemented)                   \
-  SYSCALL(157, prctl)                           \
+  SYSCALL(157, unimplemented)                           \
   SYSCALL(158, arch_prctl)                      \
   SYSCALL(159, unimplemented)                   \
-  SYSCALL(160, setrlimit)                       \
+  SYSCALL(160, unimplemented)                       \
   SYSCALL(161, chroot)                          \
   SYSCALL(162, sync)                            \
   SYSCALL(163, unimplemented)                   \
@@ -187,7 +187,7 @@
   SYSCALL(183, afs_syscall)                     \
   SYSCALL(184, tuxcall)                         \
   SYSCALL(185, security)                        \
-  SYSCALL(186, gettid)                          \
+  SYSCALL(186, unimplemented)                          \
   SYSCALL(187, unimplemented)                   \
   SYSCALL(188, setxattr)                        \
   SYSCALL(189, unimplemented)                   \
@@ -205,7 +205,7 @@
   SYSCALL(201, unimplemented)                            \
   SYSCALL(202, unimplemented)                           \
   SYSCALL(203, unimplemented)                   \
-  SYSCALL(204, sched_getaffinity)               \
+  SYSCALL(204, unimplemented)               \
   SYSCALL(205, set_thread_area)                 \
   SYSCALL(206, unimplemented)                   \
   SYSCALL(207, unimplemented)                   \
@@ -219,7 +219,7 @@
   SYSCALL(215, epoll_wait_old)                  \
   SYSCALL(216, unimplemented)                   \
   SYSCALL(217, getdents64)                      \
-  SYSCALL(218, set_tid_address)                 \
+  SYSCALL(218, unimplemented)                 \
   SYSCALL(219, unimplemented)                   \
   SYSCALL(220, unimplemented)                   \
   SYSCALL(221, fadvise64)                       \
@@ -232,10 +232,10 @@
   SYSCALL(228, unimplemented)                   \
   SYSCALL(229, unimplemented)                    \
   SYSCALL(230, unimplemented)                   \
-  SYSCALL(231, exit_group)                      \
+  SYSCALL(231, unimplemented)                      \
   SYSCALL(232, unimplemented)                   \
   SYSCALL(233, unimplemented)                   \
-  SYSCALL(234, tgkill)                          \
+  SYSCALL(234, unimplemented)                          \
   SYSCALL(235, unimplemented)                          \
   SYSCALL(236, vserver)                         \
   SYSCALL(237, unimplemented)                   \
@@ -274,7 +274,7 @@
   SYSCALL(270, pselect6)                        \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
-  SYSCALL(273, set_robust_list)                 \
+  SYSCALL(273, unimplemented)                 \
   SYSCALL(274, unimplemented)                   \
   SYSCALL(275, unimplemented)                   \
   SYSCALL(276, unimplemented)                   \
