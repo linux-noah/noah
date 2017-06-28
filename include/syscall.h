@@ -57,9 +57,9 @@
   SYSCALL(53, unimplemented)                       \
   SYSCALL(54, unimplemented)                       \
   SYSCALL(55, unimplemented)                       \
-  SYSCALL(56, clone)                            \
-  SYSCALL(57, fork)                             \
-  SYSCALL(58, vfork)                            \
+  SYSCALL(56, unimplemented)                            \
+  SYSCALL(57, unimplemented)                             \
+  SYSCALL(58, unimplemented)                            \
   SYSCALL(59, execve)                           \
   SYSCALL(60, exit)                             \
   SYSCALL(61, wait4)                            \
