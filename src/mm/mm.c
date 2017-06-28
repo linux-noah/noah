@@ -15,7 +15,7 @@
 #include "x86/vm.h"
 #include "x86/specialreg.h"
 
-/* 
+/*
  * Manage kernel memory space allocated by kmap.
  * Some members related to user memory space such as start_brk are meaningless in vkern_mm.
  */
@@ -164,7 +164,7 @@ region_compare(struct mm_region *r1, struct mm_region *r2)
   if (r1->gaddr + r1->size <= r2->gaddr) {
     return -1;
   }
-  
+
   return 0;
 }
 
@@ -260,25 +260,6 @@ destroy_mm(struct mm *mm)
   INIT_LIST_HEAD(&mm->mm_regions);
 }
 
-DEFINE_SYSCALL(madvise, gaddr_t, addr, size_t, length, int, advice)
-{
-  printk("madvise is not implemented\n");
-  return 0;
-
-}
-
-DEFINE_SYSCALL(mlock, gaddr_t, addr, size_t, length)
-{
-  printk("mlock is not implemented\n");
-  return 0;
-}
-
-DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
-{
-  printk("munlock is not implemented\n");
-  return 0;
-}
-
 DEFINE_SYSCALL(brk, unsigned long, brk)
 {
   uint64_t ret;
@@ -302,41 +283,4 @@ out:
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
 
   return ret;
-}
-
-DEFINE_SYSCALL(get_mempolicy, gaddr_t, policy, gaddr_t, nmask, unsigned long, maxnode, unsigned long, addr, unsigned long, flags)
-{
-  maxnode = roundup(maxnode, sizeof(unsigned long));
-  if (flags != 0) {
-    printk("get_mempolicy: unsupported flags: 0x%lx\n", flags);
-    return -LINUX_ENOSYS;
-  }
-  assert(addr == 0);
-  int policy_val = LINUX_MPOL_DEFAULT;
-  if (copy_to_user(policy, &policy_val, sizeof policy_val))
-    return -LINUX_EFAULT;
-  size_t size = maxnode / 64;
-  unsigned long mask[size];
-  memset(mask, 0, sizeof mask);
-  if (copy_to_user(nmask, mask, sizeof mask))
-    return -LINUX_EFAULT;
-  return 0;
-}
-
-DEFINE_SYSCALL(msync, gaddr_t, addr, size_t, len, int, flags)
-{
-  struct mm_region *region = find_region(addr, proc.mm);
-  if (!region || addr - region->gaddr >= len || len + addr - region->gaddr >= region->size) {
-    return -LINUX_ENOMEM;
-  }
-  
-  if (flags & ~(LINUX_MS_ASYNC | LINUX_MS_SYNC | LINUX_MS_INVALIDATE)) {
-    return -LINUX_EINVAL;
-  }
-  int dflags = 0;
-  if (flags & LINUX_MS_ASYNC) dflags |= MS_ASYNC;
-  if (flags & LINUX_MS_SYNC) dflags |= MS_SYNC;
-  if (flags & LINUX_MS_INVALIDATE) dflags |= MS_INVALIDATE;
-  
-  return syswrap(msync(addr - region->gaddr + region->haddr, len, dflags));
 }

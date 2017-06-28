@@ -7,34 +7,34 @@
   SYSCALL(3, close)                             \
   SYSCALL(4, stat)                              \
   SYSCALL(5, fstat)                             \
-  SYSCALL(6, lstat)                             \
-  SYSCALL(7, poll)                              \
-  SYSCALL(8, lseek)                             \
+  SYSCALL(6, unimplemented)                             \
+  SYSCALL(7, unimplemented)                              \
+  SYSCALL(8, unimplemented)                             \
   SYSCALL(9, mmap)                              \
   SYSCALL(10, mprotect)                         \
-  SYSCALL(11, munmap)                           \
+  SYSCALL(11, unimplemented)                           \
   SYSCALL(12, brk)                              \
   SYSCALL(13, unimplemented)                     \
   SYSCALL(14, unimplemented)                   \
   SYSCALL(15, unimplemented)                     \
-  SYSCALL(16, ioctl)                            \
-  SYSCALL(17, pread64)                          \
-  SYSCALL(18, pwrite64)                         \
-  SYSCALL(19, readv)                            \
-  SYSCALL(20, writev)                           \
+  SYSCALL(16, unimplemented)                            \
+  SYSCALL(17, unimplemented)                          \
+  SYSCALL(18, unimplemented)                         \
+  SYSCALL(19, unimplemented)                            \
+  SYSCALL(20, unimplemented)                           \
   SYSCALL(21, access)                           \
-  SYSCALL(22, pipe)                             \
-  SYSCALL(23, select)                           \
+  SYSCALL(22, unimplemented)                             \
+  SYSCALL(23, unimplemented)                           \
   SYSCALL(24, unimplemented)                      \
-  SYSCALL(25, mremap)                           \
-  SYSCALL(26, msync)                            \
+  SYSCALL(25, unimplemented)                           \
+  SYSCALL(26, unimplemented)                            \
   SYSCALL(27, unimplemented)                    \
-  SYSCALL(28, madvise)                          \
+  SYSCALL(28, unimplemented)                          \
   SYSCALL(29, unimplemented)                           \
   SYSCALL(30, unimplemented)                            \
   SYSCALL(31, unimplemented)                           \
-  SYSCALL(32, dup)                              \
-  SYSCALL(33, dup2)                             \
+  SYSCALL(32, unimplemented)                              \
+  SYSCALL(33, unimplemented)                             \
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, unimplemented)                        \
   SYSCALL(36, unimplemented)                    \
@@ -73,30 +73,30 @@
   SYSCALL(69, unimplemented)                    \
   SYSCALL(70, unimplemented)                    \
   SYSCALL(71, unimplemented)                    \
-  SYSCALL(72, fcntl)                            \
-  SYSCALL(73, flock)                            \
-  SYSCALL(74, fsync)                            \
+  SYSCALL(72, unimplemented)                            \
+  SYSCALL(73, unimplemented)                            \
+  SYSCALL(74, unimplemented)                            \
   SYSCALL(75, unimplemented)                        \
   SYSCALL(76, unimplemented)                    \
-  SYSCALL(77, ftruncate)                        \
-  SYSCALL(78, getdents)                         \
-  SYSCALL(79, getcwd)                           \
-  SYSCALL(80, chdir)                            \
-  SYSCALL(81, fchdir)                           \
+  SYSCALL(77, unimplemented)                        \
+  SYSCALL(78, unimplemented)                         \
+  SYSCALL(79, unimplemented)                           \
+  SYSCALL(80, unimplemented)                            \
+  SYSCALL(81, unimplemented)                           \
   SYSCALL(82, rename)                           \
-  SYSCALL(83, mkdir)                            \
-  SYSCALL(84, rmdir)                            \
-  SYSCALL(85, creat)                            \
-  SYSCALL(86, link)                             \
-  SYSCALL(87, unlink)                           \
-  SYSCALL(88, symlink)                          \
-  SYSCALL(89, readlink)                         \
-  SYSCALL(90, chmod)                            \
-  SYSCALL(91, fchmod)                           \
-  SYSCALL(92, chown)                            \
-  SYSCALL(93, fchown)                           \
-  SYSCALL(94, lchown)                           \
-  SYSCALL(95, umask)                            \
+  SYSCALL(83, unimplemented)                            \
+  SYSCALL(84, unimplemented)                            \
+  SYSCALL(85, unimplemented)                            \
+  SYSCALL(86, unimplemented)                             \
+  SYSCALL(87, unimplemented)                           \
+  SYSCALL(88, unimplemented)                          \
+  SYSCALL(89, unimplemented)                         \
+  SYSCALL(90, unimplemented)                            \
+  SYSCALL(91, unimplemented)                           \
+  SYSCALL(92, unimplemented)                            \
+  SYSCALL(93, unimplemented)                           \
+  SYSCALL(94, unimplemented)                           \
+  SYSCALL(95, unimplemented)                            \
   SYSCALL(96, unimplemented)                     \
   SYSCALL(97, unimplemented)                        \
   SYSCALL(98, unimplemented)                        \
@@ -135,11 +135,11 @@
   SYSCALL(131, unimplemented)                     \
   SYSCALL(132, unimplemented)                           \
   SYSCALL(133, unimplemented)                   \
-  SYSCALL(134, uselib)                          \
+  SYSCALL(134, unimplemented)                          \
   SYSCALL(135, unimplemented)                   \
   SYSCALL(136, unimplemented)                   \
-  SYSCALL(137, statfs)                          \
-  SYSCALL(138, fstatfs)                         \
+  SYSCALL(137, unimplemented)                          \
+  SYSCALL(138, unimplemented)                         \
   SYSCALL(139, unimplemented)                   \
   SYSCALL(140, unimplemented)                     \
   SYSCALL(141, unimplemented)                     \
@@ -150,8 +150,8 @@
   SYSCALL(146, unimplemented)                   \
   SYSCALL(147, unimplemented)                   \
   SYSCALL(148, unimplemented)                   \
-  SYSCALL(149, mlock)                           \
-  SYSCALL(150, munlock)                         \
+  SYSCALL(149, unimplemented)                           \
+  SYSCALL(150, unimplemented)                         \
   SYSCALL(151, unimplemented)                   \
   SYSCALL(152, unimplemented)                   \
   SYSCALL(153, unimplemented)                   \
@@ -162,8 +162,8 @@
   SYSCALL(158, arch_prctl)                      \
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, unimplemented)                       \
-  SYSCALL(161, chroot)                          \
-  SYSCALL(162, sync)                            \
+  SYSCALL(161, unimplemented)                          \
+  SYSCALL(162, unimplemented)                            \
   SYSCALL(163, unimplemented)                   \
   SYSCALL(164, unimplemented)                   \
   SYSCALL(165, unimplemented)                   \
@@ -181,23 +181,23 @@
   SYSCALL(177, unimplemented)                   \
   SYSCALL(178, unimplemented)                   \
   SYSCALL(179, unimplemented)                   \
-  SYSCALL(180, nfsservctl)                      \
-  SYSCALL(181, getpmsg)                         \
-  SYSCALL(182, putpmsg)                         \
-  SYSCALL(183, afs_syscall)                     \
-  SYSCALL(184, tuxcall)                         \
-  SYSCALL(185, security)                        \
+  SYSCALL(180, unimplemented)                      \
+  SYSCALL(181, unimplemented)                         \
+  SYSCALL(182, unimplemented)                         \
+  SYSCALL(183, unimplemented)                     \
+  SYSCALL(184, unimplemented)                         \
+  SYSCALL(185, unimplemented)                        \
   SYSCALL(186, unimplemented)                          \
   SYSCALL(187, unimplemented)                   \
-  SYSCALL(188, setxattr)                        \
+  SYSCALL(188, unimplemented)                        \
   SYSCALL(189, unimplemented)                   \
-  SYSCALL(190, fsetxattr)                       \
-  SYSCALL(191, getxattr)                        \
+  SYSCALL(190, unimplemented)                       \
+  SYSCALL(191, unimplemented)                        \
   SYSCALL(192, unimplemented)                   \
-  SYSCALL(193, fgetxattr)                       \
+  SYSCALL(193, unimplemented)                       \
   SYSCALL(194, unimplemented)                   \
   SYSCALL(195, unimplemented)                   \
-  SYSCALL(196, flistxattr)                      \
+  SYSCALL(196, unimplemented)                      \
   SYSCALL(197, unimplemented)                   \
   SYSCALL(198, unimplemented)                   \
   SYSCALL(199, unimplemented)                   \
@@ -206,23 +206,23 @@
   SYSCALL(202, unimplemented)                           \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, unimplemented)               \
-  SYSCALL(205, set_thread_area)                 \
+  SYSCALL(205, unimplemented)                 \
   SYSCALL(206, unimplemented)                   \
   SYSCALL(207, unimplemented)                   \
   SYSCALL(208, unimplemented)                   \
   SYSCALL(209, unimplemented)                   \
   SYSCALL(210, unimplemented)                   \
-  SYSCALL(211, get_thread_area)                 \
+  SYSCALL(211, unimplemented)                 \
   SYSCALL(212, unimplemented)                   \
   SYSCALL(213, unimplemented)                   \
-  SYSCALL(214, epoll_ctl_old)                   \
-  SYSCALL(215, epoll_wait_old)                  \
+  SYSCALL(214, unimplemented)                   \
+  SYSCALL(215, unimplemented)                  \
   SYSCALL(216, unimplemented)                   \
-  SYSCALL(217, getdents64)                      \
+  SYSCALL(217, unimplemented)                      \
   SYSCALL(218, unimplemented)                 \
   SYSCALL(219, unimplemented)                   \
   SYSCALL(220, unimplemented)                   \
-  SYSCALL(221, fadvise64)                       \
+  SYSCALL(221, unimplemented)                       \
   SYSCALL(222, unimplemented)                   \
   SYSCALL(223, unimplemented)                   \
   SYSCALL(224, unimplemented)                   \
@@ -237,10 +237,10 @@
   SYSCALL(233, unimplemented)                   \
   SYSCALL(234, unimplemented)                          \
   SYSCALL(235, unimplemented)                          \
-  SYSCALL(236, vserver)                         \
+  SYSCALL(236, unimplemented)                         \
   SYSCALL(237, unimplemented)                   \
   SYSCALL(238, unimplemented)                   \
-  SYSCALL(239, get_mempolicy)                   \
+  SYSCALL(239, unimplemented)                   \
   SYSCALL(240, unimplemented)                   \
   SYSCALL(241, unimplemented)                   \
   SYSCALL(242, unimplemented)                   \
@@ -259,19 +259,19 @@
   SYSCALL(255, unimplemented)                   \
   SYSCALL(256, unimplemented)                   \
   SYSCALL(257, openat)                          \
-  SYSCALL(258, mkdirat)                         \
+  SYSCALL(258, unimplemented)                         \
   SYSCALL(259, unimplemented)                   \
-  SYSCALL(260, fchownat)                        \
+  SYSCALL(260, unimplemented)                        \
   SYSCALL(261, unimplemented)                   \
   SYSCALL(262, newfstatat)                      \
-  SYSCALL(263, unlinkat)                        \
+  SYSCALL(263, unimplemented)                        \
   SYSCALL(264, renameat)                        \
-  SYSCALL(265, linkat)                          \
-  SYSCALL(266, symlinkat)                       \
-  SYSCALL(267, readlinkat)                      \
-  SYSCALL(268, fchmodat)                        \
+  SYSCALL(265, unimplemented)                          \
+  SYSCALL(266, unimplemented)                       \
+  SYSCALL(267, unimplemented)                      \
+  SYSCALL(268, unimplemented)                        \
   SYSCALL(269, faccessat)                       \
-  SYSCALL(270, pselect6)                        \
+  SYSCALL(270, unimplemented)                        \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \
   SYSCALL(273, unimplemented)                 \
@@ -286,15 +286,15 @@
   SYSCALL(282, unimplemented)                   \
   SYSCALL(283, unimplemented)                   \
   SYSCALL(284, unimplemented)                   \
-  SYSCALL(285, fallocate)                       \
+  SYSCALL(285, unimplemented)                       \
   SYSCALL(286, unimplemented)                   \
   SYSCALL(287, unimplemented)                   \
   SYSCALL(288, unimplemented)                   \
   SYSCALL(289, unimplemented)                   \
   SYSCALL(290, unimplemented)                   \
   SYSCALL(291, unimplemented)                   \
-  SYSCALL(292, dup3)                            \
-  SYSCALL(293, pipe2)                           \
+  SYSCALL(292, unimplemented)                            \
+  SYSCALL(293, unimplemented)                           \
   SYSCALL(294, unimplemented)                   \
   SYSCALL(295, unimplemented)                   \
   SYSCALL(296, unimplemented)                   \

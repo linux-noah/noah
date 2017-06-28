@@ -130,90 +130,6 @@ DEFINE_SYSCALL(mmap, gaddr_t, addr, size_t, len, int, prot, int, flags, int, fd,
   return  ret;
 }
 
-DEFINE_SYSCALL(mremap, gaddr_t, old_addr, size_t, old_size, size_t, new_size, int, flags, gaddr_t, new_addr)
-{
-  if (flags & ~(LINUX_MREMAP_FIXED | LINUX_MREMAP_MAYMOVE)) {
-    return -LINUX_EINVAL;
-  }
-  if (flags & LINUX_MREMAP_FIXED && !(flags & LINUX_MREMAP_MAYMOVE))
-    return -LINUX_EINVAL;
-  if (!is_page_aligned((void*)old_addr, PAGE_4KB))
-    return -LINUX_EINVAL;
-  if (!(flags & LINUX_MREMAP_MAYMOVE)) {
-    warnk("unsupported mremap flags: 0x%x\n", flags);
-    return -LINUX_EINVAL;
-  }
-
-  if (new_size == 0)
-    return -LINUX_EINVAL;
-
-  /* Linux kernel also does these aligning */
-  old_size = roundup(old_size, PAGE_SIZE(PAGE_4KB));
-  new_size = roundup(new_size, PAGE_SIZE(PAGE_4KB));
-
-  gaddr_t ret = old_addr;
-
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-
-  struct mm_region *region = find_region(old_addr, proc.mm);
-  /* Linux requires old_addr is the exact address of start of vm_area  */
-  if (!region || region->gaddr != old_addr) {
-    ret = -LINUX_EFAULT;
-    goto out;
-  }
-  /* The region must not be across multiple regions */
-  if (region->size < old_size) {
-    ret = -LINUX_EFAULT;
-    goto out;
-  }
-
-  /* new_size <= old_size. We can just shrink */
-  if (new_size <= old_size) {
-    munmap(region->haddr + new_size, region->size - new_size);
-    vmm_munmap(region->gaddr + new_size, region->size - new_size);
-    region->size = new_size;
-    goto out;
-  }
-
-  /* new_size > old_size */
-  void *moved_to = mmap(0, new_size, PROT_NONE, linux_to_darwin_mflags(region->mm_flags), region->mm_fd, region->pgoff);
-  if (moved_to == MAP_FAILED) {
-    panic("mremap failed. old_addr :0x%llx, old_size: 0x%lux, new_size: 0x%lux, flags:0x%ux, new_addr: 0x%llx, mm_flags: 0x%ux, mm_fd: %d", old_addr, old_size, new_size, flags, new_addr, region->mm_flags, region->mm_fd);
-  }
-  if (!(region->mm_flags & LINUX_MAP_ANONYMOUS)) {
-    /* A file is mapped to this region. We have to take the file permission into account */
-    int d_prot = 0;
-    if (region->prot & LINUX_PROT_READ) d_prot |= PROT_READ;
-    if (region->prot & LINUX_PROT_WRITE) d_prot |= PROT_WRITE;
-    mprotect(moved_to, new_size, d_prot);
-  } else {
-    /* Anonymous page. Copy contents to new area */
-    mprotect(moved_to, new_size, PROT_READ | PROT_WRITE);
-    memcpy(moved_to, region->haddr, old_size);
-  }
-
-  /* Unmap the old page */
-  if (old_size < region->size) {
-    split_region(proc.mm, region, region->gaddr + old_size);
-  }
-  list_del(&region->list);
-  RB_REMOVE(mm_region_tree, &proc.mm->mm_region_tree, region);
-  munmap(region->haddr, region->size);
-  vmm_munmap(region->gaddr, region->size);
-
-  /* Map new one */
-  ret = alloc_region(new_size);
-  struct mm_region *new = record_region(proc.mm, moved_to, ret, new_size, region->prot, region->mm_flags, region->mm_fd, region->pgoff);
-  vmm_mmap(new->gaddr, new->size, new->prot, new->haddr);
-
-  free(region);
-
-out:
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
-
-  return ret;
-}
-
 DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 {
   if (!is_page_aligned((void*)addr, PAGE_4KB) || len == 0) {
@@ -272,15 +188,6 @@ DEFINE_SYSCALL(mprotect, gaddr_t, addr, size_t, len, int, prot)
 out:
   pthread_rwlock_unlock(&proc.mm->alloc_lock);
 
-  return ret;
-}
-
-DEFINE_SYSCALL(munmap, gaddr_t, gaddr, size_t, size)
-{
-  uint64_t ret;
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-  ret = do_munmap(gaddr, size);
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
   return ret;
 }
 

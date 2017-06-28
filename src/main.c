@@ -45,7 +45,7 @@ handle_syscall(void)
     //send_signal(getpid(), LINUX_SIGSYS);
     abort();
   }
-  fprintf(stderr, "syscall no = %llu\n", rax);
+  fprintf(stderr, "syscall no = %llu, %s\n", rax, sc_name_table[rax]);
   uint64_t rdi, rsi, rdx, r10, r8, r9;
   vmm_read_register(HV_X86_RDI, &rdi);
   vmm_read_register(HV_X86_RSI, &rsi);
