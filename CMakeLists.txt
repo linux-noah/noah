@@ -18,12 +18,10 @@ add_executable(noah
   src/conv.c
   src/debug.c
   src/proc/exec.c
-#  src/proc/fork.c
   src/proc/process.c
   src/fs/fs.c
   src/mm/mm.c
   src/mm/mmap.c
-  src/mm/malloc.c
   )
 target_link_libraries(noah pthread "-framework Hypervisor")
 

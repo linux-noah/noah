@@ -9,7 +9,6 @@
 #include "util/list.h"
 #include "util/khash.h"
 #include "linux/mman.h"
-#include "malloc.h"
 #include "version.h"
 #include <stdnoreturn.h>
 

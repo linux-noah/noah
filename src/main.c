@@ -407,7 +407,7 @@ static void
 init_vkernel(const char *root)
 {
   init_mm(&vkern_mm);
-  init_shm_malloc();
+  //init_shm_malloc();
   init_vmcs();
   init_msr();
   init_page();
