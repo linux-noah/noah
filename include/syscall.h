@@ -30,33 +30,33 @@
   SYSCALL(26, msync)                            \
   SYSCALL(27, unimplemented)                    \
   SYSCALL(28, madvise)                          \
-  SYSCALL(29, shmget)                           \
-  SYSCALL(30, shmat)                            \
-  SYSCALL(31, shmctl)                           \
+  SYSCALL(29, unimplemented)                           \
+  SYSCALL(30, unimplemented)                            \
+  SYSCALL(31, unimplemented)                           \
   SYSCALL(32, dup)                              \
   SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
-  SYSCALL(35, nanosleep)                        \
+  SYSCALL(35, unimplemented)                        \
   SYSCALL(36, unimplemented)                    \
   SYSCALL(37, alarm)                            \
   SYSCALL(38, unimplemented)                    \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
-  SYSCALL(41, socket)                           \
-  SYSCALL(42, connect)                          \
-  SYSCALL(43, accept)                           \
-  SYSCALL(44, sendto)                           \
-  SYSCALL(45, recvfrom)                         \
-  SYSCALL(46, sendmsg)                          \
-  SYSCALL(47, recvmsg)                          \
-  SYSCALL(48, shutdown)                         \
-  SYSCALL(49, bind)                             \
-  SYSCALL(50, listen)                           \
-  SYSCALL(51, getsockname)                      \
-  SYSCALL(52, getpeername)                      \
-  SYSCALL(53, socketpair)                       \
-  SYSCALL(54, setsockopt)                       \
-  SYSCALL(55, getsockopt)                       \
+  SYSCALL(41, unimplemented)                           \
+  SYSCALL(42, unimplemented)                          \
+  SYSCALL(43, unimplemented)                           \
+  SYSCALL(44, unimplemented)                           \
+  SYSCALL(45, unimplemented)                         \
+  SYSCALL(46, unimplemented)                          \
+  SYSCALL(47, unimplemented)                          \
+  SYSCALL(48, unimplemented)                         \
+  SYSCALL(49, unimplemented)                             \
+  SYSCALL(50, unimplemented)                           \
+  SYSCALL(51, unimplemented)                      \
+  SYSCALL(52, unimplemented)                      \
+  SYSCALL(53, unimplemented)                       \
+  SYSCALL(54, unimplemented)                       \
+  SYSCALL(55, unimplemented)                       \
   SYSCALL(56, clone)                            \
   SYSCALL(57, fork)                             \
   SYSCALL(58, vfork)                            \
@@ -65,9 +65,9 @@
   SYSCALL(61, wait4)                            \
   SYSCALL(62, kill)                             \
   SYSCALL(63, uname)                            \
-  SYSCALL(64, semget)                           \
-  SYSCALL(65, semop)                            \
-  SYSCALL(66, semctl)                           \
+  SYSCALL(64, unimplemented)                           \
+  SYSCALL(65, unimplemented)                            \
+  SYSCALL(66, unimplemented)                           \
   SYSCALL(67, unimplemented)                    \
   SYSCALL(68, unimplemented)                    \
   SYSCALL(69, unimplemented)                    \
@@ -76,7 +76,7 @@
   SYSCALL(72, fcntl)                            \
   SYSCALL(73, flock)                            \
   SYSCALL(74, fsync)                            \
-  SYSCALL(75, fdatasync)                        \
+  SYSCALL(75, unimplemented)                        \
   SYSCALL(76, unimplemented)                    \
   SYSCALL(77, ftruncate)                        \
   SYSCALL(78, getdents)                         \
@@ -97,12 +97,12 @@
   SYSCALL(93, fchown)                           \
   SYSCALL(94, lchown)                           \
   SYSCALL(95, umask)                            \
-  SYSCALL(96, gettimeofday)                     \
+  SYSCALL(96, unimplemented)                     \
   SYSCALL(97, getrlimit)                        \
   SYSCALL(98, getrusage)                        \
-  SYSCALL(99, sysinfo)                          \
+  SYSCALL(99, unimplemented)                          \
   SYSCALL(100, unimplemented)                   \
-  SYSCALL(101, ptrace)                          \
+  SYSCALL(101, unimplemented)                          \
   SYSCALL(102, getuid)                          \
   SYSCALL(103, unimplemented)                   \
   SYSCALL(104, getgid)                          \
@@ -133,7 +133,7 @@
   SYSCALL(129, unimplemented)                   \
   SYSCALL(130, rt_sigsuspend)                   \
   SYSCALL(131, sigaltstack)                     \
-  SYSCALL(132, utime)                           \
+  SYSCALL(132, unimplemented)                           \
   SYSCALL(133, unimplemented)                   \
   SYSCALL(134, uselib)                          \
   SYSCALL(135, unimplemented)                   \
@@ -202,7 +202,7 @@
   SYSCALL(198, unimplemented)                   \
   SYSCALL(199, unimplemented)                   \
   SYSCALL(200, unimplemented)                   \
-  SYSCALL(201, time)                            \
+  SYSCALL(201, unimplemented)                            \
   SYSCALL(202, futex)                           \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, sched_getaffinity)               \
@@ -229,14 +229,14 @@
   SYSCALL(225, unimplemented)                   \
   SYSCALL(226, unimplemented)                   \
   SYSCALL(227, unimplemented)                   \
-  SYSCALL(228, clock_gettime)                   \
-  SYSCALL(229, clock_getres)                    \
+  SYSCALL(228, unimplemented)                   \
+  SYSCALL(229, unimplemented)                    \
   SYSCALL(230, unimplemented)                   \
   SYSCALL(231, exit_group)                      \
   SYSCALL(232, unimplemented)                   \
   SYSCALL(233, unimplemented)                   \
   SYSCALL(234, tgkill)                          \
-  SYSCALL(235, utimes)                          \
+  SYSCALL(235, unimplemented)                          \
   SYSCALL(236, vserver)                         \
   SYSCALL(237, unimplemented)                   \
   SYSCALL(238, unimplemented)                   \
@@ -281,7 +281,7 @@
   SYSCALL(277, unimplemented)                   \
   SYSCALL(278, unimplemented)                   \
   SYSCALL(279, unimplemented)                   \
-  SYSCALL(280, utimensat)                       \
+  SYSCALL(280, unimplemented)                       \
   SYSCALL(281, unimplemented)                   \
   SYSCALL(282, unimplemented)                   \
   SYSCALL(283, unimplemented)                   \
@@ -308,7 +308,7 @@
   SYSCALL(304, unimplemented)                   \
   SYSCALL(305, unimplemented)                   \
   SYSCALL(306, unimplemented)                   \
-  SYSCALL(307, sendmmsg)                        \
+  SYSCALL(307, unimplemented)                        \
   SYSCALL(308, unimplemented)                   \
   SYSCALL(309, unimplemented)                   \
   SYSCALL(310, unimplemented)                   \
@@ -319,7 +319,7 @@
   SYSCALL(315, unimplemented)                   \
   SYSCALL(316, unimplemented)                   \
   SYSCALL(317, unimplemented)                   \
-  SYSCALL(318, getrandom)                       \
+  SYSCALL(318, unimplemented)                       \
   SYSCALL(319, unimplemented)                   \
   SYSCALL(320, unimplemented)                   \
   SYSCALL(321, unimplemented)                   \
