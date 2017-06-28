@@ -370,7 +370,7 @@ meta_strace_hook *strace_pre_hooks[NR_SYSCALLS] = {
 //  [LSYS_recvfrom] = trace_recvfrom_pre,
   [LSYS_write] = trace_write_pre,
 //  [LSYS_sendto] = trace_sendto_pre,
-  [LSYS_execve] = trace_execve_pre,
+//  [LSYS_execve] = trace_execve_pre,
 //  [LSYS_rt_sigprocmask] = trace_rt_sigprocmask_post,
 };
 meta_strace_hook *strace_post_hooks[NR_SYSCALLS] = {
