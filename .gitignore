@@ -6,3 +6,4 @@ GTAGS
 tags
 bin/noah
 include/version.h
+build

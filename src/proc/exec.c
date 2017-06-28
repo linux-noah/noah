@@ -372,7 +372,7 @@ prepare_newproc(void)
   destroy_mm(proc.mm); // munlock is also done by unmapping mm
   init_mm(proc.mm);
   init_reg_state();
-  reset_signal_state();
+  //reset_signal_state();
   // TODO: destroy LDT if it is implemented
 
   /* task.tid = getpid(); */
@@ -388,7 +388,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   int fd;
   struct stat st;
   char *data;
-  
+
   if ((err = do_access(elf_path, X_OK)) < 0) {
     return err;
   }

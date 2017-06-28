@@ -14,9 +14,9 @@
   SYSCALL(10, mprotect)                         \
   SYSCALL(11, munmap)                           \
   SYSCALL(12, brk)                              \
-  SYSCALL(13, rt_sigaction)                     \
-  SYSCALL(14, rt_sigprocmask)                   \
-  SYSCALL(15, rt_sigreturn)                     \
+  SYSCALL(13, unimplemented)                     \
+  SYSCALL(14, unimplemented)                   \
+  SYSCALL(15, unimplemented)                     \
   SYSCALL(16, ioctl)                            \
   SYSCALL(17, pread64)                          \
   SYSCALL(18, pwrite64)                         \
@@ -38,7 +38,7 @@
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, unimplemented)                        \
   SYSCALL(36, unimplemented)                    \
-  SYSCALL(37, alarm)                            \
+  SYSCALL(37, unimplemented)                            \
   SYSCALL(38, unimplemented)                    \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
@@ -63,7 +63,7 @@
   SYSCALL(59, execve)                           \
   SYSCALL(60, exit)                             \
   SYSCALL(61, wait4)                            \
-  SYSCALL(62, kill)                             \
+  SYSCALL(62, unimplemented)                             \
   SYSCALL(63, uname)                            \
   SYSCALL(64, unimplemented)                           \
   SYSCALL(65, unimplemented)                            \
@@ -128,11 +128,11 @@
   SYSCALL(124, getsid)                          \
   SYSCALL(125, capget)                          \
   SYSCALL(126, unimplemented)                   \
-  SYSCALL(127, rt_sigpending)                   \
+  SYSCALL(127, unimplemented)                   \
   SYSCALL(128, unimplemented)                   \
   SYSCALL(129, unimplemented)                   \
-  SYSCALL(130, rt_sigsuspend)                   \
-  SYSCALL(131, sigaltstack)                     \
+  SYSCALL(130, unimplemented)                   \
+  SYSCALL(131, unimplemented)                     \
   SYSCALL(132, unimplemented)                           \
   SYSCALL(133, unimplemented)                   \
   SYSCALL(134, uselib)                          \
@@ -203,7 +203,7 @@
   SYSCALL(199, unimplemented)                   \
   SYSCALL(200, unimplemented)                   \
   SYSCALL(201, unimplemented)                            \
-  SYSCALL(202, futex)                           \
+  SYSCALL(202, unimplemented)                           \
   SYSCALL(203, unimplemented)                   \
   SYSCALL(204, sched_getaffinity)               \
   SYSCALL(205, set_thread_area)                 \

@@ -20,8 +20,8 @@ add_executable(noah
   src/proc/exec.c
   src/proc/fork.c
   src/proc/process.c
-  src/ipc/futex.c
-  src/ipc/signal.c
+#  src/ipc/futex.c
+#  src/ipc/signal.c
   src/fs/fs.c
   src/mm/mm.c
   src/mm/mmap.c

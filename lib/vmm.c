@@ -191,7 +191,8 @@ dump_instr()
       sprintf(inst_str + 3 * i, "%02x ", ip[i]);
     } else {
       printk("rip is in invalid user address: 0x%016llx\n", rip);
-      send_signal(getpid(), LINUX_SIGSEGV);
+      //send_signal(getpid(), LINUX_SIGSEGV);
+      abort();
       return;
     }
   }

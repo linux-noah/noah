@@ -119,9 +119,9 @@ do_setresuid(l_uid_t ruid, l_uid_t euid, l_uid_t suid)
     }
     proc.cred.suid = suid;
   }
-  
+
   return 0;
-  
+
 cred_management_err:
   panic("Cannot setresuid [%d, %d, %d] -> [%d, %d, %d]. Credential management bug of Noah. Host cred is [%d, %d, %d]",
           proc.cred.uid, proc.cred.euid, proc.cred.suid, ruid, euid, suid, getuid(), geteuid(), darwin_getsuid());
@@ -152,7 +152,7 @@ DEFINE_SYSCALL(getresuid, gaddr_t, ruid, gaddr_t, euid, gaddr_t, suid)
     ret = -LINUX_EFAULT;
     goto out;
   }
-  
+
 out:
   pthread_rwlock_unlock(&proc.cred.lock);
   return ret;
@@ -333,7 +333,7 @@ DEFINE_SYSCALL(exit, int, reason)
     int zero = 0;
     if (copy_to_user(task.clear_child_tid, &zero, sizeof zero))
       return -LINUX_EFAULT;
-    do_futex_wake(task.clear_child_tid, 1);
+    //do_futex_wake(task.clear_child_tid, 1);
   }
   vmm_destroy_vcpu();
   pthread_rwlock_wrlock(&proc.lock);
@@ -353,7 +353,7 @@ DEFINE_SYSCALL(exit_group, int, reason)
     int zero = 0;
     if (copy_to_user(task.clear_child_tid, &zero, sizeof zero))
       return -LINUX_EFAULT;
-    do_futex_wake(task.clear_child_tid, 1);
+    //do_futex_wake(task.clear_child_tid, 1);
   }
   _exit(reason);
 }
