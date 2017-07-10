@@ -102,8 +102,8 @@ warnk(const char *fmt, ...)
   print_to_sink(warnk_sink, &printk_sync, mes);
 
 #ifndef NDEBUG
-  const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
-  fprintf(stderr, "%sNoah WARNING: %s%s", magenda, mes, reset);
+  //const char *magenda = "\x1b[35m", *reset = "\x1b[0m";
+  //fprintf(stderr, "%sNoah WARNING: %s%s", magenda, mes, reset);
 #endif
 
   free(mes);
@@ -153,7 +153,7 @@ panic(const char *fmt, ...)
   vasprintf(&given, fmt, ap);
   asprintf(&mes, "!!PANIC!!\nperror is \"%s\" if it is valid\n%s\n", strerror(err), given);
 
-  printk("%s", mes);
+  printk("!!PANIC!!%s", mes);
   printbt_to_sink(printk_sink, &printk_sync);
 
   print_to_sink(warnk_sink, &warnk_sync, mes);

@@ -23,6 +23,9 @@
 
 #include <sys/sysctl.h>
 
+#define _GNU_SOURCE
+#include <sys/syscall.h>
+
 struct proc proc;
 _Thread_local struct task task;
 
@@ -34,7 +37,7 @@ DEFINE_SYSCALL(sched_yield)
 
 DEFINE_SYSCALL(getpid)
 {
-  return syswrap(getpid());
+  return syswrap(syscall(SYS_getpid));
 }
 
 DEFINE_SYSCALL(getuid)
@@ -255,7 +258,7 @@ DEFINE_SYSCALL(getsid, l_pid_t, pid)
 DEFINE_SYSCALL(getgroups, int, gidsetsize, gaddr_t, grouplist_ptr)
 {
   gid_t *gl = malloc(gidsetsize * sizeof(gid_t));
-  int r = syswrap(getgroups(gidsetsize, gl));
+  int r = syswrap(getgroups(gidsetsize, gidsetsize == 0 ? NULL : gl));
   if (r < 0) {
     goto out;
   }

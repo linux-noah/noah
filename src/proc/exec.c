@@ -422,10 +422,10 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     if ((err = load_script(data, st.st_size, elf_path, argc, argv, envp)) < 0)
       return err;
   }
-  else if (4 <= st.st_size && memcmp(data, "\xcf\xfa\xed\xfe", 4) == 0) {
-    /* Mach-O */
+  /*else if (4 <= st.st_size && memcmp(data, "\xcf\xfa\xed\xfe", 4) == 0) {
+    // Mach-O
     return syswrap(execve(elf_path, argv, envp));
-  }
+  }*/
   else {
     return -LINUX_ENOEXEC;                  /* unsupported file type */
   }

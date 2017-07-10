@@ -267,7 +267,7 @@ wake_sighandler()
     meta_strace_sigdeliver(sig);
     switch (proc.sigaction[sig - 1].lsa_handler) {
       case LINUX_SIG_DFL:
-        warnk("Handling default signal in Noah is not implemented yet\n");
+        //warnk("Handling default signal in Noah is not implemented yet\n");
         /* fall through */
       case LINUX_SIG_IGN:
         continue;
@@ -414,6 +414,11 @@ DEFINE_SYSCALL(rt_sigsuspend, gaddr_t, nset, size_t, size)
   }
   LINUX_SIGDELSET(&lnset, LINUX_SIGKILL);
   LINUX_SIGDELSET(&lnset, LINUX_SIGSTOP);
+
+  sigset_t dwset, doset;
+  linux_to_darwin_sigset(&lnset, &dwset);
+  pthread_sigmask(SIG_SETMASK, &dwset, &doset);
+  
   task.sigmask = lnset;
 
   while (1) {
@@ -426,6 +431,7 @@ DEFINE_SYSCALL(rt_sigsuspend, gaddr_t, nset, size_t, size)
   }
   handle_signal();
   warnk("signal handled\n");
+  pthread_sigmask(SIG_SETMASK, &doset, NULL);
   task.sigmask = loset;
   return -LINUX_EINTR;          /* returns -EINTR when its execution ends NORMALLY */
 }

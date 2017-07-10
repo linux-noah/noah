@@ -323,8 +323,16 @@ vmm_reentry(struct vmm_snapshot *snapshot)
   hv_return_t ret;
 
   printk("vmm_restore\n");
+  bool retried = false;
+retry:
   ret = hv_vm_create(HV_VM_DEFAULT);
   if (ret != HV_SUCCESS) {
+    if (!retried && ret == HV_NO_DEVICE) {
+      sleep(0);
+      retried = true;
+      printk("retried\n");
+      goto retry;
+    }
     panic("could not create the vm: error code %x", ret);
     return;
   }
