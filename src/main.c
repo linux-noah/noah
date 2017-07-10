@@ -390,7 +390,7 @@ init_first_proc(const char *root)
     perror("could not open initial root directory");
     exit(1);
   }
-  init_fileinfo(rootfd);
+  //init_fileinfo(rootfd);
   close(rootfd);
   proc.pfutex = kh_init(pfutex);
   pthread_mutex_init(&proc.futex_mutex, NULL);

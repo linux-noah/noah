@@ -35,7 +35,7 @@ load_elf_interp(const char *path, ulong load_addr)
   int fd;
   struct stat st;
 
-  if ((fd = vkern_open(path, LINUX_O_RDONLY, 0)) < 0) {
+  if ((fd = open(path, O_RDONLY)) < 0) {
     fprintf(stderr, "load_elf_interp, could not open file: %s\n", path);
     return -1;
   }
@@ -44,7 +44,7 @@ load_elf_interp(const char *path, ulong load_addr)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  vkern_close(fd);
+  close(fd);
 
   h = (Elf64_Ehdr *)data;
 
@@ -378,7 +378,7 @@ prepare_newproc(void)
   /* task.tid = getpid(); */
   task.clear_child_tid = task.set_child_tid = 0;
   task.robust_list = 0;
-  close_cloexec();
+  //close_cloexec();
 }
 
 int
@@ -389,10 +389,10 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
   struct stat st;
   char *data;
 
-  if ((err = do_access(elf_path, X_OK)) < 0) {
+  if ((err = access(elf_path, X_OK)) < 0) {
     return err;
   }
-  if ((fd = vkern_open(elf_path, LINUX_O_RDONLY, 0)) < 0) {
+  if ((fd = open(elf_path, O_RDONLY)) < 0) {
     return fd;
   }
   if (proc.nr_tasks > 1) {
@@ -407,7 +407,7 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
-  vkern_close(fd);
+  close(fd);
 
   drop_privilege();
 

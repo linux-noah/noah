@@ -259,28 +259,3 @@ destroy_mm(struct mm *mm)
   RB_INIT(&mm->mm_region_tree);
   INIT_LIST_HEAD(&mm->mm_regions);
 }
-
-DEFINE_SYSCALL(brk, unsigned long, brk)
-{
-  uint64_t ret;
-  brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
-
-  pthread_rwlock_wrlock(&proc.mm->alloc_lock);
-  if (brk < proc.mm->start_brk) {
-    ret = proc.mm->start_brk;
-    goto out;
-  }
-
-  if (brk < proc.mm->current_brk) {
-    do_munmap(brk, proc.mm->current_brk - brk);
-    ret = proc.mm->current_brk = brk;
-  } else {
-    do_mmap(proc.mm->current_brk, brk - proc.mm->current_brk, PROT_READ | PROT_WRITE, LINUX_PROT_READ | LINUX_PROT_WRITE, LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANONYMOUS, -1, 0);
-    ret = proc.mm->current_brk = brk;
-  }
-
-out:
-  pthread_rwlock_unlock(&proc.mm->alloc_lock);
-
-  return ret;
-}

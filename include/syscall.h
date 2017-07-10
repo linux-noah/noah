@@ -1,19 +1,19 @@
 #include <stdint.h>
 
 #define SYSCALLS                                \
-  SYSCALL(0, read)                              \
+  SYSCALL(0, unimplemented)                              \
   SYSCALL(1, write)                             \
-  SYSCALL(2, open)                              \
-  SYSCALL(3, close)                             \
-  SYSCALL(4, stat)                              \
-  SYSCALL(5, fstat)                             \
+  SYSCALL(2, unimplemented)                              \
+  SYSCALL(3, unimplemented)                             \
+  SYSCALL(4, unimplemented)                              \
+  SYSCALL(5, unimplemented)                             \
   SYSCALL(6, unimplemented)                             \
   SYSCALL(7, unimplemented)                              \
   SYSCALL(8, unimplemented)                             \
-  SYSCALL(9, mmap)                              \
-  SYSCALL(10, mprotect)                         \
+  SYSCALL(9, unimplemented)                              \
+  SYSCALL(10, unimplemented)                         \
   SYSCALL(11, unimplemented)                           \
-  SYSCALL(12, brk)                              \
+  SYSCALL(12, unimplemented)                              \
   SYSCALL(13, unimplemented)                     \
   SYSCALL(14, unimplemented)                   \
   SYSCALL(15, unimplemented)                     \
@@ -22,7 +22,7 @@
   SYSCALL(18, unimplemented)                         \
   SYSCALL(19, unimplemented)                            \
   SYSCALL(20, unimplemented)                           \
-  SYSCALL(21, access)                           \
+  SYSCALL(21, unimplemented)                           \
   SYSCALL(22, unimplemented)                             \
   SYSCALL(23, unimplemented)                           \
   SYSCALL(24, unimplemented)                      \
@@ -64,7 +64,7 @@
   SYSCALL(60, exit)                             \
   SYSCALL(61, unimplemented)                            \
   SYSCALL(62, unimplemented)                             \
-  SYSCALL(63, uname)                            \
+  SYSCALL(63, unimplemented)                            \
   SYSCALL(64, unimplemented)                           \
   SYSCALL(65, unimplemented)                            \
   SYSCALL(66, unimplemented)                           \
@@ -83,7 +83,7 @@
   SYSCALL(79, unimplemented)                           \
   SYSCALL(80, unimplemented)                            \
   SYSCALL(81, unimplemented)                           \
-  SYSCALL(82, rename)                           \
+  SYSCALL(82, unimplemented)                           \
   SYSCALL(83, unimplemented)                            \
   SYSCALL(84, unimplemented)                            \
   SYSCALL(85, unimplemented)                            \
@@ -159,7 +159,7 @@
   SYSCALL(155, unimplemented)                   \
   SYSCALL(156, unimplemented)                   \
   SYSCALL(157, unimplemented)                           \
-  SYSCALL(158, arch_prctl)                      \
+  SYSCALL(158, unimplemented)                      \
   SYSCALL(159, unimplemented)                   \
   SYSCALL(160, unimplemented)                       \
   SYSCALL(161, unimplemented)                          \
@@ -258,19 +258,19 @@
   SYSCALL(254, unimplemented)                   \
   SYSCALL(255, unimplemented)                   \
   SYSCALL(256, unimplemented)                   \
-  SYSCALL(257, openat)                          \
+  SYSCALL(257, unimplemented)                          \
   SYSCALL(258, unimplemented)                         \
   SYSCALL(259, unimplemented)                   \
   SYSCALL(260, unimplemented)                        \
   SYSCALL(261, unimplemented)                   \
-  SYSCALL(262, newfstatat)                      \
+  SYSCALL(262, unimplemented)                      \
   SYSCALL(263, unimplemented)                        \
-  SYSCALL(264, renameat)                        \
+  SYSCALL(264, unimplemented)                        \
   SYSCALL(265, unimplemented)                          \
   SYSCALL(266, unimplemented)                       \
   SYSCALL(267, unimplemented)                      \
   SYSCALL(268, unimplemented)                        \
-  SYSCALL(269, faccessat)                       \
+  SYSCALL(269, unimplemented)                       \
   SYSCALL(270, unimplemented)                        \
   SYSCALL(271, unimplemented)                   \
   SYSCALL(272, unimplemented)                   \

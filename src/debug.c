@@ -26,7 +26,7 @@ init_sink(const char *fn, FILE **sinkp, const char *name)
     fn = "/dev/null";
   }
   int fd = open(fn, O_RDWR | O_CREAT, 0644);
-  *sinkp = fdopen(vkern_dup_fd(fd, false), "w");
+  *sinkp = fdopen(dup(fd), "w");
   close(fd);
 
   char buf[1000];
@@ -178,7 +178,7 @@ panic(const char *fmt, ...)
       setrlimit(RLIMIT_CORE, &lim);
     }
   }
-  
+
   fprintf(stderr, "%saborting..%s\n", magenda, reset);
   die_with_forcedsig(LINUX_SIGABRT);
 }
