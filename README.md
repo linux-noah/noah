@@ -2,7 +2,7 @@
 
 Noah is a Darwin subsystem for Linux, or "Bash on Ubuntu on Mac OS X". Noah is implemented as a hypervisor that traps linux system calls and translates them into Darwin's system calls. Noah also has an interpreter of ELF files so that binary executables of Linux run directly and flawlessly without any modifications.
 
-![demo](https://github.com/linux-noah/noah/blob/master/images/screenshot.png)]
+<img src="https://github.com/linux-noah/noah/blob/master/images/screenshot.png" width="600">
 
 ## Quick Start
 
