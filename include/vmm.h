@@ -11,7 +11,7 @@
 
 struct vcpu_snapshot {
   uint64_t vcpu_reg[NR_X86_REG_LIST];
-  uint64_t vmcs[NR_VMCS_FIELD];
+  uint64_t vmcs[NR_VMCS_FIELD_MASKED];
   char fpu_states[512] __attribute__((aligned(16)));
 };
 
