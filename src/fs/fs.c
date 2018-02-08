@@ -1384,7 +1384,7 @@ DEFINE_SYSCALL(renameat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, ne
 
   struct path oldpath, newpath;
   int r;
-  if ((r = vfs_grab_dir(oldfd, oldname, 0, &oldpath)) < 0) {
+  if ((r = vfs_grab_dir(oldfd, oldname, LOOKUP_NOFOLLOW, &oldpath)) < 0) {
     goto out1;
   }
   if ((r = vfs_grab_dir(newfd, newname, 0, &newpath)) < 0) {
