@@ -1414,7 +1414,7 @@ DEFINE_SYSCALL(unlinkat, int, dirfd, gstr_t, path_ptr, int, flags)
 
   struct path path;
   int r;
-  if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
+  if ((r = vfs_grab_dir(dirfd, name, LOOKUP_NOFOLLOW, &path)) < 0) {
     return r;
   }
   r = path.fs->ops->unlinkat(path.fs, path.dir, path.subpath, flags);
