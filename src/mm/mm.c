@@ -326,7 +326,7 @@ DEFINE_SYSCALL(get_mempolicy, gaddr_t, policy, gaddr_t, nmask, unsigned long, ma
 DEFINE_SYSCALL(msync, gaddr_t, addr, size_t, len, int, flags)
 {
   struct mm_region *region = find_region(addr, proc.mm);
-  if (!region || addr - region->gaddr >= len || len + addr - region->gaddr >= region->size) {
+  if (!region || addr - region->gaddr >= len || len + addr - region->gaddr > region->size) {
     return -LINUX_ENOMEM;
   }
   
