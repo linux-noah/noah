@@ -110,7 +110,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
 
   void *ptr = mmap(0, len, d_prot, linux_to_darwin_mflags(l_flags), fd, offset);
   if (ptr == MAP_FAILED) {
-    panic("mmap failed. addr :0x%llx, len: 0x%lux, prot: %d, l_flags: %d, fd: %d, offset: 0x%llx\n", addr, len, l_prot, l_flags, fd, offset);
+    return -darwin_to_linux_errno(errno);
   }
 
   do_munmap(addr, len);
