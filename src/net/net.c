@@ -246,21 +246,36 @@ DEFINE_SYSCALL(shutdown, int, socket, int, how)
   return syswrap(shutdown(socket, how));
 }
 
-DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf_ptr, int, length, int, flags, gaddr_t, dest_addr, socklen_t, dest_len)
+DEFINE_SYSCALL(sendto, int, socket, gaddr_t, buf_ptr, int, length, int, flags, gaddr_t, addr_ptr, socklen_t, addrlen)
 {
-  warnk("sendto: dest_addr is not used! (dest_addr = 0x%llx, dest_len = %d)\n", dest_addr, dest_len);
-  int r;
+  int ret;
+  struct sockaddr *sockaddr = NULL;
+  struct l_sockaddr l_sockaddr;
+
+  if (addr_ptr != 0) {
+    if (copy_from_user(&l_sockaddr, addr_ptr, addrlen))
+      return -LINUX_EFAULT;
+    if (linux_to_darwin_sockaddr(&sockaddr, &l_sockaddr, addrlen) < 0)
+      return -LINUX_EINVAL;
+  }
   char *buf = malloc(length);
-  
-  if (copy_from_user(buf, buf_ptr, length)) {
-    r = -LINUX_EFAULT;
+  if (buf == NULL) {
+    ret = -LINUX_ENOMEM;
+    goto err;
+  }
+  ret = copy_from_user(buf, buf_ptr, length);
+  if (ret < 0) {
+    ret = -LINUX_EFAULT;
     goto out;
   }
-  r = syswrap(sendto(socket, buf, length, flags, NULL, 0));
-  
-out:
+  ret = syswrap(sendto(socket, buf, length, flags, sockaddr, addrlen));
+
+ out:
   free(buf);
-  return r;
+ err:
+  if (sockaddr)
+    free(sockaddr);
+  return ret;
 }
 
 int
