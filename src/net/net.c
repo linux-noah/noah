@@ -339,7 +339,7 @@ DEFINE_SYSCALL(recvfrom, int, socket, gaddr_t, buf_ptr, int, length, int, flags,
   int ret = syswrap(recvfrom(socket, buf, length, flags, sock_ptr, socklen_ptr));
   if (ret < 0)
     return ret;
-  if (copy_to_user(buf_ptr, buf, length))
+  if (copy_to_user(buf_ptr, buf, ret))
     return -LINUX_EFAULT;
   if (addr_ptr != 0) {
     char addr[sock_ptr->sa_len];
