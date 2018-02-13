@@ -620,10 +620,32 @@ DEFINE_SYSCALL(getpeername, int, sockfd, gaddr_t, addr_ptr, gaddr_t, addrlen_ptr
 DEFINE_SYSCALL(socketpair, int, family, int, type, int, protocol, gaddr_t, usockvec_ptr)
 {
   int fds[2];
-  int r = syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, fds));
-  if (r < 0)
-    return r;
-  if (copy_to_user(usockvec_ptr, fds, sizeof fds))
-    return -LINUX_EFAULT;
-  return r;
+  pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
+  int ret = syswrap(socketpair(linux_to_darwin_sa_family(family), type, protocol, fds));
+  if (ret < 0)
+    goto err;
+  int e = register_fd(fds[0], type & LINUX_SOCK_CLOEXEC);
+  if (e < 0) {
+    close(fds[0]);
+    close(fds[1]);
+    ret = e;
+    goto err;
+  }
+  e = register_fd(fds[1], type & LINUX_SOCK_CLOEXEC);
+  if (e < 0) {
+    user_close(fds[0]);
+    close(fds[1]);
+    ret = e;
+    goto err;
+  }
+  if (copy_to_user(usockvec_ptr, fds, sizeof fds)) {
+    user_close(fds[0]);
+    user_close(fds[1]);
+    ret = -LINUX_EFAULT;
+    goto err;
+  }
+
+err:
+  pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
+  return ret;
 }
