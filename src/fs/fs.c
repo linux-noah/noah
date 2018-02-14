@@ -84,10 +84,49 @@ struct file_operations {
 };
 
 static inline bool in_userfd(int fd);
+static const int user_fdtable_initsize = 64;
 static const int vkern_fdtable_maxsize = 64;
+static const int fdtable_alloc_unit = 64; // must be a multiple of 64
 
 static inline void set_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
 static inline void clear_fdbit(struct fdtable *table, uint64_t *fdbits, int fd);
+
+static inline int div_ceil(int x, int y) { return (x + y - 1) / y; }
+
+int
+alloc_fdtable(struct fdtable *fdtable, int newsize)
+{
+  newsize = div_ceil(newsize, fdtable_alloc_unit) * fdtable_alloc_unit;
+  int oldsize = fdtable->size;
+  if (newsize <= oldsize)
+    return 0;
+
+  int newunit = newsize / fdtable_alloc_unit;
+  int oldunit = oldsize / fdtable_alloc_unit;
+  fdtable->files = realloc(fdtable->files, sizeof(struct file *) * newunit);
+  if (fdtable->files == NULL)
+    return -LINUX_ENOMEM;
+  for (int i = oldunit; i < newunit; i++) {
+    fdtable->files[i] = calloc(fdtable_alloc_unit, sizeof(struct file));
+    if (fdtable->files[i] == NULL)
+      return -LINUX_ENOMEM;
+  }
+
+  int newfdslen = newsize / 8;
+  fdtable->open_fds = realloc(fdtable->open_fds, newfdslen);
+  if (fdtable->open_fds == NULL)
+      return -LINUX_ENOMEM;
+  fdtable->cloexec_fds = realloc(fdtable->cloexec_fds, newfdslen);
+  if (fdtable->cloexec_fds == NULL)
+      return -LINUX_ENOMEM;
+  int offset = oldsize / 8;
+  int size = newfdslen - offset;
+  bzero(fdtable->open_fds + offset, size);
+  bzero(fdtable->cloexec_fds + offset, size);
+
+  fdtable->size = newsize;
+  return 0;
+}
 
 void
 init_fileinfo(int rootfd)
@@ -96,24 +135,11 @@ init_fileinfo(int rootfd)
   struct fileinfo *fileinfo = &proc.fileinfo;
 
   getrlimit(RLIMIT_NOFILE, &limit);
-  fileinfo->vkern_fdtable = (struct fdtable) {
-    .start = limit.rlim_cur - 64,
-    .size = 64,
-    .files = malloc(sizeof(struct file) * 64),
-    .open_fds = malloc(sizeof(uint64_t)),
-    .cloexec_fds = malloc(sizeof(uint64_t))
-  };
-  fileinfo->vkern_fdtable.open_fds[0] = 0;
-  fileinfo->vkern_fdtable.cloexec_fds[0] = 0;
-  fileinfo->fdtable = (struct fdtable) {
-    .start = 0,
-    .size = vkern_fdtable_maxsize,
-    .files = malloc(sizeof(struct file) * vkern_fdtable_maxsize),
-    .open_fds = malloc(sizeof(uint64_t)),
-    .cloexec_fds = malloc(sizeof(uint64_t))
-  };
-  fileinfo->fdtable.open_fds[0] = 0;
-  fileinfo->fdtable.cloexec_fds[0] = 0;
+  fileinfo->vkern_fdtable = (struct fdtable) { 0, 0, NULL, NULL, NULL };
+  fileinfo->vkern_fdtable.start = limit.rlim_cur - vkern_fdtable_maxsize;
+  alloc_fdtable(&fileinfo->vkern_fdtable, vkern_fdtable_maxsize);
+  fileinfo->fdtable = (struct fdtable) { 0, 0, NULL, NULL, NULL };
+  alloc_fdtable(&fileinfo->fdtable, user_fdtable_initsize);
 
   for (int i = 0; i < (int) limit.rlim_cur; i++) {
     if (i == rootfd) {
@@ -500,7 +526,8 @@ alloc_file(struct fdtable *table, int fd)
     darwinfs_fchmod,
   };
 
-  struct file *file = table->files + (fd - table->start);
+  int offset = fd - table->start;
+  struct file *file = &table->files[offset / fdtable_alloc_unit][offset % fdtable_alloc_unit];
   file->ops = &ops;
   file->fd = fd;
 }
@@ -518,16 +545,9 @@ register_fd(int fd, bool is_cloexec)
   }
   struct fdtable *fdtable = &proc.fileinfo.fdtable;
   if (proc.fileinfo.fdtable.size <= fd) {
-    // Expand table
-    int new_size = roundup(fd, sizeof(uint64_t));
-    size_t old_nunits = proc.fileinfo.fdtable.size / 64;
-    size_t new_nunits = new_size / 64;
-    fdtable->files = realloc(fdtable->files, new_size * sizeof(struct file));
-    fdtable->open_fds = realloc(fdtable->open_fds, sizeof(uint64_t) * new_nunits);
-    fdtable->cloexec_fds = realloc(fdtable->cloexec_fds, sizeof(uint64_t) * new_nunits);
-    bzero(fdtable->open_fds + old_nunits, (new_nunits - old_nunits) * sizeof(uint64_t));
-    bzero(fdtable->cloexec_fds + old_nunits, (new_nunits - old_nunits) * sizeof(uint64_t));
-    fdtable->size = new_size;
+    int err = alloc_fdtable(fdtable, fd + 1);
+    if (err < 0)
+      return err;
   }
   set_fdbit(fdtable, fdtable->open_fds, fd);
   if (is_cloexec) {
@@ -570,18 +590,25 @@ vkern_dup_fd(int fd, bool is_cloexec)
 }
 
 struct file *
-get_file(int fd)
+do_get_file(struct fdtable *table, int fd)
 {
-  if (fd < 0 || fd >= proc.fileinfo.fdtable.size) {
+  if (!test_fdbit(table, table->open_fds, fd)) {
     return NULL;
   }
+  int offset = fd - table->start;
+  return &table->files[offset / fdtable_alloc_unit][offset % fdtable_alloc_unit];
+}
 
+struct file *
+get_file(int fd)
+{
   struct file *ret = NULL;
+  struct fdtable *table = &proc.fileinfo.fdtable;
   pthread_rwlock_rdlock(&proc.fileinfo.fdtable_lock);
-  if (!test_fdbit(&proc.fileinfo.fdtable, proc.fileinfo.fdtable.open_fds, fd)) {
+  if (fd < 0 || fd >= table->size) {
     goto out;
   }
-  ret = &proc.fileinfo.fdtable.files[fd - proc.fileinfo.fdtable.start];
+  ret = do_get_file(table, fd);
 
 out:
   pthread_rwlock_unlock(&proc.fileinfo.fdtable_lock);
@@ -1161,8 +1188,9 @@ do_close(struct fdtable *table, int fd)
   if (!test_fdbit(table, table->open_fds, fd)) {
     return -LINUX_EBADF;
   }
-  struct file *file = &table->files[fd - table->start];
-  assert(file);
+  struct file *file = do_get_file(table, fd);
+  if (file == NULL)
+    return -LINUX_EBADF;
   int n = file->ops->close(file);
   clear_fdbit(table, table->open_fds, fd);
   clear_fdbit(table, table->cloexec_fds, fd);
