@@ -24,6 +24,15 @@
 #include <mach-o/dyld.h>
 
 static bool
+is_avx(int instlen, uint64_t rip)
+{
+  uint8_t op;
+  if (copy_from_user(&op, rip, sizeof op))
+    return false;
+  return op == 0xc4 || op == 0xc5;
+}
+
+static bool
 is_syscall(int instlen, uint64_t rip)
 {
   static const ushort OP_SYSCALL = 0x050f;
@@ -131,7 +140,18 @@ main_loop(int return_on_sigret)
             return;
           }
           continue;
-        }
+        } else if (is_avx(instlen, rip)) {
+	  uint64_t xcr0;
+	  vmm_read_register(HV_X86_XCR0, &xcr0);
+	  if ((xcr0 & XCR0_AVX_STATE) == 0) {
+	    uint64_t eax;
+	    asm ("cpuid" : "=a" (eax) : "a" (0x0d), "c" (0));
+	    if (eax & XCR0_AVX_STATE) {
+	      vmm_write_register(HV_X86_XCR0, xcr0 | XCR0_AVX_STATE);
+	      continue;
+	    }
+	  }
+	}
         /* FIXME */
         warnk("invalid opcode! (rip = %p): ", (void *) rip);
         unsigned char inst[instlen];
@@ -310,6 +330,13 @@ init_regs()
 {
   /* set up cpu regs */
   vmm_write_register(HV_X86_RFLAGS, 0x2);
+  uint64_t eax;
+  asm ("cpuid" : "=a" (eax) : "a" (0x0d), "c" (0));
+  if (eax & XCR0_SSE_STATE) {
+    uint64_t xcr0;
+    vmm_read_register(HV_X86_XCR0, &xcr0);
+    vmm_write_register(HV_X86_XCR0, xcr0 | XCR0_SSE_STATE);
+  }
 }
 
 void
