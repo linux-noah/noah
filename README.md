@@ -7,6 +7,7 @@ Noah is a Darwin subsystem for Linux, or "Bash on Ubuntu on Mac OS X". Noah is i
 ## Quick Start
 
 Noah is installed via homebrew. On the first run, noah automatically downloads and installs a comprehensive linux environment in your home directory (by default, ubuntu 16.04 is installed in `~/.noah/tree`).
+macOS Sierra or higher is required.
 
 ```console
 $ brew install linux-noah/noah/noah
