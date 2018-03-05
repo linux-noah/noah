@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.7)
 
-project(noah VERSION 0.5.0)
+project(noah VERSION 0.5.1)
 
 configure_file(bin/noah.in ${PROJECT_SOURCE_DIR}/bin/noah @ONLY)
 configure_file(include/version.h.in ${PROJECT_SOURCE_DIR}/include/version.h)
