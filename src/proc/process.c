@@ -294,11 +294,7 @@ DEFINE_SYSCALL(gettid)
   return do_gettid();
 }
 
-DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
-{
-  struct rlimit rl;
-  struct l_rlimit l_rl;
-
+int linux_to_darwin_rlimopts(int l_resource) {
   int resource = 0;
   switch (l_resource) {
   case LINUX_RLIMIT_CPU: resource = RLIMIT_CPU; break;
@@ -312,6 +308,19 @@ DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
   case LINUX_RLIMIT_MEMLOCK: resource = RLIMIT_MEMLOCK; break;
   case LINUX_RLIMIT_AS: resource = RLIMIT_AS; break;
   }
+  return resource;
+}
+
+DEFINE_SYSCALL(getrlimit, int, l_resource, gaddr_t, rl_ptr)
+{
+  struct rlimit rl;
+  struct l_rlimit l_rl;
+
+  if (l_resource >= LINUX_RLIM_NLIMITS) {
+    return -LINUX_EINVAL;
+  }
+
+  int resource = linux_to_darwin_rlimopts(l_resource);
 
   int r = syswrap(getrlimit(resource, &rl));
   if (r < 0)
