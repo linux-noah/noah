@@ -23,6 +23,16 @@
 
 #include <mach-o/dyld.h>
 
+static int
+get_cpuid_count (unsigned int leaf,
+		 unsigned int subleaf,
+		 unsigned int *eax, unsigned int *ebx,
+		 unsigned int *ecx, unsigned int *edx)
+{
+    __cpuid_count(leaf, subleaf, *eax, *ebx, *ecx, *edx);
+    return 1;
+}
+
 static bool
 is_avx(int instlen, uint64_t rip)
 {
@@ -144,8 +154,8 @@ main_loop(int return_on_sigret)
 	  uint64_t xcr0;
 	  vmm_read_register(HV_X86_XCR0, &xcr0);
 	  if ((xcr0 & XCR0_AVX_STATE) == 0) {
-	    uint64_t eax;
-	    asm ("cpuid" : "=a" (eax) : "a" (0x0d), "c" (0) : "rbx");
+	    unsigned int eax, ebx, ecx, edx;
+	    get_cpuid_count(0x0d, 0x0, &eax, &ebx, &ecx, &edx);
 	    if (eax & XCR0_AVX_STATE) {
 	      vmm_write_register(HV_X86_XCR0, xcr0 | XCR0_AVX_STATE);
 	      continue;
@@ -330,8 +340,8 @@ init_regs()
 {
   /* set up cpu regs */
   vmm_write_register(HV_X86_RFLAGS, 0x2);
-  uint64_t eax;
-  asm ("cpuid" : "=a" (eax) : "a" (0x0d), "c" (0): "rbx");
+  unsigned int eax, ebx, ecx, edx;
+  get_cpuid_count(0x0d, 0x0, &eax, &ebx, &ecx, &edx);
   if (eax & XCR0_SSE_STATE) {
     uint64_t xcr0;
     vmm_read_register(HV_X86_XCR0, &xcr0);
