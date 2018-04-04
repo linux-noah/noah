@@ -119,10 +119,12 @@ alloc_fdtable(struct fdtable *fdtable, int newsize)
   fdtable->cloexec_fds = realloc(fdtable->cloexec_fds, newfdslen);
   if (fdtable->cloexec_fds == NULL)
       return -LINUX_ENOMEM;
+
   int offset = oldsize / 8;
   int size = newfdslen - offset;
-  bzero(fdtable->open_fds + offset, size);
-  bzero(fdtable->cloexec_fds + offset, size);
+
+  bzero(fdtable->open_fds + oldunit, size);
+  bzero(fdtable->cloexec_fds + oldunit, size);
 
   fdtable->size = newsize;
   return 0;
