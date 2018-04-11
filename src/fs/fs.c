@@ -267,6 +267,18 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
     linux_to_darwin_winsize(&ws, &lws);
     return syswrap(ioctl(fd, TIOCSWINSZ, &ws));
   }
+  case LINUX_TCXONC: {
+    int sel;
+    switch(val0) {
+    case LINUX_TCOOFF: sel = TCOOFF; break;
+    case LINUX_TCOON: sel = TCOON; break;
+    case LINUX_TCIOFF: sel = TCIOFF; break;
+    case LINUX_TCION: sel = TCION; break;
+    default:
+      return -LINUX_EINVAL;
+    }
+    return syswrap(tcflow(fd, sel));
+  }
   case LINUX_TCFLSH: {
     int sel;
     switch (val0) {
@@ -277,6 +289,24 @@ darwinfs_ioctl(struct file *file, int cmd, uint64_t val0)
       return -LINUX_EINVAL;
     }
     return syswrap(tcflush(fd, sel));
+  }
+  case LINUX_FIONREAD: {
+    int val;
+    int r = syswrap(ioctl(fd, FIONREAD, &val));
+    if (r < 0) {
+      return r;
+    }
+    if (copy_to_user(val0, &val, sizeof val)) {
+      return -LINUX_EFAULT;
+    }
+    return r;
+  }
+  case LINUX_FIONBIO: {
+    int val;
+    if (copy_from_user(&val, val0, sizeof val)) {
+      return -LINUX_EFAULT;
+    }
+    return syswrap(ioctl(fd, FIONBIO, &val));
   }
   case LINUX_FIOCLEX: {
     pthread_rwlock_wrlock(&proc.fileinfo.fdtable_lock);
