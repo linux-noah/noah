@@ -316,7 +316,7 @@ linux_to_darwin_msg_flags(l_int flags)
   }
 
   if (flags) {
-    warnk("unsupported msg_flags: 0x%x", flags);
+    warnk("unsupported msg_flags: 0x%x\n", flags);
     return -LINUX_EOPNOTSUPP;
   }
 
@@ -378,18 +378,34 @@ do_sendmsg(int sockfd, const struct l_msghdr *msg, int flags)
     if (copy_from_user(hdr.msg_iov[i].iov_base, liov[i].iov_base, hdr.msg_iov[i].iov_len))
       return -LINUX_EFAULT;
   }
-  hdr.msg_flags = linux_to_darwin_msg_flags(msg->msg_flags);
-  if (hdr.msg_flags < 0) {
-    warnk("do_sendmsg: unsupported flags\n");
-    return hdr.msg_flags;
-  }
+
   if (LINUX_CMSG_FIRSTHDR(msg) != 0) {
     warnk("we do not support ancillary data yet\n");
     return -LINUX_EINVAL;
   }
   hdr.msg_control = NULL;
   hdr.msg_controllen = 0;
-  return syswrap(sendmsg(sockfd, &hdr, flags));
+
+  /*
+    On Mac OS X MSG_NOSIGNAL is not supported, so we need to set SO_NOSIGPIPE
+    option on the socket.
+    See https://lists.apple.com/archives/macnetworkprog/2002/Dec/msg00091.html.
+   */
+  int msg_flags = linux_to_darwin_msg_flags(flags & ~LINUX_MSG_NOSIGNAL);
+  if (msg_flags < 0) {
+    warnk("do_sendmsg: unsupported flags\n");
+    return hdr.msg_flags;
+  }
+  if (flags & LINUX_MSG_NOSIGNAL) {
+    int val = 1;
+    int r = syswrap(setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE,
+			       (void*)&val, sizeof(val)));
+    if (r < 0) {
+      return r;
+    }
+  }
+
+  return syswrap(sendmsg(sockfd, &hdr, msg_flags));
 }
 
 DEFINE_SYSCALL(sendmsg, int, sockfd, gaddr_t, msg_ptr, int, flags)
