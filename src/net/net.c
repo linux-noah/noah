@@ -401,7 +401,7 @@ do_sendmsg(int sockfd, const struct l_msghdr *msg, int flags)
     int r = syswrap(setsockopt(sockfd, SOL_SOCKET, SO_NOSIGPIPE,
 			       (void*)&val, sizeof(val)));
     if (r < 0) {
-      return r;
+      panic("Noah cannot set SO_NOSIGPIPE option.");
     }
   }
 
