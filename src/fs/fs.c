@@ -983,7 +983,11 @@ darwinfs_statfs(struct fs *fs, struct dir *dir, const char *path, struct l_statf
   if (dir->fd != AT_FDCWD) {
     path_to_statfs = full_path;
     char at_path[PATH_MAX];
-    assert(fcntl(dir->fd, F_GETPATH, at_path) == 0); // fd must be a regular directory to which fcntl should succeed
+    // fd must be a regular directory to which fcntl should succeed
+    int r = fcntl(dir->fd, F_GETPATH, at_path);
+    if (r != 0) {
+      panic("fcntl failed");
+    }
     if (snprintf(full_path, PATH_MAX, "%s/%s", at_path, path) >= PATH_MAX) {
       return -LINUX_ENAMETOOLONG;
     }
@@ -1504,7 +1508,6 @@ DEFINE_SYSCALL(linkat, int, oldfd, gstr_t, oldpath_ptr, int, newfd, gstr_t, newp
   }
 
   int lkflag = flags & LINUX_AT_SYMLINK_FOLLOW ? 0 : LOOKUP_NOFOLLOW;
-
   struct path oldpath, newpath;
   int r;
   if ((r = vfs_grab_dir(oldfd, oldname, lkflag, &oldpath)) < 0) {
