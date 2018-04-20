@@ -413,11 +413,23 @@ DEFINE_SYSCALL(uname, gaddr_t, buf_ptr)
   return 0;
 }
 
-DEFINE_SYSCALL(prctl, int, option)
+DEFINE_SYSCALL(prctl, int, option, unsigned long, arg1, unsigned long, arg2, unsigned long, arg3, unsigned long, arg4, unsigned long, arg5)
 {
-  /* FIXME */
-  printk("prctl is not implemented yet\n");
-  return -ENOSYS;
+  switch (option) {
+  case LINUX_PR_SET_NAME: {
+    char buf[16];
+    if (copy_from_user(buf, (gaddr_t)arg1, sizeof(buf))) {
+      return -LINUX_EFAULT;
+    }
+    // trancate if the legnth of arg1 exceeds 16byte.
+    buf[15] = '\0';
+    pthread_setname_np(buf);
+    return 0;
+  }
+  default:
+    warnk("unkown prctl cmd: %d\n", option);
+    return -LINUX_EINVAL;
+  }
 }
 
 DEFINE_SYSCALL(arch_prctl, int, code, gaddr_t, addr)
