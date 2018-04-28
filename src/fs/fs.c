@@ -1858,10 +1858,6 @@ DEFINE_SYSCALL(pwrite64, unsigned int, fd, gstr_t, buf_ptr, size_t, count, off_t
   if (r < 0) {
     goto out;
   }
-  if (copy_to_user(buf_ptr, buf, r)) {
-    r = -LINUX_EFAULT;
-    goto out;
-  }
 out:
   free(buf);
   return r;
