@@ -37,9 +37,9 @@
   SYSCALL(33, dup2)                             \
   SYSCALL(34, unimplemented)                    \
   SYSCALL(35, nanosleep)                        \
-  SYSCALL(36, unimplemented)                    \
+  SYSCALL(36, getitimer)                        \
   SYSCALL(37, alarm)                            \
-  SYSCALL(38, unimplemented)                    \
+  SYSCALL(38, setitimer)                        \
   SYSCALL(39, getpid)                           \
   SYSCALL(40, unimplemented)                    \
   SYSCALL(41, socket)                           \
