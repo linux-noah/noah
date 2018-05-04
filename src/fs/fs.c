@@ -1482,6 +1482,14 @@ DEFINE_SYSCALL(unlinkat, int, dirfd, gstr_t, path_ptr, int, flags)
     return r;
   }
   r = path.fs->ops->unlinkat(path.fs, path.dir, path.subpath, flags);
+  if (r == -LINUX_EPERM) {
+    struct l_newstat st;
+    int r2 = path.fs->ops->fstatat(path.fs, path.dir, path.subpath, &st,
+				   LINUX_AT_SYMLINK_NOFOLLOW);
+    if (r2 == 0 && S_ISDIR(st.st_mode)) {
+      r = -LINUX_EISDIR;
+    }
+  }
   vfs_ungrab_dir(&path);
   return r;
 }
