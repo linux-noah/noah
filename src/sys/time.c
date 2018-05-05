@@ -244,6 +244,7 @@ linux_to_darwin_itimerval(const struct l_itimerval* l_val, struct itimerval* d_v
 
 DEFINE_SYSCALL(getitimer, int, which, gaddr_t, ret_ptr) {
   struct itimerval value;
+  // Darwin's which is compatible with that of Linux
   int r = syswrap(getitimer(which, &value));
   if (r < 0) {
     return r;
@@ -267,6 +268,7 @@ DEFINE_SYSCALL(setitimer, int, which, gaddr_t, new_ptr, gaddr_t, old_ptr) {
     return -LINUX_EFAULT;
   }
   linux_to_darwin_itimerval(&l_newvalue, &newvalue);
+  // Darwin's which is compatible with that of Linux
   int r = syswrap(setitimer(which, &newvalue, &oldvalue));
   if (r < 0) {
     return r;
