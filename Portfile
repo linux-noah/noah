@@ -1,0 +1,30 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+
+PortSystem              1.0
+PortGroup               GitHub 1.0
+
+github.setup            linux-noah noah 0.5.1 
+
+PortGroup               cmake 1.0
+cmake.out_of_source     yes
+
+categories              emulators
+maintainers             nomaintainer
+platforms               darwin
+# others do not make sense at this point
+supported_archs         x86_64
+
+description             Linux ABI implementation for OSX
+
+homepage                http://github.com/linux-noah/noah
+
+long_description        Noah is a Darwin subsystem for Linux, or \"Bash on Ubuntu on Mac OS X\". Noah is implemented as a hypervisor that traps linux system calls and translates them into Darwin's system calls. Noah also has an interpreter of ELF files so that binary executables of Linux run directly and flawlessly without any modifications. \
+\
+                        I.e. it's effectively an OSX Linux Execution Flavour, similar to that of FreeBSD Linuxolator, aka Linux Emulation, aka Linux ABI. \
+\
+                        In other words, it's the exact reverse of the Linux Darling project: https://github.com/darlinghq.
+
+license                 Dual MIT/GPL
+
+checksums               rmd160  acfb387976bd21a0b2a02a1490a4ef1891d73103 \
+                        sha256  6a2ecba330aa6b3aacc7a2799f4d4a2fbdb5413dd3a8aa9553d3bcd1a81424c0
