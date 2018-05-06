@@ -21,7 +21,7 @@ First, install a local portfile (see the [macports guide](https://guide.macports
 ```console
 $ mkdir -p ${LOCAL_MACPORTS_ROOT}/emulators/noah
 $ cp Portfile ${LOCAL_MACPORTS_ROOT}/emulators/noah
-$ (cd ${LOCAL_MACPORTS_ROOT}; portindex))
+$ (cd ${LOCAL_MACPORTS_ROOT}; portindex)
 $ sudo port install noah
 $ noah
 ```
