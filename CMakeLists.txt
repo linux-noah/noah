@@ -37,6 +37,7 @@ target_link_libraries(noah pthread "-framework Hypervisor")
 
 install(PROGRAMS bin/noah DESTINATION bin)
 install(TARGETS noah DESTINATION libexec)
+install(FILES man/noah.1 DESTINATION ${CMAKE_INSTALL_PREFIX}/man/man1)
 
 enable_testing()
 add_subdirectory(test)

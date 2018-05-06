@@ -648,10 +648,11 @@ main(int argc, char *argv[], char **envp)
     { "strace", required_argument, NULL, 's'},
     { "warning", required_argument, NULL, 'w'},
     { "mnt", required_argument, NULL, 'm' },
+    { "help", no_argument, NULL, 'h' },
     { 0, 0, 0, 0 }
   };
 
-  while ((c = getopt_long(argc, argv, "+o:w:s:m:", long_options, NULL)) != -1) {
+  while ((c = getopt_long(argc, argv, "+ho:w:s:m:", long_options, NULL)) != -1) {
     switch (c) {
     case 'o':
       strncpy(debug_paths[PRINTK_PATH], optarg, PATH_MAX);
@@ -669,6 +670,10 @@ main(int argc, char *argv[], char **envp)
       }
       argv[optind - 1] = root;
       break;
+    case 'h':
+    default:
+      printf("Usage: noah -h | [-o output] [-w warning] [-s strace] -m /virtual/filesystem/root executable ...\n");
+      exit(0);
     }
   }
 
