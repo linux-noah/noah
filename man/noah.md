@@ -15,7 +15,7 @@ that is normally executed from path, providing _~/.noah/tree_ as the
 virtual root.
 
 On the first invocation the script uses noahstrap(1) to populate this virtual
-root with a default Ubuntu suite, see noastrap-suites(1).
+root with a default Ubuntu suite, see noahstrap-suites(1).
 
 #### Options
 
