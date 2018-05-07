@@ -1678,7 +1678,9 @@ DEFINE_SYSCALL(umask, int, mask)
 
 DEFINE_SYSCALL(mknodat, int, dirfd, gaddr_t, path_ptr, l_mode_t, mode, l_dev_t, dev) {
   char name[LINUX_PATH_MAX];
-  strncpy_from_user(name, path_ptr, sizeof name);
+  if (strncpy_from_user(name, path_ptr, sizeof name) < 0)
+    return -LINUX_EFAULT;
+
   struct path path;
   int r = 0;
   switch(mode & S_IFMT) {
