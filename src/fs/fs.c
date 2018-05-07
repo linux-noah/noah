@@ -1676,6 +1676,32 @@ DEFINE_SYSCALL(umask, int, mask)
   return vfs_umask(mask);
 }
 
+DEFINE_SYSCALL(mknodat, int, dirfd, gaddr_t, path_ptr, l_mode_t, mode, l_dev_t, dev) {
+  char name[LINUX_PATH_MAX];
+  strncpy_from_user(name, path_ptr, sizeof name);
+  struct path path;
+  int r = 0;
+  switch(mode & S_IFMT) {
+  case S_IFIFO: {
+    if ((r = vfs_grab_dir(dirfd, name, 0, &path)) < 0) {
+      goto out;
+    }
+    r = syswrap(mkfifo(path.subpath, mode));
+    break;
+  }
+  default:
+    warnk("unsupported mknod mode: %d", mode);
+    return -LINUX_EINVAL;
+  }
+ out:
+  vfs_ungrab_dir(&path);
+  return r;
+}
+
+DEFINE_SYSCALL(mknod, gaddr_t, path_ptr, l_mode_t, mode, l_dev_t, dev) {
+  return sys_mknodat(LINUX_AT_FDCWD, path_ptr, mode, dev);
+}
+
 
 /* TODO: functions below are not yet ported to the new vfs archtecture. */
 
