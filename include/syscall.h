@@ -134,7 +134,7 @@
   SYSCALL(130, rt_sigsuspend)                   \
   SYSCALL(131, sigaltstack)                     \
   SYSCALL(132, utime)                           \
-  SYSCALL(133, unimplemented)                   \
+  SYSCALL(133, mknod)                           \
   SYSCALL(134, uselib)                          \
   SYSCALL(135, unimplemented)                   \
   SYSCALL(136, unimplemented)                   \
@@ -260,7 +260,7 @@
   SYSCALL(256, unimplemented)                   \
   SYSCALL(257, openat)                          \
   SYSCALL(258, mkdirat)                         \
-  SYSCALL(259, unimplemented)                   \
+  SYSCALL(259, mknodat)                         \
   SYSCALL(260, fchownat)                        \
   SYSCALL(261, unimplemented)                   \
   SYSCALL(262, newfstatat)                      \
