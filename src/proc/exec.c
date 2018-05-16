@@ -400,10 +400,14 @@ do_exec(const char *elf_path, int argc, char *argv[], char **envp)
     return -LINUX_EINVAL;
   }
 
-  prepare_newproc();
-
   /* Now do exec */
   fstat(fd, &st);
+  if (!S_ISREG(st.st_mode)) {
+    vkern_close(fd);
+    return -LINUX_EACCES;
+  }
+
+  prepare_newproc();
 
   data = mmap(0, st.st_size, PROT_READ | PROT_EXEC, MAP_PRIVATE, fd, 0);
 
