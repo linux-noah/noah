@@ -18,8 +18,8 @@ typedef enum {
   PAGE_PML4E,
 } page_type_t;
 
-#define PAGE_SHIFT(page_type)            (12 + (page_type) * 9)
-#define PAGE_SIZEOF(page_type)           (1ULL << PAGE_SHIFT(page_type))
+#define PAGE_SHIFTOF(page_type)          (12 + (page_type) * 9)
+#define PAGE_SIZEOF(page_type)           (1ULL << PAGE_SHIFTOF(page_type))
 #define NR_PAGE_ENTRY                    512
 
 static inline int is_page_aligned(void *addr, page_type_t page)
