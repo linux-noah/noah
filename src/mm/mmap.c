@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <mach/vm_statistics.h>
 #include <pthread.h>
 
 #include <Hypervisor/hv.h>
@@ -76,6 +77,7 @@ linux_to_darwin_mflags(int l_flags)
   if (l_flags & LINUX_MAP_SHARED) d_flags |= MAP_SHARED;
   if (l_flags & LINUX_MAP_PRIVATE) d_flags |= MAP_PRIVATE;
   if (l_flags & LINUX_MAP_ANON) d_flags |= MAP_ANON;
+  if (l_flags & LINUX_MAP_HUGETLB) d_flags |= VM_FLAGS_SUPERPAGE_SIZE_ANY;
   return d_flags;
 }
 
@@ -96,7 +98,7 @@ do_mmap(gaddr_t addr, size_t len, int d_prot, int l_prot, int l_flags, int fd, o
 
   len = roundup(len, PAGE_SIZEOF(PAGE_4KB));
 
-  if ((l_flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON)) != 0) {
+  if ((l_flags & ~(LINUX_MAP_SHARED | LINUX_MAP_PRIVATE | LINUX_MAP_FIXED | LINUX_MAP_ANON | LINUX_MAP_HUGETLB)) != 0) {
     warnk("unsupported mmap l_flags: 0x%x\n", l_flags);
     exit(1);
   }
