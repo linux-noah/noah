@@ -282,7 +282,7 @@ DEFINE_SYSCALL(munlock, gaddr_t, addr, size_t, length)
 DEFINE_SYSCALL(brk, unsigned long, brk)
 {
   uint64_t ret;
-  brk = roundup(brk, PAGE_SIZE(PAGE_4KB));
+  brk = roundup(brk, PAGE_SIZEOF(PAGE_4KB));
 
   pthread_rwlock_wrlock(&proc.mm->alloc_lock);
   if (brk < proc.mm->start_brk) {
