@@ -14,12 +14,41 @@
 #include <ctype.h>
 
 #include <utime.h>
-#include <time.h>
 #include <sys/time.h>
 #include <sys/attr.h>
 #include <sys/stat.h>
 #include <mach/clock.h>
 #include <mach/mach.h>
+
+#if defined(MACOS_PRE_16)
+#include <mach/mach_time.h>
+#define TIMER_ABSTIME -1
+#define CLOCK_REALTIME CALENDAR_CLOCK
+#define CLOCK_MONOTONIC SYSTEM_CLOCK
+#define CLOCK_PROCESS_CPUTIME_ID       2
+#define CLOCK_THREAD_CPUTIME_ID        3
+
+typedef int clockid_t;
+
+int clock_gettime(clockid_t clk_id, struct timespec *t){
+    mach_timebase_info_data_t timebase;
+    mach_timebase_info(&timebase);
+    uint64_t time;
+    time = mach_absolute_time();
+    double nseconds = ((double)time * (double)timebase.numer)/((double)timebase.denom);
+    double seconds = ((double)time * (double)timebase.numer)/((double)timebase.denom * 1e9);
+    t->tv_sec = seconds;
+    t->tv_nsec = nseconds;
+    return 0;
+}
+
+int clock_getres(clockid_t clk_id, struct timespec *t){
+    return 0;
+}
+#else
+#include <time.h>
+#endif
+
 
 DEFINE_SYSCALL(time, gaddr_t, tloc_ptr)
 {
