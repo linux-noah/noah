@@ -47,14 +47,22 @@ DEFINE_SYSCALL(sysinfo, gaddr_t, info_ptr)
   }
   info.freeram = freepages * 0x1000;
 
-  uint64_t swapinfo[4];
+  /*
+   * sysctlbyname() changed in macos 15. Any older os will leave swapinfo[4] as 0.
+   */
+  
+  uint64_t swapinfo[4] = {0};
   len = sizeof swapinfo;
   if (sysctlbyname("vm.swapusage", &swapinfo, &len, NULL, 0) < 0){
     perror("sysinfo:");
     exit(1);
   }
   info.totalswap = swapinfo[0];
-  info.freeswap = swapinfo[1];
+  
+  if(swapinfo[3] == 0)
+    info.freeswap = swapinfo[2];
+  else
+    info.freeswap = swapinfo[1];
 
   /* TODO */
   info.sharedram = 0;
