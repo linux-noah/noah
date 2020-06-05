@@ -32,4 +32,4 @@ See [HACKING.md](HACKING.md).
 
 ## LICENSE
 
-Dual MITL/GPL, for all files without explicit notaiton.
+Dual MITL/GPL, for all files without explicit notation.
